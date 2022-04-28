@@ -1,0 +1,14 @@
+.vs/**
+x64/**
+Debug/**
+Release/**
+lavaBRSARLib/x64/**
+lavaBRSARLib/Debug/**
+lavaBRSARLib/Release/**
+lavaBRSARLib/Junk/**
+lavaBRSARLib/*.sawnd
+lavaBRSARLib/*.brsar
+lavaBRSARLib/*.bak
+lavaBRSARLib/*.dat
+lavaBRSARLib/*.txt
+!**/.gitkeep
