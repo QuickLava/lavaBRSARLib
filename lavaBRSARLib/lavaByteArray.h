@@ -80,26 +80,8 @@ namespace lava
 			if (startIndex + sizeof(objectType) <= body.size())
 			{
 				result = 1;
-				unsigned long long objectProxy = objectIn;
 				unsigned char* startingPtr = ((unsigned char*)body.data()) + startIndex;
-				if (endianIn == endType::et_BIG_ENDIAN)
-				{
-					unsigned long shiftDistance = (sizeof(objectType) - 1) * 8;
-					for (std::size_t i = 0; i < sizeof(objectType); i++)
-					{
-						*(startingPtr + i) = 0x000000FF & (objectProxy >> shiftDistance);
-						shiftDistance -= 8;
-					}
-				}
-				else
-				{
-					unsigned long shiftDistance = 0;
-					for (std::size_t i = 0; i < sizeof(objectType); i++)
-					{
-						*(startingPtr + i) = 0x000000FF & (objectProxy >> shiftDistance);
-						shiftDistance += 8;
-					}
-				}
+				writeFundamentalToBuffer<objectType>(objectIn, startingPtr, endianIn);
 				if (nextIndexOut != nullptr)
 				{
 					*nextIndexOut = startIndex + sizeof(objectType);

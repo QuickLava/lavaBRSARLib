@@ -91,7 +91,6 @@ namespace lava
 	bool writeRawDataToStream(std::ostream& out, const objectType& objectIn, endType endianIn = endType::et_BIG_ENDIAN)
 	{
 		unsigned char tempBuffer[sizeof(objectType)];
-		//unsigned char* addr = tempBuffer;
 		writeFundamentalToBuffer(objectIn, tempBuffer, endianIn);
 		out.write((char*)tempBuffer, sizeof(objectType));
 		return out.good();
