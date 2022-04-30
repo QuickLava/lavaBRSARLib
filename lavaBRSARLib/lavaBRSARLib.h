@@ -46,47 +46,48 @@ namespace lava
 		};
 
 
-		struct brsarSymbMaskEntry
+		struct brsarSymbPTrieNode
 		{
 			unsigned long address = ULONG_MAX;
 
-			unsigned short flags = USHRT_MAX;
-			unsigned short bit = USHRT_MAX;
+			unsigned short isLeaf = USHRT_MAX;
+			unsigned short posAndBit = USHRT_MAX;
 			unsigned long leftID = ULONG_MAX;
 			unsigned long rightID = ULONG_MAX;
 			unsigned long stringID = ULONG_MAX;
-			unsigned long index = ULONG_MAX;
+			unsigned long infoID = ULONG_MAX;
 
 			bool populate(lava::byteArray& bodyIn, unsigned long addressIn);
+			unsigned long getBit();
+			unsigned long getPos();
+			bool compareCharAndBit(char charIn);
 		};
-		struct brsarSymbMaskHeader
+		struct brsarSymbPTrie
 		{
 			unsigned long address = ULONG_MAX;
 
 			unsigned long rootID = ULONG_MAX;
 			unsigned long numEntries = ULONG_MAX;
 
-			std::vector<brsarSymbMaskEntry> entries{};
+			std::vector<brsarSymbPTrieNode> entries{};
 
 			bool populate(lava::byteArray& bodyIn, unsigned long addressIn);
+			brsarSymbPTrieNode findString(std::string stringIn);
 		};
 		struct brsarSymbSection
 		{
 			unsigned long address = ULONG_MAX;
 
-			unsigned long stringOffset = ULONG_MAX;
-			unsigned long soundsOffset = ULONG_MAX;
-			unsigned long typesOffset = ULONG_MAX;
-			unsigned long groupsOffset = ULONG_MAX;
-			unsigned long banksOffset = ULONG_MAX;
+			unsigned long stringListOffset = ULONG_MAX;
 
-			std::vector<unsigned long> stringOffsets{};
-			brsarSymbMaskHeader soundsMaskHeader;
-			brsarSymbMaskHeader typesMaskHeader;
-			brsarSymbMaskHeader groupsMaskHeader;
-			brsarSymbMaskHeader banksMaskHeader;
+			std::vector<unsigned long> trieOffsets{};
+			std::vector<brsarSymbPTrie> tries{};
+
+			std::vector<unsigned long> stringEntryOffsets{};
+			std::vector<unsigned char> stringBlock{};
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			std::string getString(std::size_t idIn);
 		};
 
 

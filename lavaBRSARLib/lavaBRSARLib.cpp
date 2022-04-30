@@ -93,7 +93,7 @@ namespace lava
 
 		/* BRSAR Symb Section */
 
-		bool brsarSymbMaskEntry::populate(lava::byteArray& bodyIn, unsigned long addressIn)
+		bool brsarSymbPTrieNode::populate(lava::byteArray& bodyIn, unsigned long addressIn)
 		{
 			bool result = 0;
 
@@ -101,19 +101,33 @@ namespace lava
 			{
 				address = addressIn;
 
-				flags = bodyIn.getShort(addressIn);
-				bit = bodyIn.getShort(addressIn + 0x02);
+				isLeaf = bodyIn.getShort(addressIn);
+				posAndBit = bodyIn.getShort(addressIn + 0x02);
 				leftID = bodyIn.getLong(address + 0x04);
 				rightID = bodyIn.getLong(address + 0x08);
 				stringID = bodyIn.getLong(address + 0x0C);
-				index = bodyIn.getLong(address + 0x10);
+				infoID = bodyIn.getLong(address + 0x10);
 
 				result = 1;
 			}
 
 			return result;
 		}
-		bool brsarSymbMaskHeader::populate(lava::byteArray& bodyIn, unsigned long addressIn)
+		unsigned long brsarSymbPTrieNode::getBit()
+		{
+			return posAndBit & 0b00000111;
+		}
+		unsigned long brsarSymbPTrieNode::getPos()
+		{
+			return posAndBit >> 3;
+		}
+		bool brsarSymbPTrieNode::compareCharAndBit(char charIn)
+		{
+			unsigned char comparisonTerm = 1 << (7 - getBit());
+			return charIn & comparisonTerm;
+		}
+
+		bool brsarSymbPTrie::populate(lava::byteArray& bodyIn, unsigned long addressIn)
 		{
 			bool result = 0;
 
@@ -143,6 +157,30 @@ namespace lava
 
 			return result;
 		}
+		brsarSymbPTrieNode brsarSymbPTrie::findString(std::string stringIn)
+		{
+			if (rootID < numEntries)
+			{
+				brsarSymbPTrieNode* currentNode = &entries[rootID];
+
+				while (!currentNode->isLeaf)
+				{
+					int pos = currentNode->getPos();
+					int bit = currentNode->getBit();
+					if (pos < stringIn.size() && currentNode->compareCharAndBit(stringIn[pos]))
+					{
+						currentNode = &entries[currentNode->rightID];
+					}
+					else
+					{
+						currentNode = &entries[currentNode->leftID];
+					}
+				}
+
+				return *currentNode;
+			}
+			return brsarSymbPTrieNode();
+		}
 
 		bool brsarSymbSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
@@ -151,31 +189,49 @@ namespace lava
 			if (bodyIn.populated())
 			{
 				address = addressIn;
+				result = 1;
 
-				stringOffset = bodyIn.getLong(address + 0x08);
-				soundsOffset = bodyIn.getLong(address + 0x0C);
-				typesOffset = bodyIn.getLong(address + 0x10);
-				groupsOffset = bodyIn.getLong(address + 0x14);
-				banksOffset = bodyIn.getLong(address + 0x18);
+				stringListOffset = bodyIn.getLong(address + 0x08);
 
-				soundsMaskHeader.populate(bodyIn, address + 0x08 + soundsOffset);
-				typesMaskHeader.populate(bodyIn, address + 0x08 + typesOffset);
-				groupsMaskHeader.populate(bodyIn, address + 0x08 + groupsOffset);
-				banksMaskHeader.populate(bodyIn, address + 0x08 + banksOffset);
-
-				unsigned long cursor = address + 0x08 + stringOffset;
-				stringOffsets.resize(bodyIn.getLong(cursor), ULONG_MAX);
-				cursor += 0x04;
-				for (std::size_t i = 0; i < stringOffsets.size(); i++)
+				for (unsigned long i = 0x04; i < stringListOffset; i += 0x04)
 				{
-					stringOffsets[i] = bodyIn.getLong(cursor);
-					cursor += 0x04;
+					trieOffsets.push_back(bodyIn.getLong(address + 0x8 + i));
+					tries.push_back(brsarSymbPTrie());
+					result &= tries.back().populate(bodyIn, address + 0x08 + trieOffsets.back());
 				}
 
-				result = 1;
+				unsigned long cursor = address + 0x08 + stringListOffset;
+				stringEntryOffsets.resize(bodyIn.getLong(cursor), ULONG_MAX);
+				cursor += 0x04;
+				for (std::size_t i = 0; i < stringEntryOffsets.size(); i++)
+				{
+					stringEntryOffsets[i] = bodyIn.getLong(cursor);
+					cursor += 0x04;
+				}
+				if (stringEntryOffsets.size())
+				{
+					unsigned long stringBlockStartAddr = address + 0x08 + stringEntryOffsets.front();
+					unsigned long stringBlockEndAddr = address + 0x08 + trieOffsets.front();
+					if (stringBlockStartAddr < stringBlockEndAddr)
+					{
+						std::size_t numGotten = SIZE_MAX;
+						stringBlock = bodyIn.getBytes(stringBlockEndAddr - stringBlockStartAddr, stringBlockStartAddr, numGotten);
+					}
+				}
 			}
 			return result;
 		}
+		std::string brsarSymbSection::getString(std::size_t idIn)
+		{
+			std::string result = "";
+			if (idIn < stringEntryOffsets.size())
+			{
+				unsigned long stringAddr = (stringEntryOffsets[idIn] - stringEntryOffsets.front());
+				result = (char*)(stringBlock.data() + stringAddr);
+			}
+			return result;
+		}
+
 
 		/* BRSAR Symb Section */
 
@@ -1145,9 +1201,9 @@ namespace lava
 
 			if (contents.populated())
 			{
-				if (indexIn < symbSection.stringOffsets.size())
+				if (indexIn < symbSection.stringEntryOffsets.size())
 				{
-					char* ptr = contents.body.data() + symbSection.address + 0x08 + symbSection.stringOffsets[indexIn];
+					char* ptr = contents.body.data() + symbSection.address + 0x08 + symbSection.stringEntryOffsets[indexIn];
 					result = std::string(ptr);
 				}
 			}
@@ -1162,10 +1218,10 @@ namespace lava
 			{
 				unsigned long stringOffset = ULONG_MAX;
 				unsigned long stringAddress = ULONG_MAX;
-				unsigned long stringOffsetAddress = symbSection.address + 0x08 + symbSection.stringOffset + 0x04;
-				for (std::size_t i = 0; i < symbSection.stringOffsets.size(); i++)
+				unsigned long stringOffsetAddress = symbSection.address + 0x08 + symbSection.stringListOffset + 0x04;
+				for (std::size_t i = 0; i < symbSection.stringEntryOffsets.size(); i++)
 				{
-					stringOffset = symbSection.stringOffsets[i];
+					stringOffset = symbSection.stringEntryOffsets[i];
 					stringAddress = symbSection.address + stringOffset + 0x08;
 					char* ptr = contents.body.data() + stringAddress;
 					output << "[0x" << lava::numToHexStringWithPadding(i, 4) << "] 0x" << lava::numToHexStringWithPadding(stringOffsetAddress, 4) << "->0x" << lava::numToHexStringWithPadding(stringAddress, 4) << ": " << ptr << "\n";

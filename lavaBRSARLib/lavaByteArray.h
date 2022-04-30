@@ -9,7 +9,6 @@
 
 namespace lava
 {
-
 	template<endType defaultEndian = endType::et_BIG_ENDIAN>
 	struct _byteArray
 	{
