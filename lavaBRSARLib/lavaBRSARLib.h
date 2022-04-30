@@ -7,7 +7,7 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.0.1";
+		const std::string version = "v0.0.5";
 		enum brsarHexTags
 		{
 			bht_RSAR = 0x52534152,
