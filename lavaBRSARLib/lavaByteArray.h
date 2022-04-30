@@ -5,16 +5,10 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include "lavaUtility.h"
 
 namespace lava
 {
-	enum class endType
-	{
-		et_BIG_ENDIAN = 0,
-		et_LITTLE_ENDIAN,
-		endTypeCount
-	};
-
 
 	template<endType defaultEndian = endType::et_BIG_ENDIAN>
 	struct _byteArray
@@ -37,69 +31,12 @@ namespace lava
 		// https://www.cplusplus.com/reference/type_traits/is_fundamental/
 
 		template<typename objectType>
-		std::vector<unsigned char> neoFundamentalToBytes(objectType& objectIn, endType endianIn = defaultEndian) const
-		{
-			std::vector<unsigned char> result(sizeof(objectType), 0x00);
-			unsigned long long objectProxy = objectIn;
-			if (endianIn == endType::et_BIG_ENDIAN)
-			{
-				unsigned long shiftDistance = (sizeof(objectType) - 1) * 8;
-				for (std::size_t i = 0; i < sizeof(objectType); i++)
-				{
-					result[i] = 0x000000FF & (objectProxy >> shiftDistance);
-					shiftDistance -= 8;
-				}
-			}
-			else
-			{
-				unsigned long shiftDistance = 0;
-				for (std::size_t i = 0; i < sizeof(objectType); i++)
-				{
-					result[i] = 0x000000FF & (objectProxy >> shiftDistance);
-					shiftDistance += 8;
-				}
-			}
-			return result;
-		}
-		template<typename objectType>
-		objectType neoBytesToFundamental(const unsigned char* bytesIn, endType endianIn = defaultEndian) const
-		{
-			objectType result = 0;
-			if (endianIn == endType::et_BIG_ENDIAN)
-			{
-				for (std::size_t i = 0; i < sizeof(objectType); i++)
-				{
-					result |= *bytesIn;
-					if (i < (sizeof(objectType) - 1))
-					{
-						bytesIn++;
-						result = result << 0x08;
-					}
-				}
-			}
-			else
-			{
-				bytesIn += sizeof(objectType) - 1;
-				for (std::size_t i = 0; i < sizeof(objectType); i++)
-				{
-					result |= *bytesIn;
-					if (i < (sizeof(objectType) - 1))
-					{
-						bytesIn--;
-						result = result << 0x08;
-					}
-				}
-			}
-			return result;
-		}
-
-		template<typename objectType>
 		objectType getFundamental(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian) const
 		{
 			objectType result = ULLONG_MAX;
 			if ((startIndex + sizeof(objectType)) <= body.size())
 			{
-				result = neoBytesToFundamental<objectType>(((unsigned char*)body.data()) + startIndex, endianIn);
+				result = bytesToFundamental<objectType>(((unsigned char*)body.data()) + startIndex, endianIn);
 				if (nextIndexOut != nullptr)
 				{
 					*nextIndexOut = startIndex + sizeof(objectType);
@@ -218,7 +155,7 @@ namespace lava
 			std::size_t result = SIZE_MAX;
 			if (startItr < body.size())
 			{
-				result = search(neoFundamentalToBytes(objectIn, endianIn), startItr, endItr);
+				result = search(lava::fundamentalToBytes(objectIn, endianIn), startItr, endItr);
 			}
 			return result;
 		}
@@ -229,7 +166,7 @@ namespace lava
 			std::vector<std::size_t> result{};
 			if (startItr < body.size())
 			{
-				result = searchMultiple(neoFundamentalToBytes(objectIn, endianIn), startItr, endItr);
+				result = searchMultiple(lava::fundamentalToBytes(objectIn, endianIn), startItr, endItr);
 			}
 			return result;
 		}
@@ -306,7 +243,7 @@ namespace lava
 			unsigned long long tempRes = getLLong(startIndex, nextIndexOut, endianIn);
 			return *(double*)(&tempRes);
 		}
-		float getFloat(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian) const
+		float getFloat(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian, float* floatOut = nullptr) const
 		{
 			unsigned long tempRes = getLong(startIndex, nextIndexOut, endianIn);
 			return *(float*)(&tempRes);
@@ -365,7 +302,7 @@ namespace lava
 		}
 		bool setFloat(float valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian)
 		{
-			unsigned long tempVal = *(unsigned long*)(&valueIn);
+			unsigned long tempVal = *((unsigned long*)(&valueIn));
 			return setFundamental<unsigned long>(tempVal, atIndex, nextIndexOut, endianIn);
 		}
 
@@ -516,6 +453,38 @@ namespace lava
 	typedef _byteArray<endType::et_BIG_ENDIAN> byteArray;
 	// Byte Array (Little Endian Default)
 	typedef _byteArray<endType::et_LITTLE_ENDIAN> byteArray_LE;
+
+	// Old Testing Stuff
+	/*const std::string testFileName = "testFile";
+	const std::string testFileSuffix = ".dat";
+	const std::string testFilePath = testFileName + testFileSuffix;
+	const std::string testFileOutputPath = testFileName + "_edit" + testFileSuffix;
+	int makeTestFile()
+	{
+		std::ofstream testFileOut(testFilePath, std::ios_base::out | std::ios_base::binary);
+		for (std::size_t i = 0; i < USHRT_MAX; i++)
+		{
+			lava::writeRawDataToStream(testFileOut, i | (i << 0x10));
+		}
+		return 0;
+	}
+	int unitTest()
+	{
+		makeTestFile();
+		lava::byteArray testFile;
+		std::ifstream testFileIn(testFilePath, std::ios_base::in | std::ios_base::binary);
+		testFile.populate(testFileIn);
+		testFileIn.close();
+
+		std::size_t cursor = 0x00;
+		while (cursor < testFile.body.size())
+		{
+			double temp = testFile.getDouble(cursor, nullptr);
+			testFile.setDouble(temp, cursor, &cursor);
+		}
+		testFile.dumpToFile(testFileOutputPath);
+		return 0;
+	}*/
 }
 
 #endif
