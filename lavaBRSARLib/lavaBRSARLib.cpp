@@ -8,13 +8,17 @@ namespace lava
 
 		brawlReference::brawlReference(unsigned long long valueIn)
 		{
-			isOffset = bool(valueIn & 0xFFFFFFFF00000000);
+			addressType = valueIn >> 0x20;
 			address = valueIn & 0x00000000FFFFFFFF;
+		}
+		bool brawlReference::isOffset()
+		{
+			return addressType & 0x01000000;
 		}
 		unsigned long brawlReference::getAddress(unsigned long relativeToIn)
 		{
 			unsigned long result = address;
-			if (isOffset)
+			if (isOffset())
 			{
 				if (relativeToIn != ULONG_MAX)
 				{
@@ -29,11 +33,7 @@ namespace lava
 		}
 		unsigned long long brawlReference::getHex()
 		{
-			unsigned long long result = address;
-			if (isOffset)
-			{
-				result |= 0x0100000000000000;
-			}
+			unsigned long long result = address | (unsigned long long(addressType) << 0x20);
 			return result;
 		}
 
@@ -113,6 +113,22 @@ namespace lava
 
 			return result;
 		}
+		bool brsarSymbPTrieNode::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, isLeaf);
+				lava::writeRawDataToStream(destinationStream, posAndBit);
+				lava::writeRawDataToStream(destinationStream, leftID);
+				lava::writeRawDataToStream(destinationStream, rightID);
+				lava::writeRawDataToStream(destinationStream, stringID);
+				lava::writeRawDataToStream(destinationStream, infoID);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
 		unsigned long brsarSymbPTrieNode::getBit()
 		{
 			return posAndBit & 0b00000111;
@@ -151,10 +167,26 @@ namespace lava
 					i++;
 				}
 
-
 				result = 1;
 			}
 
+			return result;
+		}
+		bool brsarSymbPTrie::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, rootID);
+				lava::writeRawDataToStream(destinationStream, numEntries);
+
+				for (std::size_t i = 0; i < numEntries; i++)
+				{
+					entries[i].exportContents(destinationStream);
+				}
+
+				result = destinationStream.good();
+			}
 			return result;
 		}
 		brsarSymbPTrieNode brsarSymbPTrie::findString(std::string stringIn)
@@ -188,9 +220,10 @@ namespace lava
 
 			if (bodyIn.populated())
 			{
-				address = addressIn;
 				result = 1;
+				address = addressIn;
 
+				length = bodyIn.getLong(address + 0x04);
 				stringListOffset = bodyIn.getLong(address + 0x08);
 
 				for (unsigned long i = 0x04; i < stringListOffset; i += 0x04)
@@ -221,6 +254,42 @@ namespace lava
 			}
 			return result;
 		}
+		bool brsarSymbSection::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				result = 1;
+
+				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_SYMB);
+				lava::writeRawDataToStream(destinationStream, length);
+				lava::writeRawDataToStream(destinationStream, stringListOffset);
+				for (std::size_t i = 0; i < trieOffsets.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, trieOffsets[i]);
+				}
+				lava::writeRawDataToStream(destinationStream, stringEntryOffsets.size());
+				for (std::size_t i = 0; i < stringEntryOffsets.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, stringEntryOffsets[i]);
+				}
+				destinationStream.write((char*)stringBlock.data(), stringBlock.size());
+				for (std::size_t i = 0; i < tries.size(); i++)
+				{
+					result &= tries[i].exportContents(destinationStream);
+				}
+
+				unsigned long finalStreamPos = destinationStream.tellp();
+				if (length > finalStreamPos)
+				{
+					std::vector<char> finalPadding(length - finalStreamPos, 0x00);
+					destinationStream.write(finalPadding.data(), finalPadding.size());
+				}
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
 		std::string brsarSymbSection::getString(std::size_t idIn)
 		{
 			std::string result = "";
@@ -232,12 +301,161 @@ namespace lava
 			return result;
 		}
 
-
 		/* BRSAR Symb Section */
 
 
 
 		/* BRSAR Info Section */
+
+		bool brsarInfo3DSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				address = addressIn;
+
+				std::size_t cursor = address;
+				flags = bodyIn.getLong(cursor, &cursor);
+				decayCurve = bodyIn.getChar(cursor, &cursor);
+				decayRatio = bodyIn.getChar(cursor, &cursor);
+				dopplerFactor = bodyIn.getChar(cursor, &cursor);
+				padding = bodyIn.getChar(cursor, &cursor);
+				reserved = bodyIn.getLong(cursor, &cursor);
+			}
+
+			return result;
+		}
+		bool brsarInfo3DSoundInfo::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, flags);
+				lava::writeRawDataToStream(destinationStream, decayCurve);
+				lava::writeRawDataToStream(destinationStream, decayRatio);
+				lava::writeRawDataToStream(destinationStream, dopplerFactor);
+				lava::writeRawDataToStream(destinationStream, padding);
+				lava::writeRawDataToStream(destinationStream, reserved);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		bool brsarInfoSequenceSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				address = addressIn;
+
+				std::size_t cursor = address;
+				dataID = bodyIn.getLong(cursor, &cursor);
+				bankID = bodyIn.getLong(cursor, &cursor);
+				allocTrack = bodyIn.getLong(cursor, &cursor);
+				channelPriority = bodyIn.getChar(cursor, &cursor);
+				releasePriorityFix = bodyIn.getChar(cursor, &cursor);
+				pad1 = bodyIn.getChar(cursor, &cursor);
+				pad2 = bodyIn.getChar(cursor, &cursor);
+				reserved = bodyIn.getLong(cursor, &cursor);
+			}
+
+			return result;
+		}
+		bool brsarInfoSequenceSoundInfo::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, dataID);
+				lava::writeRawDataToStream(destinationStream, bankID);
+				lava::writeRawDataToStream(destinationStream, allocTrack);
+				lava::writeRawDataToStream(destinationStream, channelPriority);
+				lava::writeRawDataToStream(destinationStream, releasePriorityFix);
+				lava::writeRawDataToStream(destinationStream, pad1);
+				lava::writeRawDataToStream(destinationStream, pad2);
+				lava::writeRawDataToStream(destinationStream, reserved);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		bool brsarInfoStreamSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				address = addressIn;
+
+				std::size_t cursor = address;
+				startPosition = bodyIn.getLong(cursor, &cursor);
+				allocChannelCount = bodyIn.getShort(cursor, &cursor);
+				allocTrackFlag = bodyIn.getShort(cursor, &cursor);
+				reserved = bodyIn.getLong(cursor, &cursor);
+			}
+
+			return result;
+		}
+		bool brsarInfoStreamSoundInfo::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, startPosition);
+				lava::writeRawDataToStream(destinationStream, allocChannelCount);
+				lava::writeRawDataToStream(destinationStream, allocTrackFlag);
+				lava::writeRawDataToStream(destinationStream, reserved);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		bool brsarInfoWaveSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				address = addressIn;
+
+				std::size_t cursor = address;
+				soundIndex = bodyIn.getLong(cursor, &cursor);
+				allocTrack = bodyIn.getLong(cursor, &cursor);
+				channelPriority = bodyIn.getChar(cursor, &cursor);
+				releasePriorityFix = bodyIn.getChar(cursor, &cursor);
+				pad1 = bodyIn.getChar(cursor, &cursor);
+				pad2 = bodyIn.getChar(cursor, &cursor);
+				reserved = bodyIn.getLong(cursor, &cursor);
+			}
+
+			return result;
+		}
+		bool brsarInfoWaveSoundInfo::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, soundIndex);
+				lava::writeRawDataToStream(destinationStream, allocTrack);
+				lava::writeRawDataToStream(destinationStream, channelPriority);
+				lava::writeRawDataToStream(destinationStream, releasePriorityFix);
+				lava::writeRawDataToStream(destinationStream, pad1);
+				lava::writeRawDataToStream(destinationStream, pad2);
+				lava::writeRawDataToStream(destinationStream, reserved);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
 
 		bool brsarInfoSoundEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
@@ -245,17 +463,18 @@ namespace lava
 
 			if (bodyIn.populated())
 			{
+				result = 1;
 				address = addressIn;
 
 				stringID = bodyIn.getLong(address);
 				fileID = bodyIn.getLong(address + 0x04);
 				playerID = bodyIn.getLong(address + 0x08);
-				param3DRefOffset = brawlReference(address + 0x0C);
+				param3DRefOffset = brawlReference(bodyIn.getLLong(address + 0x0C));
 				volume = bodyIn.getChar(address + 0x14);
 				playerPriority = bodyIn.getChar(address + 0x15);
 				soundType = bodyIn.getChar(address + 0x16);
 				remoteFilter = bodyIn.getChar(address + 0x17);
-				soundInfoRef = brawlReference(address + 0x18);
+				soundInfoRef = brawlReference(bodyIn.getLLong(address + 0x18));
 				userParam1 = bodyIn.getLong(address + 0x20);
 				userParam2 = bodyIn.getLong(address + 0x24);
 				panMode = bodyIn.getChar(address + 0x28);
@@ -266,6 +485,121 @@ namespace lava
 
 			return result;
 		}
+		bool brsarInfoSoundEntry::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, stringID);
+				lava::writeRawDataToStream(destinationStream, fileID);
+				lava::writeRawDataToStream(destinationStream, playerID);
+				lava::writeRawDataToStream(destinationStream, param3DRefOffset.getHex());
+				lava::writeRawDataToStream(destinationStream, volume);
+				lava::writeRawDataToStream(destinationStream, playerPriority);
+				lava::writeRawDataToStream(destinationStream, soundType);
+				lava::writeRawDataToStream(destinationStream, remoteFilter);
+				lava::writeRawDataToStream(destinationStream, soundInfoRef.getHex());
+				lava::writeRawDataToStream(destinationStream, userParam1);
+				lava::writeRawDataToStream(destinationStream, userParam2);
+				lava::writeRawDataToStream(destinationStream, panMode);
+				lava::writeRawDataToStream(destinationStream, panCurve);
+				lava::writeRawDataToStream(destinationStream, actorPlayerID);
+				lava::writeRawDataToStream(destinationStream, reserved);
+				switch (soundType)
+				{
+					case sit_SEQUENCE:
+					{
+						seqSoundInfo.exportContents(destinationStream);
+						break;
+					}
+					case sit_STREAM:
+					{
+						streamSoundInfo.exportContents(destinationStream);
+						break;
+					}
+					case sit_WAVE:
+					{
+						waveSoundInfo.exportContents(destinationStream);
+						break;
+					}
+					default:
+					{
+						break;
+					}
+				}
+				sound3DInfo.exportContents(destinationStream);
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		bool brsarInfoBankEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				address = addressIn;
+
+				std::size_t cursor = address;
+				stringID = bodyIn.getLong(cursor, &cursor);
+				fileID = bodyIn.getLong(cursor, &cursor);
+				padding = bodyIn.getLong(cursor, &cursor);
+			}
+
+			return result;
+		}
+		bool brsarInfoBankEntry::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, stringID);
+				lava::writeRawDataToStream(destinationStream, fileID);
+				lava::writeRawDataToStream(destinationStream, padding);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		bool brsarInfoPlayerEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				address = addressIn;
+
+				std::size_t cursor = address;
+				stringID = bodyIn.getLong(cursor, &cursor);
+				playableSoundCount = bodyIn.getChar(cursor, &cursor);
+				padding = bodyIn.getChar(cursor, &cursor);
+				padding2 = bodyIn.getShort(cursor, &cursor);
+				heapSize = bodyIn.getLong(cursor, &cursor);
+				reserved = bodyIn.getLong(cursor, &cursor);
+			}
+
+			return result;
+		}
+		bool brsarInfoPlayerEntry::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, stringID);
+				lava::writeRawDataToStream(destinationStream, playableSoundCount);
+				lava::writeRawDataToStream(destinationStream, padding);
+				lava::writeRawDataToStream(destinationStream, padding2);
+				lava::writeRawDataToStream(destinationStream, heapSize);
+				lava::writeRawDataToStream(destinationStream, reserved);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
 
 		bool brsarInfoFileEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
@@ -273,6 +607,7 @@ namespace lava
 
 			if (bodyIn.populated())
 			{
+				result = 1;
 				address = addressIn;
 
 				groupID = bodyIn.getLong(address);
@@ -281,12 +616,25 @@ namespace lava
 
 			return result;
 		}
+		bool brsarInfoFileEntry::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, groupID);
+				lava::writeRawDataToStream(destinationStream, index);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
 		bool brsarInfoFileHeader::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
+				result = 1;
 				address = addressIn;
 
 				headerLength = bodyIn.getLong(address);
@@ -296,6 +644,27 @@ namespace lava
 				listOffset = brawlReference(bodyIn.getLLong(address + 0x14));
 			}
 
+			return result;
+		}
+		bool brsarInfoFileHeader::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				result = 1;
+				lava::writeRawDataToStream(destinationStream, headerLength);
+				lava::writeRawDataToStream(destinationStream, dataLength);
+				lava::writeRawDataToStream(destinationStream, entryNumber);
+				lava::writeRawDataToStream(destinationStream, stringOffset.getHex());
+				lava::writeRawDataToStream(destinationStream, listOffset.getHex());
+				destinationStream.write((char*)stringContent.data(), stringContent.size());
+				result &= entryReferenceList.exportContents(destinationStream);
+				for (std::size_t i = 0; i < entries.size(); i++)
+				{
+					result &= entries[i].exportContents(destinationStream);
+				}
+				result &= destinationStream.good();
+			}
 			return result;
 		}
 
@@ -362,6 +731,7 @@ namespace lava
 			bool result = 0;
 			if (destinationStream.good())
 			{
+				result = 1;
 				lava::writeRawDataToStream(destinationStream, stringID);
 				lava::writeRawDataToStream(destinationStream, entryNum);
 				lava::writeRawDataToStream(destinationStream, extFilePathRef.getHex());
@@ -370,80 +740,214 @@ namespace lava
 				lava::writeRawDataToStream(destinationStream, waveDataOffset);
 				lava::writeRawDataToStream(destinationStream, waveDataLength);
 				lava::writeRawDataToStream(destinationStream, listOffset.getHex());
-
-				result = destinationStream.good();
+				result &= entryReferenceList.exportContents(destinationStream);
+				for (std::size_t i = 0; i < entries.size(); i++)
+				{
+					result &= entries[i].exportContents(destinationStream);
+				}
+				result &= destinationStream.good();
 			}
 			return result;
 		}
 
-		std::vector<brsarInfoFileHeader*> brsarInfoSection::findFilesWithGroupID(lava::byteArray& bodyIn, unsigned long groupIDIn)
+		std::vector<brsarInfoFileHeader*> brsarInfoSection::findFilesWithGroupID(unsigned long groupIDIn)
 		{
 			std::vector<brsarInfoFileHeader*> result{};
 
-			if (bodyIn.populated())
+			brsarInfoFileHeader* currHeader = nullptr;
+			for (std::size_t i = 0; i < fileHeaders.size(); i++)
 			{
-				brsarInfoFileHeader* currHeader = nullptr;
-				for (std::size_t i = 0; i < fileHeaders.size(); i++)
+				currHeader = &fileHeaders[i];
+				for (std::size_t u = 0; u < currHeader->entries.size(); u++)
 				{
-					currHeader = &fileHeaders[i];
-					for (std::size_t u = 0; u < currHeader->entries.size(); u++)
+					if (currHeader->entries[u].groupID == groupIDIn)
 					{
-						if (currHeader->entries[u].groupID == groupIDIn)
-						{
-							result.push_back(currHeader);
-						}
+						result.push_back(currHeader);
 					}
 				}
 			}
 
 			return result;
 		}
-
 		bool brsarInfoSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
+				result = 1;
 				address = addressIn;
 
+				length = bodyIn.getLong(address + 0x04);
 				soundsSectionReference = brawlReference(bodyIn.getLLong(address + 0x08));
 				banksSectionReference = brawlReference(bodyIn.getLLong(address + 0x10));
 				playerSectionReference = brawlReference(bodyIn.getLLong(address + 0x18));
 				filesSectionReference = brawlReference(bodyIn.getLLong(address + 0x20));
 				groupsSectionReference = brawlReference(bodyIn.getLLong(address + 0x28));
+				footerReference = brawlReference(bodyIn.getLLong(address + 0x30));
 
-				soundsSection.populate(bodyIn, soundsSectionReference.getAddress(address + 0x08));
-				banksSection.populate(bodyIn, banksSectionReference.getAddress(address + 0x08));
-				playerSection.populate(bodyIn, playerSectionReference.getAddress(address + 0x08));
-				filesSection.populate(bodyIn, filesSectionReference.getAddress(address + 0x08));
-				groupsSection.populate(bodyIn, groupsSectionReference.getAddress(address + 0x08));
+				result &= soundsSection.populate(bodyIn, soundsSectionReference.getAddress(address + 0x08));
+				result &= banksSection.populate(bodyIn, banksSectionReference.getAddress(address + 0x08));
+				result &= playerSection.populate(bodyIn, playerSectionReference.getAddress(address + 0x08));
+				result &= filesSection.populate(bodyIn, filesSectionReference.getAddress(address + 0x08));
+				result &= groupsSection.populate(bodyIn, groupsSectionReference.getAddress(address + 0x08));
 
+				brsarInfoSoundEntry* currSoundEntry = nullptr;
 				soundEntries.resize(soundsSection.refs.size());
 				for (std::size_t i = 0; i < soundsSection.refs.size(); i++)
 				{
-					soundEntries[i].populate(bodyIn, soundsSection.refs[i].getAddress(address + 0x08));
-				}
-
-				fileHeaders.resize(filesSection.refs.size());
-				brsarInfoFileHeader* currHeader = nullptr;
-				for (std::size_t i = 0; i < filesSection.refs.size(); i++)
-				{
-					currHeader = &fileHeaders[i];
-					currHeader->populate(bodyIn, filesSection.refs[i].getAddress(address + 0x08));
-					brawlReferenceVector temp;
-					temp.populate(bodyIn, currHeader->listOffset.getAddress(address + 0x08));
-
-					for (std::size_t u = 0; u < temp.refs.size(); u++)
+					currSoundEntry = &soundEntries[i];
+					result &= currSoundEntry->populate(bodyIn, soundsSection.refs[i].getAddress(address + 0x08));
+					currSoundEntry->sound3DInfo.populate(bodyIn, currSoundEntry->param3DRefOffset.getAddress(address + 0x08));
+					switch (currSoundEntry->soundType)
 					{
-						currHeader->entries.push_back(brsarInfoFileEntry());
-						currHeader->entries.back().populate(bodyIn, temp.refs[u].getAddress(address + 0x08));
+						case sit_SEQUENCE:
+						{
+							currSoundEntry->seqSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
+							break;
+						}
+						case sit_STREAM:
+						{
+							currSoundEntry->streamSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
+							break;
+						}
+						case sit_WAVE:
+						{
+							currSoundEntry->waveSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
+							break;
+						}
+						default:
+						{
+							break;
+						}
 					}
 				}
 
-				result = 1;
+				bankEntries.resize(banksSection.refs.size());
+				for (std::size_t i = 0; i < banksSection.refs.size(); i++)
+				{
+					result &= bankEntries[i].populate(bodyIn, banksSection.refs[i].getAddress(address + 0x08));
+				}
+
+				playerEntries.resize(playerSection.refs.size());
+				for (std::size_t i = 0; i < playerSection.refs.size(); i++)
+				{
+					result &= playerEntries[i].populate(bodyIn, playerSection.refs[i].getAddress(address + 0x08));
+				}
+
+				fileHeaders.resize(filesSection.refs.size());
+				brsarInfoFileHeader* currFileHeader = nullptr;
+				for (std::size_t i = 0; i < filesSection.refs.size(); i++)
+				{
+					currFileHeader = &fileHeaders[i];
+					currFileHeader->populate(bodyIn, filesSection.refs[i].getAddress(address + 0x08));
+					if (currFileHeader->stringOffset.getAddress() != 0x00)
+					{
+						std::size_t numGotten = SIZE_MAX;
+						std::string measurementString = bodyIn.body.data() + (currFileHeader->stringOffset.getAddress(address + 0x08));
+						std::size_t sizePrescription = measurementString.size() + (0x04 - (measurementString.size() % 0x04));
+						currFileHeader->stringContent = bodyIn.getBytes(sizePrescription, currFileHeader->stringOffset.getAddress(address + 0x08), numGotten);
+						result &= numGotten == sizePrescription;
+					}
+					if (currFileHeader->listOffset.getAddress() != 0x00)
+					{
+						result &= currFileHeader->entryReferenceList.populate(bodyIn, currFileHeader->listOffset.getAddress(address + 0x08));
+						for (std::size_t u = 0; u < currFileHeader->entryReferenceList.refs.size(); u++)
+						{
+							currFileHeader->entries.push_back(brsarInfoFileEntry());
+							result &= currFileHeader->entries.back().populate(bodyIn, currFileHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
+						}
+					}
+				}
+
+				groupHeaders.resize(groupsSection.refs.size());
+				brsarInfoGroupHeader* currGroupHeader = nullptr;
+				for (std::size_t i = 0; i < groupsSection.refs.size(); i++)
+				{
+					currGroupHeader = &groupHeaders[i];
+					currGroupHeader->populate(bodyIn, groupsSection.refs[i].getAddress(address + 0x08));
+					result &= currGroupHeader->entryReferenceList.populate(bodyIn, currGroupHeader->listOffset.getAddress(address + 0x08));
+
+					for (std::size_t u = 0; u < currGroupHeader->entryReferenceList.refs.size(); u++)
+					{
+						currGroupHeader->entries.push_back(brsarInfoGroupEntry());
+						result &= currGroupHeader->entries.back().populate(bodyIn, currGroupHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
+					}
+				}
+
+				std::size_t cursor = footerReference.getAddress(address + 0x08);
+				sequenceMax = bodyIn.getShort(cursor, &cursor);
+				sequenceTrackMax = bodyIn.getShort(cursor, &cursor);
+				streamMax = bodyIn.getShort(cursor, &cursor);
+				streamTrackMax = bodyIn.getShort(cursor, &cursor);
+				streamChannelsMax = bodyIn.getShort(cursor, &cursor);
+				waveMax = bodyIn.getShort(cursor, &cursor);
+				waveTrackMax = bodyIn.getShort(cursor, &cursor);
+				padding = bodyIn.getShort(cursor, &cursor);
+				reserved = bodyIn.getLong(cursor, &cursor);
 			}
 
+			return result;
+		}
+		bool brsarInfoSection::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_INFO);
+				lava::writeRawDataToStream(destinationStream, length);
+				lava::writeRawDataToStream(destinationStream, soundsSectionReference.getHex());
+				lava::writeRawDataToStream(destinationStream, banksSectionReference.getHex());
+				lava::writeRawDataToStream(destinationStream, playerSectionReference.getHex());
+				lava::writeRawDataToStream(destinationStream, filesSectionReference.getHex());
+				lava::writeRawDataToStream(destinationStream, groupsSectionReference.getHex());
+				lava::writeRawDataToStream(destinationStream, footerReference.getHex());
+				soundsSection.exportContents(destinationStream);
+				for (std::size_t i = 0; i < soundEntries.size(); i++)
+				{
+					soundEntries[i].exportContents(destinationStream);
+				}
+				banksSection.exportContents(destinationStream);
+				for (std::size_t i = 0; i < bankEntries.size(); i++)
+				{
+					bankEntries[i].exportContents(destinationStream);
+				}
+				playerSection.exportContents(destinationStream);
+				for (std::size_t i = 0; i < playerEntries.size(); i++)
+				{
+					playerEntries[i].exportContents(destinationStream);
+				}
+				filesSection.exportContents(destinationStream);
+				for (std::size_t i = 0; i < fileHeaders.size(); i++)
+				{
+					fileHeaders[i].exportContents(destinationStream);
+				}
+				groupsSection.exportContents(destinationStream);
+				for (std::size_t i = 0; i < groupHeaders.size(); i++)
+				{
+					groupHeaders[i].exportContents(destinationStream);
+				}
+				unsigned long pos = destinationStream.tellp();
+
+				lava::writeRawDataToStream(destinationStream, sequenceMax);
+				lava::writeRawDataToStream(destinationStream, sequenceTrackMax);
+				lava::writeRawDataToStream(destinationStream, streamMax);
+				lava::writeRawDataToStream(destinationStream, streamTrackMax);
+				lava::writeRawDataToStream(destinationStream, streamChannelsMax);
+				lava::writeRawDataToStream(destinationStream, waveMax);
+				lava::writeRawDataToStream(destinationStream, waveTrackMax);
+				lava::writeRawDataToStream(destinationStream, padding);
+				lava::writeRawDataToStream(destinationStream, reserved);
+
+				unsigned long finalStreamPos = destinationStream.tellp();
+				if (length > finalStreamPos)
+				{
+					std::vector<char> finalPadding(length - finalStreamPos, 0x00);
+					destinationStream.write(finalPadding.data(), finalPadding.size());
+				}
+
+				result = destinationStream.good();
+			}
 			return result;
 		}
 
@@ -1197,18 +1701,7 @@ namespace lava
 
 		std::string brsarFile::getSymbString(unsigned long indexIn)
 		{
-			std::string result = "";
-
-			if (contents.populated())
-			{
-				if (indexIn < symbSection.stringEntryOffsets.size())
-				{
-					char* ptr = contents.body.data() + symbSection.address + 0x08 + symbSection.stringEntryOffsets[indexIn];
-					result = std::string(ptr);
-				}
-			}
-
-			return result;
+			return symbSection.getString(indexIn);
 		}
 		bool brsarFile::summarizeSymbStringData(std::ostream& output)
 		{
