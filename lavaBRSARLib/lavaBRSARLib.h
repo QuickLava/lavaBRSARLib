@@ -1,22 +1,31 @@
 #ifndef LAVA_BRSAR_LIBRARY_V1
 #define LAVA_BRSAR_LIBRARY_V1
 
+#include <unordered_map>
+#include <filesystem>
 #include "lavaByteArray.h"
+#include "md5.h"
 
 namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.1.0";
+		const std::string version = "v0.2.0";
+		const std::string targetBrsarName = "smashbros_sound";
+		const std::string tempFileDumpBaseFolder = targetBrsarName + "/";
+
 		enum brsarHexTags
 		{
+			// File Sections
+			bht_RSAR = 0x52534152,
 			bht_SYMB = 0x53594D42,
 			bht_INFO = 0x494E464F,
 			bht_FILE = 0x46494C45,
-			bht_RSAR = 0x52534152,
+			// FILE Section Types
 			bht_RWSD = 0x52575344,
 			bht_RBNK = 0x52424E4B,
 			bht_RSEQ = 0x52534551,
+			bht_RWAR = 0x52574152,
 		};
 		enum brsarAddressConsts
 		{
@@ -24,7 +33,7 @@ namespace lava
 		};
 		enum brsarErrorReturnCodes
 		{
-			bERC_OVERWRITE_SOUND_SHARED_WAVE = 0xFFA00000,
+			berc_OVERWRITE_SOUND_SHARED_WAVE = 0xFFA00000,
 		};
 		enum soundInfoTypes
 		{
@@ -54,7 +63,6 @@ namespace lava
 			std::vector<unsigned long> getHex();
 			bool exportContents(std::ostream& destinationStream);
 		};
-
 
 		struct brsarSymbPTrieNode
 		{
@@ -94,10 +102,20 @@ namespace lava
 
 			unsigned long length = ULONG_MAX;
 			unsigned long stringListOffset = ULONG_MAX;
-
-			std::vector<unsigned long> trieOffsets{};
 			std::vector<unsigned long> stringEntryOffsets{};
-			std::vector<brsarSymbPTrie> tries{};
+
+			/*std::vector<unsigned long> trieOffsets{};
+			std::vector<brsarSymbPTrie> tries{};*/
+
+			unsigned long soundTrieOffset;
+			unsigned long playerTrieOffset;
+			unsigned long groupTrieOffset;
+			unsigned long bankTrieOffset;
+
+			brsarSymbPTrie soundTrie;
+			brsarSymbPTrie playerTrie;
+			brsarSymbPTrie groupTrie;
+			brsarSymbPTrie bankTrie;
 
 			std::vector<unsigned char> stringBlock{};
 
@@ -267,10 +285,10 @@ namespace lava
 			unsigned long stringID = ULONG_MAX;
 			unsigned long entryNum = ULONG_MAX;
 			brawlReference extFilePathRef = ULLONG_MAX;
-			unsigned long headerOffset = ULONG_MAX;
+			unsigned long headerAddress = ULONG_MAX;
 			unsigned long headerLength = ULONG_MAX;
-			unsigned long waveDataOffset = ULONG_MAX;
-			unsigned long waveDataLength = ULONG_MAX;
+			unsigned long dataAddress = ULONG_MAX;
+			unsigned long dataLength = ULONG_MAX;
 			brawlReference listOffset = ULLONG_MAX;
 			lava::brawl::brawlReferenceVector entryReferenceList;
 			std::vector<brsarInfoGroupEntry> entries;
@@ -487,13 +505,23 @@ namespace lava
 			bool exportContents(std::ostream& destinationStream);
 		};
 
+		struct brsarFileFileContents
+		{
+			unsigned long groupID = ULONG_MAX;
+			unsigned long fileID = ULONG_MAX;
+			std::size_t address = SIZE_MAX;
+			std::vector<unsigned char> header{};
+			std::vector<unsigned char> data{};
+		};
 		struct brsarFileSection
 		{
 			unsigned long address = ULONG_MAX;
 
 			unsigned long length = ULONG_MAX;
+			std::vector<brsarFileFileContents> neoFileContents{};
+			std::unordered_map<unsigned long, std::vector<std::size_t>> fileIDToIndex{};
 
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			bool populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
 		};
 
 		struct brsarFile
@@ -512,6 +540,7 @@ namespace lava
 
 			unsigned long getGroupOffset(unsigned long groupIDIn);
 
+			bool doFileDump(std::string dumpRootFolder = tempFileDumpBaseFolder, bool joinHeaderAndData = 0);
 			bool exportSawnd(std::size_t groupID, std::string targetFilePath);
 		};
 	}

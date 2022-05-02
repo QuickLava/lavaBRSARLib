@@ -2,6 +2,9 @@
 
 namespace lava
 {
+
+
+	
 	std::string stringToUpper(const std::string& stringIn)
 	{
 		std::string result = stringIn;
@@ -34,5 +37,107 @@ namespace lava
 			result = std::string(paddingLength - result.size(), '0') + result;
 		}
 		return result;
+	}
+	std::string doubleToStringWithPadding(double dblIn, unsigned long paddingLength, unsigned long precisionIn)
+	{
+		std::string result = "";
+
+		std::ostringstream out;
+		out.precision(precisionIn);
+		out << std::fixed << dblIn;
+		result = out.str();
+		if (result.size() < paddingLength)
+		{
+			result = std::string(paddingLength - result.size(), '0') + result;
+		}
+
+		return result;
+	}
+	std::string floatToStringWithPadding(float fltIn, unsigned long paddingLength, unsigned long precisionIn)
+	{
+		return doubleToStringWithPadding(fltIn, paddingLength, precisionIn);
+	}
+	std::string numberToOrdinal(unsigned int numberIn)
+	{
+		std::string result = std::to_string(numberIn);
+		numberIn = numberIn % 100;
+		if (numberIn >= 10 && numberIn < 20)
+		{
+			result += "th";
+		}
+		else
+		{
+			switch (numberIn % 10)
+			{
+				case 1:
+				{
+					result += "st";
+					break;
+				}
+				case 2:
+				{
+					result += "nd";
+					break;
+				}
+				case 3:
+				{
+					result += "rd";
+					break;
+				}
+				default:
+				{
+					result += "th";
+					break;
+				}
+			}
+		}
+		return result;
+	}
+
+	double bytesToHigherBytes(long long int bytesIn, char byteLevel)
+	{
+		if (byteLevel == CHAR_MAX)
+		{
+			byteLevel = log(bytesIn) / 10;
+		}
+		for (int i = byteLevel; i > 1; i--)
+		{
+			bytesIn = bytesIn >> 10;
+			byteLevel--;
+		}
+		return (byteLevel > 0) ? double(bytesIn) / 1024 : bytesIn;
+	}
+	std::string bytesToFileSizeString(long long int bytesIn, char byteLevel, bool abbrv)
+	{
+		static std::vector<std::string> byteLevelDictionary{};
+		if (byteLevelDictionary.empty())
+		{
+			byteLevelDictionary.resize(byteLevels::_count, " ");
+			byteLevelDictionary[byteLevels::BYT] = "";
+			byteLevelDictionary[byteLevels::KILO] = "kilo";
+			byteLevelDictionary[byteLevels::MEGA] = "mega";
+			byteLevelDictionary[byteLevels::GIGA] = "giga";
+			byteLevelDictionary[byteLevels::TERA] = "tera";
+			byteLevelDictionary[byteLevels::PETA] = "peta";
+			byteLevelDictionary[byteLevels::EXA] = "exa";
+			byteLevelDictionary[byteLevels::ZETTA] = "zetta";
+			byteLevelDictionary[byteLevels::YOTTA] = "yotta";
+		}
+
+		std::string temp = "";
+		if (byteLevel == CHAR_MAX)
+		{
+			byteLevel = log2(bytesIn) / 10;
+		}
+		temp = lava::doubleToStringWithPadding(bytesToHigherBytes(std::max(0ll, bytesIn - 1), byteLevel), 0x02) + " ";
+		if (abbrv)
+		{
+			temp += ((byteLevel) ? std::string(1, std::toupper(byteLevelDictionary[byteLevel][0])) : "") + "B";
+		}
+		else
+		{
+			temp += byteLevelDictionary[byteLevel] + "bytes";
+		}
+		return temp;
 	}
 }

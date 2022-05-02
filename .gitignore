@@ -6,6 +6,7 @@ lavaBRSARLib/x64/**
 lavaBRSARLib/Debug/**
 lavaBRSARLib/Release/**
 lavaBRSARLib/Junk/**
+lavaBRSARLib/filedump/**
 lavaBRSARLib/*.sawnd
 lavaBRSARLib/*.brsar
 lavaBRSARLib/*.bak

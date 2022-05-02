@@ -223,15 +223,27 @@ namespace lava
 				result = 1;
 				address = addressIn;
 
-				length = bodyIn.getLong(address + 0x04);
-				stringListOffset = bodyIn.getLong(address + 0x08);
+				std::size_t cursor1 = address + 0x04;
 
-				for (unsigned long i = 0x04; i < stringListOffset; i += 0x04)
+				length = bodyIn.getLong(cursor1, &cursor1);
+				stringListOffset = bodyIn.getLong(cursor1, &cursor1);
+
+				soundTrieOffset = bodyIn.getLong(cursor1, &cursor1);
+				playerTrieOffset = bodyIn.getLong(cursor1, &cursor1);
+				groupTrieOffset = bodyIn.getLong(cursor1, &cursor1);
+				bankTrieOffset = bodyIn.getLong(cursor1, &cursor1);
+
+				result &= soundTrie.populate(bodyIn, address + 0x08 + soundTrieOffset);
+				result &= playerTrie.populate(bodyIn, address + 0x08 + playerTrieOffset);
+				result &= groupTrie.populate(bodyIn, address + 0x08 + groupTrieOffset);
+				result &= bankTrie.populate(bodyIn, address + 0x08 + bankTrieOffset);
+
+				/*for (unsigned long i = 0x04; i < stringListOffset; i += 0x04)
 				{
 					trieOffsets.push_back(bodyIn.getLong(address + 0x8 + i));
 					tries.push_back(brsarSymbPTrie());
 					result &= tries.back().populate(bodyIn, address + 0x08 + trieOffsets.back());
-				}
+				}*/
 
 				unsigned long cursor = address + 0x08 + stringListOffset;
 				stringEntryOffsets.resize(bodyIn.getLong(cursor), ULONG_MAX);
@@ -244,7 +256,7 @@ namespace lava
 				if (stringEntryOffsets.size())
 				{
 					unsigned long stringBlockStartAddr = address + 0x08 + stringEntryOffsets.front();
-					unsigned long stringBlockEndAddr = address + 0x08 + trieOffsets.front();
+					unsigned long stringBlockEndAddr = address + 0x08 + soundTrieOffset;
 					if (stringBlockStartAddr < stringBlockEndAddr)
 					{
 						std::size_t numGotten = SIZE_MAX;
@@ -264,20 +276,32 @@ namespace lava
 				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_SYMB);
 				lava::writeRawDataToStream(destinationStream, length);
 				lava::writeRawDataToStream(destinationStream, stringListOffset);
-				for (std::size_t i = 0; i < trieOffsets.size(); i++)
+				lava::writeRawDataToStream(destinationStream, soundTrieOffset);
+				lava::writeRawDataToStream(destinationStream, playerTrieOffset);
+				lava::writeRawDataToStream(destinationStream, groupTrieOffset);
+				lava::writeRawDataToStream(destinationStream, bankTrieOffset);
+
+				/*for (std::size_t i = 0; i < trieOffsets.size(); i++)
 				{
 					lava::writeRawDataToStream(destinationStream, trieOffsets[i]);
-				}
+				}*/
+
 				lava::writeRawDataToStream(destinationStream, stringEntryOffsets.size());
 				for (std::size_t i = 0; i < stringEntryOffsets.size(); i++)
 				{
 					lava::writeRawDataToStream(destinationStream, stringEntryOffsets[i]);
 				}
 				destinationStream.write((char*)stringBlock.data(), stringBlock.size());
-				for (std::size_t i = 0; i < tries.size(); i++)
+
+				soundTrie.exportContents(destinationStream);
+				playerTrie.exportContents(destinationStream);
+				groupTrie.exportContents(destinationStream);
+				bankTrie.exportContents(destinationStream);
+
+				/*for (std::size_t i = 0; i < tries.size(); i++)
 				{
 					result &= tries[i].exportContents(destinationStream);
-				}
+				}*/
 
 				unsigned long finalStreamPos = destinationStream.tellp();
 				if (length > finalStreamPos)
@@ -286,7 +310,7 @@ namespace lava
 					destinationStream.write(finalPadding.data(), finalPadding.size());
 				}
 
-				result = destinationStream.good();
+				result &= destinationStream.good();
 			}
 			return result;
 		}
@@ -715,10 +739,10 @@ namespace lava
 				stringID = bodyIn.getLong(address);
 				entryNum = bodyIn.getLong(address + 0x04);
 				extFilePathRef = brawlReference(bodyIn.getLLong(address + 0x08));
-				headerOffset = bodyIn.getLong(address + 0x10);
+				headerAddress = bodyIn.getLong(address + 0x10);
 				headerLength = bodyIn.getLong(address + 0x14);
-				waveDataOffset = bodyIn.getLong(address + 0x18);
-				waveDataLength = bodyIn.getLong(address + 0x1C);
+				dataAddress = bodyIn.getLong(address + 0x18);
+				dataLength = bodyIn.getLong(address + 0x1C);
 				listOffset = brawlReference(bodyIn.getLLong(address + 0x20));
 
 				result = 1;
@@ -735,10 +759,10 @@ namespace lava
 				lava::writeRawDataToStream(destinationStream, stringID);
 				lava::writeRawDataToStream(destinationStream, entryNum);
 				lava::writeRawDataToStream(destinationStream, extFilePathRef.getHex());
-				lava::writeRawDataToStream(destinationStream, headerOffset);
+				lava::writeRawDataToStream(destinationStream, headerAddress);
 				lava::writeRawDataToStream(destinationStream, headerLength);
-				lava::writeRawDataToStream(destinationStream, waveDataOffset);
-				lava::writeRawDataToStream(destinationStream, waveDataLength);
+				lava::writeRawDataToStream(destinationStream, dataAddress);
+				lava::writeRawDataToStream(destinationStream, dataLength);
 				lava::writeRawDataToStream(destinationStream, listOffset.getHex());
 				result &= entryReferenceList.exportContents(destinationStream);
 				for (std::size_t i = 0; i < entries.size(); i++)
@@ -1554,7 +1578,7 @@ namespace lava
 					}
 					else
 					{
-						changeInWaveDataSize = brsarErrorReturnCodes::bERC_OVERWRITE_SOUND_SHARED_WAVE;
+						changeInWaveDataSize = brsarErrorReturnCodes::berc_OVERWRITE_SOUND_SHARED_WAVE;
 					}
 				}
 			}
@@ -1608,7 +1632,7 @@ namespace lava
 						}
 						else
 						{
-							changeInWaveDataSize = brsarErrorReturnCodes::bERC_OVERWRITE_SOUND_SHARED_WAVE;
+							changeInWaveDataSize = brsarErrorReturnCodes::berc_OVERWRITE_SOUND_SHARED_WAVE;
 						}
 					}
 					else
@@ -1659,7 +1683,7 @@ namespace lava
 		}
 		/* RWSD */
 
-		bool brsarFileSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		bool brsarFileSection::populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn)
 		{
 			bool result = 0;
 
@@ -1668,6 +1692,24 @@ namespace lava
 				address = addressIn;
 
 				length = bodyIn.getLong(address + 0x04);
+				brsarInfoGroupHeader* currHeader = nullptr;
+				brsarInfoGroupEntry* currEntry = nullptr;
+				for (std::size_t i = 0; i < infoSectionIn.groupHeaders.size(); i++)
+				{
+					currHeader = &infoSectionIn.groupHeaders[i];
+					for (std::size_t u = 0; u < currHeader->entries.size(); u++)
+					{
+						currEntry = &currHeader->entries[u];
+						std::size_t numGotten = ULONG_MAX;
+						neoFileContents.push_back(brsarFileFileContents());
+						neoFileContents.back().fileID = currEntry->fileID;
+						neoFileContents.back().groupID = currHeader->stringID;
+						neoFileContents.back().address = currHeader->headerAddress + currEntry->headerOffset;
+						neoFileContents.back().header = bodyIn.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset, numGotten);
+						neoFileContents.back().data = bodyIn.getBytes(currEntry->dataLength, currHeader->dataAddress + currEntry->dataOffset, numGotten);
+						fileIDToIndex[currEntry->fileID].push_back(neoFileContents.size() - 1);
+					}
+				}
 
 				result = 1;
 			}
@@ -1694,7 +1736,7 @@ namespace lava
 				fileIn.close();
 				result &= symbSection.populate(contents, contents.getLong(0x10));
 				result &= infoSection.populate(contents, contents.getLong(0x18));
-				result &= fileSection.populate(contents, contents.getLong(0x20));
+				result &= fileSection.populate(contents, contents.getLong(0x20), infoSection);
 			}
 			return result;
 		}
@@ -1767,7 +1809,147 @@ namespace lava
 
 			return result;
 		}
+		bool brsarFile::doFileDump(std::string dumpRootFolder, bool joinHeaderAndData)
+		{
+			bool result = 0;
 
+			std::filesystem::create_directories(dumpRootFolder);
+			brsarInfoGroupHeader* currHeader = nullptr;
+			brsarInfoGroupEntry* currEntry = nullptr;
+			std::ofstream metadataOutput(dumpRootFolder + "summary.txt");
+			metadataOutput << "lavaBRSARLib " << version << "\n\n";
+			metadataOutput << "BRSAR File Dump Summary:\n";
+			MD5 md5Object;
+			for (std::size_t i = 0; i < infoSection.groupHeaders.size(); i++)
+			{
+				currHeader = &infoSection.groupHeaders[i];
+				std::string groupName = symbSection.getString(currHeader->stringID);
+				if (groupName.size() == 0x00)
+				{
+					groupName = "[NAMELESS]";
+				}
+				std::string groupFolder = dumpRootFolder + groupName + "/";
+				std::filesystem::create_directory(groupFolder);
+				metadataOutput << "File(s) in \"" << groupName << "\" (ID: " 
+					<< lava::numToDecStringWithPadding(currHeader->stringID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(currHeader->stringID, 0x03) << ")...\n";
+				for (std::size_t u = 0; u < currHeader->entries.size(); u++)
+				{
+					currEntry = &currHeader->entries[u];
+					std::vector<std::size_t>* idToIndexVecPtr = &fileSection.fileIDToIndex[currEntry->fileID];
+					std::string fileBaseName = lava::numToDecStringWithPadding(currEntry->fileID, 0x03) + "_(0x" + lava::numToHexStringWithPadding(currEntry->fileID, 0x03) + ")";
+					bool entryExported = 0;
+					std::size_t y = 0;
+					while(!entryExported)
+					{
+						brsarFileFileContents* fileContentsPtr = &fileSection.neoFileContents[(*idToIndexVecPtr)[y]];
+						if (fileContentsPtr->groupID == currHeader->stringID)
+						{
+							metadataOutput << "\tFile " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << lava::numToHexStringWithPadding(fileContentsPtr->address, 0x08) << ")\n";
+							metadataOutput << "\t\tFile Type: ";
+							if (fileContentsPtr->header.size() >= 0x04)
+							{
+								metadataOutput << fileContentsPtr->header[0] << fileContentsPtr->header[1] << fileContentsPtr->header[2] << fileContentsPtr->header[3] << "\n";
+							}
+							else
+							{
+								metadataOutput << "----\n";
+							}
+							metadataOutput << "\t\tHeader Size: " << bytesToFileSizeString(fileContentsPtr->header.size()) << "\n";
+							metadataOutput << "\t\tData Size: " << bytesToFileSizeString(fileContentsPtr->data.size()) << "\n";
+							metadataOutput << "\t\tTotal Size: " << bytesToFileSizeString(fileContentsPtr->header.size() + fileContentsPtr->data.size()) << "\n";
+							metadataOutput << "\t\tNumber Times File Occurs in BRSAR: " << idToIndexVecPtr->size() << "\n";
+							metadataOutput << "\t\tNumber of Current Occurence: " << numberToOrdinal(y + 1) << " (Suffixed with \"_" << std::string(1, 'A' + y) << "\")\n";
+							metadataOutput << "\t\tHeader MD5 Hash: " << md5Object((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size()) << "\n";
+							metadataOutput << "\t\tData MD5 Hash: " << md5Object((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size()) << "\n";
+
+							std::string headerFilename = "";
+							std::string dataFilename = "";
+							headerFilename += "_" + std::string(1, 'A' + y);
+							dataFilename += "_" + std::string(1, 'A' + y);
+							if (joinHeaderAndData)
+							{
+								headerFilename += "_joined.dat";
+								std::ofstream headerOutput(groupFolder + fileBaseName + headerFilename, std::ios_base::out | std::ios_base::binary);
+								if (headerOutput.is_open())
+								{
+									headerOutput.write((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size());
+									headerOutput.write((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size());
+									headerOutput.close();
+								}
+							}
+							else
+							{
+								headerFilename += "_header.dat";
+								dataFilename += "_data.dat";
+								std::ofstream headerOutput(groupFolder + fileBaseName + headerFilename, std::ios_base::out | std::ios_base::binary);
+								if (headerOutput.is_open())
+								{
+									headerOutput.write((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size());
+									headerOutput.close();
+								}
+								std::ofstream dataOutput(groupFolder + fileBaseName + dataFilename, std::ios_base::out | std::ios_base::binary);
+								if (dataOutput.is_open())
+								{
+									dataOutput.write((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size());
+									dataOutput.close();
+								}
+							}
+							entryExported = 1;
+						}
+						y++;
+					}
+				}
+			}
+
+			/*for (auto i : fileSection.fileIDToIndex)
+			{
+				std::string newBaseFolder = dumpRootFolder + "File_" + lava::numToDecStringWithPadding(i.first, 0x03) + "_(0x" + lava::numToHexStringWithPadding(i.first, 0x03) + ")/";
+				std::vector<std::size_t>* idToIndexVecPtr = &i.second;
+				std::filesystem::create_directory(newBaseFolder);
+				for (std::size_t y = 0; y < idToIndexVecPtr->size(); y++)
+				{
+					brsarFileFileContents* fileContentsPtr = &fileSection.neoFileContents[(*idToIndexVecPtr)[y]];
+					std::string headerFilename = "";
+					std::string dataFilename = "";
+					headerFilename += symbSection.getString(fileContentsPtr->groupID) + "_";
+					dataFilename += symbSection.getString(fileContentsPtr->groupID) + "_";
+					if (joinHeaderAndData)
+					{
+						headerFilename += "file.dat";
+						std::ofstream headerOutput(newBaseFolder + headerFilename, std::ios_base::out | std::ios_base::binary);
+						if (headerOutput.is_open())
+						{
+							headerOutput.write((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size());
+							headerOutput.write((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size());
+							headerOutput.close();
+						}
+					}
+					else
+					{
+						headerFilename += "header.dat";
+						dataFilename += "data.dat";
+						std::ofstream headerOutput(newBaseFolder + headerFilename, std::ios_base::out | std::ios_base::binary);
+						if (headerOutput.is_open())
+						{
+							headerOutput.write((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size());
+							headerOutput.close();
+						}
+						std::ofstream dataOutput(newBaseFolder + dataFilename, std::ios_base::out | std::ios_base::binary);
+						if (dataOutput.is_open())
+						{
+							dataOutput.write((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size());
+							dataOutput.close();
+						}
+					}
+					if (!outputPotentialDupes)
+					{
+						break;
+					}
+				}
+			}*/
+
+			return result = 1;
+		}
 		bool brsarFile::exportSawnd(std::size_t groupID, std::string targetFilePath)
 		{
 			bool result = 0;
@@ -1786,14 +1968,14 @@ namespace lava
 					targetGroup.populate(contents, groupOffset);
 
 					std::cout << "Address: 0x" << lava::numToHexStringWithPadding(targetGroup.address, 8) << "\n";
-					std::cout << "Header: Offset = 0x" << lava::numToHexStringWithPadding(targetGroup.headerOffset, 8) <<
+					std::cout << "Header: Offset = 0x" << lava::numToHexStringWithPadding(targetGroup.headerAddress, 8) <<
 						", Length = 0x" << lava::numToHexStringWithPadding(targetGroup.headerLength, 8) << " bytes\n";
-					std::cout << "Wave Data: Offset = 0x" << lava::numToHexStringWithPadding(targetGroup.waveDataOffset, 8) <<
-						", Length = 0x" << lava::numToHexStringWithPadding(targetGroup.waveDataLength, 8) << " bytes\n";
+					std::cout << "Wave Data: Offset = 0x" << lava::numToHexStringWithPadding(targetGroup.dataAddress, 8) <<
+						", Length = 0x" << lava::numToHexStringWithPadding(targetGroup.dataLength, 8) << " bytes\n";
 
 					sawndOutput.put(2);
 					lava::writeRawDataToStream(sawndOutput, groupID);
-					lava::writeRawDataToStream(sawndOutput, targetGroup.waveDataLength);
+					lava::writeRawDataToStream(sawndOutput, targetGroup.dataLength);
 
 					std::size_t collectionRefListAddress = targetGroup.listOffset.getAddress(infoSection.address + 0x08);
 					brawlReferenceVector collectionReferences;
@@ -1823,8 +2005,8 @@ namespace lava
 						lava::writeRawDataToStream(sawndOutput, currEntry->dataLength);
 					}
 
-					std::cout << "Total Size:" << targetGroup.headerLength + targetGroup.waveDataLength << "\n";
-					sawndOutput.write(contents.body.data() + targetGroup.headerOffset, targetGroup.headerLength + targetGroup.waveDataLength);
+					std::cout << "Total Size:" << targetGroup.headerLength + targetGroup.dataLength << "\n";
+					sawndOutput.write(contents.body.data() + targetGroup.headerAddress, targetGroup.headerLength + targetGroup.dataLength);
 				}
 				else
 				{
