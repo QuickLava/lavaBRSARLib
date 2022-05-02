@@ -186,15 +186,15 @@ namespace lava
 
 		std::vector<unsigned char> getBytes(std::size_t numToGet, std::size_t startIndex, std::size_t& numGot) const
 		{
-			std::size_t numGotten = 0;
+			numGot = ULONG_MAX;
 			if (startIndex < body.size())
 			{
 				if (startIndex + numToGet > body.size())
 				{
-					numGotten = body.size() - startIndex;
+					numGot = body.size() - startIndex;
 					return std::vector<unsigned char>(body.begin() + startIndex, body.end());
 				}
-				numGotten = numToGet;
+				numGot = numToGet;
 				return std::vector<unsigned char>(body.begin() + startIndex, body.begin() + startIndex + numToGet);
 			}
 			else
