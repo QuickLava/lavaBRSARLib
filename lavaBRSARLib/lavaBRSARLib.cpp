@@ -1844,7 +1844,7 @@ namespace lava
 						brsarFileFileContents* fileContentsPtr = &fileSection.neoFileContents[(*idToIndexVecPtr)[y]];
 						if (fileContentsPtr->groupID == currHeader->stringID)
 						{
-							metadataOutput << "\tFile " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << lava::numToHexStringWithPadding(fileContentsPtr->address, 0x08) << ")\n";
+							metadataOutput << "\tFile " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << lava::numToHexStringWithPadding(fileContentsPtr->address, 0x08) << "\n";
 							metadataOutput << "\t\tFile Type: ";
 							if (fileContentsPtr->header.size() >= 0x04)
 							{
