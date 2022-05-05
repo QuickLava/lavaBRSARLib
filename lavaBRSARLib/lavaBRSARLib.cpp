@@ -113,7 +113,7 @@ namespace lava
 
 			return result;
 		}
-		bool brsarSymbPTrieNode::exportContents(std::ostream& destinationStream)
+		bool brsarSymbPTrieNode::exportContents(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 			if (destinationStream.good())
@@ -129,15 +129,15 @@ namespace lava
 			}
 			return result;
 		}
-		unsigned long brsarSymbPTrieNode::getBit()
+		unsigned long brsarSymbPTrieNode::getBit() const
 		{
 			return posAndBit & 0b00000111;
 		}
-		unsigned long brsarSymbPTrieNode::getPos()
+		unsigned long brsarSymbPTrieNode::getPos() const
 		{
 			return posAndBit >> 3;
 		}
-		bool brsarSymbPTrieNode::compareCharAndBit(char charIn)
+		bool brsarSymbPTrieNode::compareCharAndBit(char charIn) const
 		{
 			unsigned char comparisonTerm = 1 << (7 - getBit());
 			return charIn & comparisonTerm;
@@ -172,7 +172,7 @@ namespace lava
 
 			return result;
 		}
-		bool brsarSymbPTrie::exportContents(std::ostream& destinationStream)
+		bool brsarSymbPTrie::exportContents(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 			if (destinationStream.good())
@@ -189,11 +189,11 @@ namespace lava
 			}
 			return result;
 		}
-		brsarSymbPTrieNode brsarSymbPTrie::findString(std::string stringIn)
+		brsarSymbPTrieNode brsarSymbPTrie::findString(std::string stringIn) const
 		{
 			if (rootID < numEntries)
 			{
-				brsarSymbPTrieNode* currentNode = &entries[rootID];
+				const brsarSymbPTrieNode* currentNode = &entries[rootID];
 
 				while (!currentNode->isLeaf)
 				{
@@ -266,7 +266,7 @@ namespace lava
 			}
 			return result;
 		}
-		bool brsarSymbSection::exportContents(std::ostream& destinationStream)
+		bool brsarSymbSection::exportContents(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 			if (destinationStream.good())
@@ -314,7 +314,7 @@ namespace lava
 			}
 			return result;
 		}
-		std::string brsarSymbSection::getString(std::size_t idIn)
+		std::string brsarSymbSection::getString(std::size_t idIn) const
 		{
 			std::string result = "";
 			if (idIn < stringEntryOffsets.size())
@@ -322,6 +322,40 @@ namespace lava
 				unsigned long stringAddr = (stringEntryOffsets[idIn] - stringEntryOffsets.front());
 				result = (char*)(stringBlock.data() + stringAddr);
 			}
+			return result;
+		}
+		bool brsarSymbSection::dumpTrieStrings(std::ostream& destinationStream, const brsarSymbPTrie& sourceTrie) const
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				for (std::size_t i = 0; i < sourceTrie.entries.size(); i++)
+				{
+					const brsarSymbPTrieNode* currNode = &sourceTrie.entries[i];
+					if (currNode->isLeaf)
+					{
+						destinationStream << "[StrID: 0x" << lava::numToHexStringWithPadding(currNode->stringID, 0x04) << ", InfoID: 0x" << lava::numToHexStringWithPadding(currNode->infoID, 0x04) << "] " << getString(currNode->stringID) << "\n";
+					}
+				}
+				result = destinationStream.good();
+			}
+
+			return result;
+		}
+		bool brsarSymbSection::dumpStrings(std::ostream& destinationStream) const
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				dumpTrieStrings(destinationStream, playerTrie);
+				dumpTrieStrings(destinationStream, groupTrie);
+				dumpTrieStrings(destinationStream, bankTrie);
+				dumpTrieStrings(destinationStream, soundTrie);
+				result = destinationStream.good();
+			}
+
 			return result;
 		}
 
@@ -1724,7 +1758,7 @@ namespace lava
 
 		/* BRSAR */
 
-		bool brsarFile::init(std::string filePathIn)
+		bool brsar::init(std::string filePathIn)
 		{
 			bool result = 0;
 			std::ifstream fileIn;
@@ -1742,13 +1776,13 @@ namespace lava
 			return result;
 		}
 
-		std::string brsarFile::getSymbString(unsigned long indexIn)
+		std::string brsar::getSymbString(unsigned long indexIn)
 		{
 			return symbSection.getString(indexIn);
 		}
-		bool brsarFile::summarizeSymbStringData(std::ostream& output)
+		bool brsar::summarizeSymbStringData(std::ostream& output)
 		{
-			bool result = 0;
+			/*bool result = 0;
 
 			if (output.good() && symbSection.address != ULONG_MAX)
 			{
@@ -1766,9 +1800,10 @@ namespace lava
 
 			}
 
-			return result;
+			return result;*/
+			return symbSection.dumpStrings(output);
 		}
-		bool brsarFile::outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output)
+		bool brsar::outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output)
 		{
 			bool result = 0;
 
@@ -1785,21 +1820,20 @@ namespace lava
 
 			return result;
 		}
-
-		unsigned long brsarFile::getGroupOffset(unsigned long groupIDIn)
+		unsigned long brsar::getGroupOffset(unsigned long groupIDIn)
 		{
 			std::size_t result = SIZE_MAX;
 
 			std::size_t i = 0;
-			brsarInfoGroupHeader currentGroup;
 			bool done = 0;
 
-			while (!done && i < infoSection.groupsSection.refs.size())
+			const brsarInfoGroupHeader* currentGroup = nullptr;
+			while (!done && i < infoSection.groupHeaders.size())
 			{
-				currentGroup.populate(contents, infoSection.groupsSection.refs[i].getAddress(infoSection.address + 0x08));
-				if (groupIDIn == currentGroup.stringID)
+				currentGroup = &infoSection.groupHeaders[i];
+				if (groupIDIn == currentGroup->stringID)
 				{
-					result = currentGroup.address;
+					result = currentGroup->address;
 					done = 1;
 				}
 				else
@@ -1810,7 +1844,7 @@ namespace lava
 
 			return result;
 		}
-		bool brsarFile::doFileDump(std::string dumpRootFolder, bool joinHeaderAndData)
+		bool brsar::doFileDump(std::string dumpRootFolder, bool joinHeaderAndData)
 		{
 			bool result = 0;
 
@@ -1951,7 +1985,7 @@ namespace lava
 
 			return result = 1;
 		}
-		bool brsarFile::exportSawnd(std::size_t groupID, std::string targetFilePath)
+		bool brsar::exportSawnd(std::size_t groupID, std::string targetFilePath)
 		{
 			bool result = 0;
 			std::cout << "Creating \"" << targetFilePath << "\" from Group #" << groupID << "...\n";

@@ -10,7 +10,7 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.2.0";
+		const std::string version = "v0.2.5";
 		const std::string targetBrsarName = "smashbros_sound";
 		const std::string tempFileDumpBaseFolder = targetBrsarName + "/";
 
@@ -76,11 +76,11 @@ namespace lava
 			unsigned long infoID = ULONG_MAX;
 
 			bool populate(lava::byteArray& bodyIn, unsigned long addressIn);
-			bool exportContents(std::ostream& destinationStream);
+			bool exportContents(std::ostream& destinationStream) const;
 
-			unsigned long getBit();
-			unsigned long getPos();
-			bool compareCharAndBit(char charIn);
+			unsigned long getBit() const;
+			unsigned long getPos() const;
+			bool compareCharAndBit(char charIn) const;
 		};
 		struct brsarSymbPTrie
 		{
@@ -92,9 +92,9 @@ namespace lava
 			std::vector<brsarSymbPTrieNode> entries{};
 
 			bool populate(lava::byteArray& bodyIn, unsigned long addressIn);
-			bool exportContents(std::ostream& destinationStream);
+			bool exportContents(std::ostream& destinationStream) const;
 
-			brsarSymbPTrieNode findString(std::string stringIn);
+			brsarSymbPTrieNode findString(std::string stringIn) const;
 		};
 		struct brsarSymbSection
 		{
@@ -120,8 +120,10 @@ namespace lava
 			std::vector<unsigned char> stringBlock{};
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
-			bool exportContents(std::ostream& destinationStream);
-			std::string getString(std::size_t idIn);
+			bool exportContents(std::ostream& destinationStream) const;
+			std::string getString(std::size_t idIn) const;
+			bool dumpTrieStrings(std::ostream& destinationStream, const brsarSymbPTrie& sourceTrie) const;
+			bool dumpStrings(std::ostream& destinationStream) const;
 		};
 
 		struct brsarInfo3DSoundInfo
@@ -525,7 +527,7 @@ namespace lava
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
 		};
 
-		struct brsarFile
+		struct brsar
 		{
 			lava::byteArray contents;
 
