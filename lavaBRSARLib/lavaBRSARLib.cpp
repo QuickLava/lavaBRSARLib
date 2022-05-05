@@ -1704,8 +1704,9 @@ namespace lava
 						neoFileContents.push_back(brsarFileFileContents());
 						neoFileContents.back().fileID = currEntry->fileID;
 						neoFileContents.back().groupID = currHeader->stringID;
-						neoFileContents.back().address = currHeader->headerAddress + currEntry->headerOffset;
+						neoFileContents.back().headerAddress = currHeader->headerAddress + currEntry->headerOffset;
 						neoFileContents.back().header = bodyIn.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset, numGotten);
+						neoFileContents.back().dataAddress = currHeader->dataAddress + currEntry->dataOffset;
 						neoFileContents.back().data = bodyIn.getBytes(currEntry->dataLength, currHeader->dataAddress + currEntry->dataOffset, numGotten);
 						fileIDToIndex[currEntry->fileID].push_back(neoFileContents.size() - 1);
 					}
@@ -1844,7 +1845,7 @@ namespace lava
 						brsarFileFileContents* fileContentsPtr = &fileSection.neoFileContents[(*idToIndexVecPtr)[y]];
 						if (fileContentsPtr->groupID == currHeader->stringID)
 						{
-							metadataOutput << "\tFile " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << lava::numToHexStringWithPadding(fileContentsPtr->address, 0x08) << "\n";
+							metadataOutput << "\tFile " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << lava::numToHexStringWithPadding(fileContentsPtr->headerAddress, 0x08) << "\n";
 							metadataOutput << "\t\tFile Type: ";
 							if (fileContentsPtr->header.size() >= 0x04)
 							{

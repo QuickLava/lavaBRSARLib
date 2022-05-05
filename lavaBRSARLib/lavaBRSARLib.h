@@ -509,8 +509,9 @@ namespace lava
 		{
 			unsigned long groupID = ULONG_MAX;
 			unsigned long fileID = ULONG_MAX;
-			std::size_t address = SIZE_MAX;
+			std::size_t headerAddress = SIZE_MAX;
 			std::vector<unsigned char> header{};
+			std::size_t dataAddress = SIZE_MAX;
 			std::vector<unsigned char> data{};
 		};
 		struct brsarFileSection

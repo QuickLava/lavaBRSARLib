@@ -155,6 +155,9 @@
     <ClInclude Include="lavaByteArray.h" />
     <ClInclude Include="md5.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="Notes.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
