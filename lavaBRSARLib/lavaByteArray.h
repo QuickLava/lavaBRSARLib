@@ -14,7 +14,6 @@ namespace lava
 	{
 	private:
 		bool _populated = 0;
-	public:
 		std::vector<char> body = {};
 	private:
 
@@ -155,7 +154,10 @@ namespace lava
 		// --- Fundamentals ---
 
 	public:
-		_byteArray() {};
+		_byteArray(std::size_t lengthIn = 0x00, char defaultChar = 0x00) 
+		{
+			populate(lengthIn, defaultChar);
+		};
 		_byteArray(std::vector<char>& sourceVec)
 		{
 			populate(sourceVec);
@@ -165,6 +167,15 @@ namespace lava
 			populate(sourceStream);
 		}
 
+		void populate(std::size_t lengthIn, char defaultChar = 0x00)
+		{
+			if (_populated)
+			{
+				body.clear();
+			}
+			_populated = 1;
+			body.resize(lengthIn, defaultChar);
+		}
 		void populate(std::vector<char>& sourceVec)
 		{
 			_populated = 1;
@@ -172,6 +183,10 @@ namespace lava
 		}
 		void populate(std::istream& sourceStream)
 		{
+			if (_populated)
+			{
+				body.clear();
+			}
 			_populated = 1;
 			sourceStream.seekg(0, sourceStream.end);
 			std::size_t sourceSize(sourceStream.tellg());
@@ -182,6 +197,15 @@ namespace lava
 		bool populated() const
 		{
 			return _populated;
+		}
+
+		const char* data() const
+		{
+			return body.data();
+		}
+		std::size_t size() const
+		{
+			return body.size();
 		}
 
 		std::vector<unsigned char> getBytes(std::size_t numToGet, std::size_t startIndex, std::size_t& numGot) const
@@ -416,6 +440,16 @@ namespace lava
 			return findFundamentalMultiple<float>(searchCriteria, startItr, endItr, endianIn);
 		}
 
+		bool dumpToStream(std::ostream& outputStream) const
+		{
+			bool result = 0;
+			if (outputStream.good())
+			{
+				outputStream.write(body.data(), body.size());
+				result = outputStream.good();
+			}
+			return result;
+		}
 		bool dumpToFile(std::string targetPath) const
 		{
 			bool result = 0;
@@ -423,8 +457,7 @@ namespace lava
 			output.open(targetPath, std::ios_base::binary | std::ios_base::out);
 			if (output.is_open())
 			{
-				output.write(body.data(), body.size());
-				result = output.good();
+				result = dumpToStream(output);
 				std::cout << "Dumped body to \"" << targetPath << "\".\n";
 			}
 			return result;

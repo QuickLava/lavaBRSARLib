@@ -41,7 +41,7 @@ namespace lava
 		{
 			bool result = 0;
 
-			if (bodyIn.populated() && (addressIn < bodyIn.body.size()))
+			if (bodyIn.populated() && (addressIn < bodyIn.size()))
 			{
 				std::size_t count = bodyIn.getLong(addressIn);
 				refs.resize(count);
@@ -902,7 +902,7 @@ namespace lava
 					if (currFileHeader->stringOffset.getAddress() != 0x00)
 					{
 						std::size_t numGotten = SIZE_MAX;
-						std::string measurementString = bodyIn.body.data() + (currFileHeader->stringOffset.getAddress(address + 0x08));
+						std::string measurementString = bodyIn.data() + (currFileHeader->stringOffset.getAddress(address + 0x08));
 						std::size_t sizePrescription = measurementString.size() + (0x04 - (measurementString.size() % 0x04));
 						currFileHeader->stringContent = bodyIn.getBytes(sizePrescription, currFileHeader->stringOffset.getAddress(address + 0x08), numGotten);
 						result &= numGotten == sizePrescription;
@@ -1536,7 +1536,7 @@ namespace lava
 					dataInfo* associatedDataInfo = &dataSection.entries[dataSectionIndex];
 					unsigned long waveDataStartLocation = parentGroupWaveDataAddress + collectionDataOffset + associatedWaveInfo->dataLocation;
 					unsigned long waveDataLength = associatedWaveInfo->getLengthInBytes();
-					if (waveDataStartLocation + waveDataLength < bodyIn.body.size())
+					if (waveDataStartLocation + waveDataLength < bodyIn.size())
 					{
 						result = associatedWaveInfo->packetContents.populate(bodyIn, waveDataStartLocation, waveDataLength);
 						if (associatedDataInfo->ntWaveIndex < (waveSection.entries.size() - 1))
@@ -2041,7 +2041,7 @@ namespace lava
 					}
 
 					std::cout << "Total Size:" << targetGroup.headerLength + targetGroup.dataLength << "\n";
-					sawndOutput.write(contents.body.data() + targetGroup.headerAddress, targetGroup.headerLength + targetGroup.dataLength);
+					sawndOutput.write(contents.data() + targetGroup.headerAddress, targetGroup.headerLength + targetGroup.dataLength);
 				}
 				else
 				{
