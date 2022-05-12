@@ -213,7 +213,7 @@ namespace lava
 			numGot = ULONG_MAX;
 			if (startIndex < body.size())
 			{
-				if (startIndex + numToGet > body.size())
+				if (startIndex + numToGet >= body.size())
 				{
 					numGot = body.size() - startIndex;
 					return std::vector<unsigned char>(body.begin() + startIndex, body.end());
@@ -254,10 +254,10 @@ namespace lava
 			return *(float*)(&tempRes);
 		}
 
-		bool setBytes(std::vector<unsigned char> bytesIn, std::size_t atIndex)
+		bool setBytes(std::vector<unsigned char> bytesIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr)
 		{
 			bool result = 0;
-			if ((atIndex + bytesIn.size()) > atIndex && atIndex + bytesIn.size() < body.size())
+			if ((atIndex + bytesIn.size()) > atIndex && atIndex + bytesIn.size() <= body.size())
 			{
 				/*int tempInt = 0;
 				char* tempPtr = body.data() + atIndex;
@@ -270,6 +270,10 @@ namespace lava
 				}
 				std::cout << "\n" << std::dec;*/
 				std::memcpy(body.data() + atIndex, bytesIn.data(), bytesIn.size());
+				if (nextIndexOut != nullptr)
+				{
+					*nextIndexOut += bytesIn.size();
+				}
 				/*tempInt = 0;
 				tempPtr = body.data() + atIndex;
 				std::cout << "Modified Value: " << std::hex;
@@ -282,6 +286,14 @@ namespace lava
 				std::cout << "\n" << std::dec;*/
 				result = 1;
 			}
+			else
+			{
+				if (nextIndexOut != nullptr)
+				{
+					*nextIndexOut = SIZE_MAX;
+				}
+			}
+
 			return result;
 		}
 		bool setLLong(unsigned long long int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian)
