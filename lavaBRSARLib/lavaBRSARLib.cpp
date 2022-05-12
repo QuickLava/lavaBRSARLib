@@ -4,6 +4,18 @@ namespace lava
 {
 	namespace brawl
 	{
+		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress)
+		{
+			bool result = 1;
+
+			if (startingAddress <= relativeBaseOffset + offsetIn)
+			{
+				offsetIn += adjustmentAmount;
+			}
+
+			return result;
+		}
+
 		/* Brawl Reference */
 
 		brawlReference::brawlReference(unsigned long long valueIn)
@@ -29,7 +41,7 @@ namespace lava
 		}
 		std::string brawlReference::getAddressString(unsigned long relativeToIn)
 		{
-			return lava::numToHexStringWithPadding(getAddress(relativeToIn), 8);
+			return numToHexStringWithPadding(getAddress(relativeToIn), 8);
 		}
 		unsigned long long brawlReference::getHex()
 		{
@@ -238,14 +250,7 @@ namespace lava
 				result &= groupTrie.populate(bodyIn, address + 0x08 + groupTrieOffset);
 				result &= bankTrie.populate(bodyIn, address + 0x08 + bankTrieOffset);
 
-				/*for (unsigned long i = 0x04; i < stringListOffset; i += 0x04)
-				{
-					trieOffsets.push_back(bodyIn.getLong(address + 0x8 + i));
-					tries.push_back(brsarSymbPTrie());
-					result &= tries.back().populate(bodyIn, address + 0x08 + trieOffsets.back());
-				}*/
-
-				unsigned long cursor = address + 0x08 + stringListOffset;
+				std::size_t cursor = address + 0x08 + stringListOffset;
 				stringEntryOffsets.resize(bodyIn.getLong(cursor), ULONG_MAX);
 				cursor += 0x04;
 				for (std::size_t i = 0; i < stringEntryOffsets.size(); i++)
@@ -264,6 +269,7 @@ namespace lava
 					}
 				}
 			}
+
 			return result;
 		}
 		bool brsarSymbSection::exportContents(std::ostream& destinationStream) const
@@ -272,6 +278,7 @@ namespace lava
 			if (destinationStream.good())
 			{
 				result = 1;
+				unsigned long initialStreamPos = destinationStream.tellp();
 
 				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_SYMB);
 				lava::writeRawDataToStream(destinationStream, length);
@@ -304,9 +311,10 @@ namespace lava
 				}*/
 
 				unsigned long finalStreamPos = destinationStream.tellp();
-				if (length > finalStreamPos)
+				unsigned long amountWritten = finalStreamPos - initialStreamPos;
+				if (length > amountWritten)
 				{
-					std::vector<char> finalPadding(length - finalStreamPos, 0x00);
+					std::vector<char> finalPadding(length - amountWritten, 0x00);
 					destinationStream.write(finalPadding.data(), finalPadding.size());
 				}
 
@@ -314,6 +322,40 @@ namespace lava
 			}
 			return result;
 		}
+
+		/*bool brsarSymbSection::addSpace(unsigned long startingAddress, unsigned long adjustmentAmount)
+		{
+			bool result = 0;
+
+			// If the starting address comes before the start of this section...
+			if (startingAddress < address)
+			{
+				address += adjustmentAmount;
+			}
+			// If the starting address is somewhere within this section...
+			else if (startingAddress >= address && startingAddress < (address + length))
+			{
+				length += adjustmentAmount;
+				adjustOffset(address + 0x08, stringListOffset, adjustmentAmount, startingAddress);
+				adjustOffset(address + 0x08, soundTrieOffset, adjustmentAmount, startingAddress);
+				adjustOffset(address + 0x08, playerTrieOffset, adjustmentAmount, startingAddress);
+				adjustOffset(address + 0x08, groupTrieOffset, adjustmentAmount, startingAddress);
+				adjustOffset(address + 0x08, bankTrieOffset, adjustmentAmount, startingAddress);
+				for (std::size_t i = 0; i < stringEntryOffsets.size(); i++)
+				{
+					adjustOffset(address + 0x08, stringEntryOffsets[i], adjustmentAmount, startingAddress);
+				}
+			}
+			// If the starting address comes after the end of this section...
+			else if (startingAddress >= (address + length))
+			{
+				// do nothing?
+			}
+
+			return result;
+		}*/
+
+
 		std::string brsarSymbSection::getString(std::size_t idIn) const
 		{
 			std::string result = "";
@@ -335,7 +377,7 @@ namespace lava
 					const brsarSymbPTrieNode* currNode = &sourceTrie.entries[i];
 					if (currNode->isLeaf)
 					{
-						destinationStream << "[StrID: 0x" << lava::numToHexStringWithPadding(currNode->stringID, 0x04) << ", InfoID: 0x" << lava::numToHexStringWithPadding(currNode->infoID, 0x04) << "] " << getString(currNode->stringID) << "\n";
+						destinationStream << "[StrID: 0x" << numToHexStringWithPadding(currNode->stringID, 0x04) << ", InfoID: 0x" << numToHexStringWithPadding(currNode->infoID, 0x04) << "] " << getString(currNode->stringID) << "\n";
 					}
 				}
 				result = destinationStream.good();
@@ -827,6 +869,38 @@ namespace lava
 
 			return result;
 		}
+		bool brsarInfoSection::summarizeFileEntryData(std::ostream& output)
+		{
+			bool result = 0;
+			if (output.good())
+			{
+				output << "There are " << fileHeaders.size() << " File Info Entries(s) in this BRSAR:\n";
+				for (unsigned long i = 0; i < fileHeaders.size(); i++)
+				{
+					brsarInfoFileHeader* currHeaderPtr = &fileHeaders[i];
+					output << "File Info #" << i << " (@ 0x" << numToHexStringWithPadding(currHeaderPtr->address, 0x08) << "):\n";
+					output << "\tFile String: \"";
+					if (!currHeaderPtr->stringContent.empty())
+					{
+						output << std::string((char*)currHeaderPtr->stringContent.data());
+					}
+					output << "\"\n";
+					output << "\tFile Header Length: " << currHeaderPtr->headerLength << " byte(s)\n";
+					output << "\tFile Data Length: " << currHeaderPtr->dataLength << " byte(s)\n";
+					output << "\tFile Entry Number: " << currHeaderPtr->entryNumber << "\n";
+					output << "\tFile Entries:\n";
+					for (unsigned long u = 0; u < currHeaderPtr->entries.size(); u++)
+					{
+						brsarInfoFileEntry* currEntryPtr = &currHeaderPtr->entries[u];
+						output << "\tEntry #" << u << " (@ 0x" << numToHexStringWithPadding(currEntryPtr->address, 0x08) << "):\n";
+						output << "\t\tEntry Index: " << currEntryPtr->index << "\n";
+						output << "\t\tGroup ID: " << currEntryPtr->groupID << "\n";
+					}
+				}
+				result = output.good();
+			}
+			return result;
+		}
 		bool brsarInfoSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -952,6 +1026,9 @@ namespace lava
 			bool result = 0;
 			if (destinationStream.good())
 			{
+				result = 1;
+				unsigned long initialStreamPos = destinationStream.tellp();
+
 				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_INFO);
 				lava::writeRawDataToStream(destinationStream, length);
 				lava::writeRawDataToStream(destinationStream, soundsSectionReference.getHex());
@@ -998,9 +1075,10 @@ namespace lava
 				lava::writeRawDataToStream(destinationStream, reserved);
 
 				unsigned long finalStreamPos = destinationStream.tellp();
-				if (length > finalStreamPos)
+				unsigned long amountWritten = finalStreamPos - initialStreamPos;
+				if (length > amountWritten)
 				{
-					std::vector<char> finalPadding(length - finalStreamPos, 0x00);
+					std::vector<char> finalPadding(length - amountWritten, 0x00);
 					destinationStream.write(finalPadding.data(), finalPadding.size());
 				}
 
@@ -1554,7 +1632,7 @@ namespace lava
 								associatedWaveInfo->packetContents.length -= overlapSize;
 								associatedWaveInfo->packetContents.body.resize(associatedWaveInfo->packetContents.body.size() - overlapSize);
 								associatedWaveInfo->packetContents.paddingLength = 0x00;
-								std::cout << "[WARNING] Wave Packet Truncation performed! Lost 0x" << lava::numToHexStringWithPadding(overlapSize, 0x02) << " byte(s) as a result.\n";
+								std::cout << "[WARNING] Wave Packet Truncation performed! Lost 0x" << numToHexStringWithPadding(overlapSize, 0x02) << " byte(s) as a result.\n";
 							}
 						}
 						else
@@ -1735,18 +1813,53 @@ namespace lava
 					{
 						currEntry = &currHeader->entries[u];
 						std::size_t numGotten = ULONG_MAX;
-						neoFileContents.push_back(brsarFileFileContents());
-						neoFileContents.back().fileID = currEntry->fileID;
-						neoFileContents.back().groupID = currHeader->stringID;
-						neoFileContents.back().headerAddress = currHeader->headerAddress + currEntry->headerOffset;
-						neoFileContents.back().header = bodyIn.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset, numGotten);
-						neoFileContents.back().dataAddress = currHeader->dataAddress + currEntry->dataOffset;
-						neoFileContents.back().data = bodyIn.getBytes(currEntry->dataLength, currHeader->dataAddress + currEntry->dataOffset, numGotten);
-						fileIDToIndex[currEntry->fileID].push_back(neoFileContents.size() - 1);
+						fileContents.push_back(brsarFileFileContents());
+						fileContents.back().fileID = currEntry->fileID;
+						fileContents.back().groupID = currHeader->stringID;
+						fileContents.back().headerAddress = currHeader->headerAddress + currEntry->headerOffset;
+						fileContents.back().header = bodyIn.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset, numGotten);
+						fileContents.back().dataAddress = currHeader->dataAddress + currEntry->dataOffset;
+						fileContents.back().data = bodyIn.getBytes(currEntry->dataLength, currHeader->dataAddress + currEntry->dataOffset, numGotten);
+						fileIDToIndex[currEntry->fileID].push_back(fileContents.size() - 1);
 					}
 				}
 
 				result = 1;
+			}
+
+			return result;
+		}
+		bool brsarFileSection::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				byteArray tempArray(length, 0x00);
+				tempArray.setLong(brsarHexTags::bht_FILE, 0x00);
+				tempArray.setLong(length, 0x04);
+				for (unsigned long i = 0; i < fileContents.size(); i++)
+				{
+					brsarFileFileContents* currFilePtr = &fileContents[i];
+					if (currFilePtr->headerAddress > address)
+					{
+						tempArray.setBytes(currFilePtr->header, currFilePtr->headerAddress - address);
+					}
+					else
+					{
+						std::cerr << "Invalid header address!\n";
+					}
+					if (currFilePtr->dataAddress > address)
+					{
+						tempArray.setBytes(currFilePtr->data, currFilePtr->dataAddress - address);
+					}
+					else
+					{
+						std::cerr << "Invalid data address!\n";
+					}
+				}
+				tempArray.dumpToStream(destinationStream);
+				result = destinationStream.good();
 			}
 
 			return result;
@@ -1757,7 +1870,6 @@ namespace lava
 
 
 		/* BRSAR */
-
 		bool brsar::init(std::string filePathIn)
 		{
 			bool result = 0;
@@ -1769,56 +1881,63 @@ namespace lava
 				std::cout << "Parsing \"" << filePathIn << "\"...\n";
 				contents.populate(fileIn);
 				fileIn.close();
+				std::size_t cursor = 0x04;
+				byteOrderMarker = contents.getShort(cursor, &cursor);
+				version = contents.getShort(cursor, &cursor);
+				length = contents.getLong(cursor, &cursor);
+				headerLength = contents.getShort(cursor, &cursor);
+				sectionCount = contents.getShort(cursor, &cursor);
+
 				result &= symbSection.populate(contents, contents.getLong(0x10));
 				result &= infoSection.populate(contents, contents.getLong(0x18));
 				result &= fileSection.populate(contents, contents.getLong(0x20), infoSection);
 			}
 			return result;
 		}
+		bool brsar::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 1;
+
+			writeRawDataToStream(destinationStream, brsarHexTags::bht_RSAR);
+			writeRawDataToStream(destinationStream, byteOrderMarker);
+			writeRawDataToStream(destinationStream, version);
+			writeRawDataToStream(destinationStream, length);
+			writeRawDataToStream(destinationStream, headerLength);
+			writeRawDataToStream(destinationStream, sectionCount);
+			writeRawDataToStream(destinationStream, symbSection.address);
+			writeRawDataToStream(destinationStream, symbSection.length);
+			writeRawDataToStream(destinationStream, infoSection.address);
+			writeRawDataToStream(destinationStream, infoSection.length);
+			writeRawDataToStream(destinationStream, fileSection.address);
+			writeRawDataToStream(destinationStream, fileSection.length);
+			if (headerLength > destinationStream.tellp())
+			{
+				std::vector<char> padding(headerLength - destinationStream.tellp(), 0x00);
+				destinationStream.write(padding.data(), padding.size());
+			}
+			result &= symbSection.exportContents(destinationStream);
+			result &= infoSection.exportContents(destinationStream);
+			result &= fileSection.exportContents(destinationStream);
+
+			return result;
+		}
+		bool brsar::exportContents(std::string outputFilename)
+		{
+			bool result = 0;
+
+			std::ofstream output(outputFilename, std::ios_base::out | std::ios_base::binary);
+			if (output.is_open())
+			{
+				result = exportContents(output);
+			}
+
+			return result;
+		}
+
 
 		std::string brsar::getSymbString(unsigned long indexIn)
 		{
 			return symbSection.getString(indexIn);
-		}
-		bool brsar::summarizeSymbStringData(std::ostream& output)
-		{
-			/*bool result = 0;
-
-			if (output.good() && symbSection.address != ULONG_MAX)
-			{
-				unsigned long stringOffset = ULONG_MAX;
-				unsigned long stringAddress = ULONG_MAX;
-				unsigned long stringOffsetAddress = symbSection.address + 0x08 + symbSection.stringListOffset + 0x04;
-				for (std::size_t i = 0; i < symbSection.stringEntryOffsets.size(); i++)
-				{
-					stringOffset = symbSection.stringEntryOffsets[i];
-					stringAddress = symbSection.address + stringOffset + 0x08;
-					char* ptr = contents.body.data() + stringAddress;
-					output << "[0x" << lava::numToHexStringWithPadding(i, 4) << "] 0x" << lava::numToHexStringWithPadding(stringOffsetAddress, 4) << "->0x" << lava::numToHexStringWithPadding(stringAddress, 4) << ": " << ptr << "\n";
-					stringOffsetAddress += 0x04;
-				}
-
-			}
-
-			return result;*/
-			return symbSection.dumpStrings(output);
-		}
-		bool brsar::outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output)
-		{
-			bool result = 0;
-
-			if (output.good() && symbSection.address != ULONG_MAX)
-			{
-				unsigned long fileID = infoSection.soundEntries[startingIndex].fileID;
-				std::size_t i = startingIndex;
-				while (i < infoSection.soundEntries.size() && infoSection.soundEntries[i].fileID == fileID)
-				{
-					output << "\t[String 0x" << lava::numToHexStringWithPadding(i, 0x04) << "] " << getSymbString(i) << "\n";
-					i++;
-				}
-			}
-
-			return result;
 		}
 		unsigned long brsar::getGroupOffset(unsigned long groupIDIn)
 		{
@@ -1838,6 +1957,29 @@ namespace lava
 				}
 				else
 				{
+					i++;
+				}
+			}
+
+			return result;
+		}
+
+		bool brsar::summarizeSymbStringData(std::ostream& output)
+		{
+			return symbSection.dumpStrings(output);
+		}
+		
+		bool brsar::outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output)
+		{
+			bool result = 0;
+
+			if (output.good() && symbSection.address != ULONG_MAX)
+			{
+				unsigned long fileID = infoSection.soundEntries[startingIndex].fileID;
+				std::size_t i = startingIndex;
+				while (i < infoSection.soundEntries.size() && infoSection.soundEntries[i].fileID == fileID)
+				{
+					output << "\t[String 0x" << numToHexStringWithPadding(i, 0x04) << "] " << getSymbString(i) << "\n";
 					i++;
 				}
 			}
@@ -1865,21 +2007,22 @@ namespace lava
 				}
 				std::string groupFolder = dumpRootFolder + groupName + "/";
 				std::filesystem::create_directory(groupFolder);
-				metadataOutput << "File(s) in \"" << groupName << "\" (ID: " 
-					<< lava::numToDecStringWithPadding(currHeader->stringID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(currHeader->stringID, 0x03) << ")...\n";
+				metadataOutput << "File(s) in \"" << groupName << "\" (Raw ID: " 
+					<< numToDecStringWithPadding(currHeader->stringID, 0x03) << " / 0x" << numToHexStringWithPadding(currHeader->stringID, 0x03) << 
+					", Info Index: " << numToDecStringWithPadding(i, 0x03) << " / 0x" << numToHexStringWithPadding(i, 0x03) << ")...\n";
 				for (std::size_t u = 0; u < currHeader->entries.size(); u++)
 				{
 					currEntry = &currHeader->entries[u];
 					std::vector<std::size_t>* idToIndexVecPtr = &fileSection.fileIDToIndex[currEntry->fileID];
-					std::string fileBaseName = lava::numToDecStringWithPadding(currEntry->fileID, 0x03) + "_(0x" + lava::numToHexStringWithPadding(currEntry->fileID, 0x03) + ")";
+					std::string fileBaseName = numToDecStringWithPadding(currEntry->fileID, 0x03) + "_(0x" + numToHexStringWithPadding(currEntry->fileID, 0x03) + ")";
 					bool entryExported = 0;
 					std::size_t y = 0;
 					while(!entryExported)
 					{
-						brsarFileFileContents* fileContentsPtr = &fileSection.neoFileContents[(*idToIndexVecPtr)[y]];
+						brsarFileFileContents* fileContentsPtr = &fileSection.fileContents[(*idToIndexVecPtr)[y]];
 						if (fileContentsPtr->groupID == currHeader->stringID)
 						{
-							metadataOutput << "\tFile " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << lava::numToHexStringWithPadding(fileContentsPtr->headerAddress, 0x08) << "\n";
+							metadataOutput << "\tFile " << numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << numToHexStringWithPadding(fileContentsPtr->headerAddress, 0x08) << "\n";
 							metadataOutput << "\t\tFile Type: ";
 							if (fileContentsPtr->header.size() >= 0x04)
 							{
@@ -1889,9 +2032,9 @@ namespace lava
 							{
 								metadataOutput << "----\n";
 							}
-							metadataOutput << "\t\tHeader Size: " << bytesToFileSizeString(fileContentsPtr->header.size()) << "\n";
-							metadataOutput << "\t\tData Size: " << bytesToFileSizeString(fileContentsPtr->data.size()) << "\n";
-							metadataOutput << "\t\tTotal Size: " << bytesToFileSizeString(fileContentsPtr->header.size() + fileContentsPtr->data.size()) << "\n";
+							metadataOutput << "\t\tHeader Size: " << fileContentsPtr->header.size() << " byte(s) (" << bytesToFileSizeString(fileContentsPtr->header.size()) << ")\n";
+							metadataOutput << "\t\tData Size: " << fileContentsPtr->data.size() << " byte(s) (" << bytesToFileSizeString(fileContentsPtr->data.size()) << ")\n";
+							metadataOutput << "\t\tTotal Size: " << fileContentsPtr->header.size() + fileContentsPtr->data.size() << " byte(s) (" << bytesToFileSizeString(fileContentsPtr->header.size() + fileContentsPtr->data.size()) << ")\n";
 							metadataOutput << "\t\tNumber Times File Occurs in BRSAR: " << idToIndexVecPtr->size() << "\n";
 							metadataOutput << "\t\tNumber of Current Occurence: " << numberToOrdinal(y + 1) << " (Suffixed with \"_" << std::string(1, 'A' + y) << "\")\n";
 							metadataOutput << "\t\tHeader MD5 Hash: " << md5Object((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size()) << "\n";
@@ -1936,53 +2079,6 @@ namespace lava
 				}
 			}
 
-			/*for (auto i : fileSection.fileIDToIndex)
-			{
-				std::string newBaseFolder = dumpRootFolder + "File_" + lava::numToDecStringWithPadding(i.first, 0x03) + "_(0x" + lava::numToHexStringWithPadding(i.first, 0x03) + ")/";
-				std::vector<std::size_t>* idToIndexVecPtr = &i.second;
-				std::filesystem::create_directory(newBaseFolder);
-				for (std::size_t y = 0; y < idToIndexVecPtr->size(); y++)
-				{
-					brsarFileFileContents* fileContentsPtr = &fileSection.neoFileContents[(*idToIndexVecPtr)[y]];
-					std::string headerFilename = "";
-					std::string dataFilename = "";
-					headerFilename += symbSection.getString(fileContentsPtr->groupID) + "_";
-					dataFilename += symbSection.getString(fileContentsPtr->groupID) + "_";
-					if (joinHeaderAndData)
-					{
-						headerFilename += "file.dat";
-						std::ofstream headerOutput(newBaseFolder + headerFilename, std::ios_base::out | std::ios_base::binary);
-						if (headerOutput.is_open())
-						{
-							headerOutput.write((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size());
-							headerOutput.write((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size());
-							headerOutput.close();
-						}
-					}
-					else
-					{
-						headerFilename += "header.dat";
-						dataFilename += "data.dat";
-						std::ofstream headerOutput(newBaseFolder + headerFilename, std::ios_base::out | std::ios_base::binary);
-						if (headerOutput.is_open())
-						{
-							headerOutput.write((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size());
-							headerOutput.close();
-						}
-						std::ofstream dataOutput(newBaseFolder + dataFilename, std::ios_base::out | std::ios_base::binary);
-						if (dataOutput.is_open())
-						{
-							dataOutput.write((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size());
-							dataOutput.close();
-						}
-					}
-					if (!outputPotentialDupes)
-					{
-						break;
-					}
-				}
-			}*/
-
 			return result = 1;
 		}
 		bool brsar::exportSawnd(std::size_t groupID, std::string targetFilePath)
@@ -1995,18 +2091,18 @@ namespace lava
 			if (sawndOutput.is_open())
 			{
 				std::size_t groupOffset = getGroupOffset(groupID);
-				std::cout << "\nGroup found @ 0x" << lava::numToHexStringWithPadding(groupOffset, 8) << "!\n";
+				std::cout << "\nGroup found @ 0x" << numToHexStringWithPadding(groupOffset, 8) << "!\n";
 
 				if (groupOffset != SIZE_MAX)
 				{
 					brsarInfoGroupHeader targetGroup;
 					targetGroup.populate(contents, groupOffset);
 
-					std::cout << "Address: 0x" << lava::numToHexStringWithPadding(targetGroup.address, 8) << "\n";
-					std::cout << "Header: Offset = 0x" << lava::numToHexStringWithPadding(targetGroup.headerAddress, 8) <<
-						", Length = 0x" << lava::numToHexStringWithPadding(targetGroup.headerLength, 8) << " bytes\n";
-					std::cout << "Wave Data: Offset = 0x" << lava::numToHexStringWithPadding(targetGroup.dataAddress, 8) <<
-						", Length = 0x" << lava::numToHexStringWithPadding(targetGroup.dataLength, 8) << " bytes\n";
+					std::cout << "Address: 0x" << numToHexStringWithPadding(targetGroup.address, 8) << "\n";
+					std::cout << "Header: Offset = 0x" << numToHexStringWithPadding(targetGroup.headerAddress, 8) <<
+						", Length = 0x" << numToHexStringWithPadding(targetGroup.headerLength, 8) << " bytes\n";
+					std::cout << "Wave Data: Offset = 0x" << numToHexStringWithPadding(targetGroup.dataAddress, 8) <<
+						", Length = 0x" << numToHexStringWithPadding(targetGroup.dataLength, 8) << " bytes\n";
 
 					sawndOutput.put(2);
 					lava::writeRawDataToStream(sawndOutput, groupID);
@@ -2015,7 +2111,7 @@ namespace lava
 					std::size_t collectionRefListAddress = targetGroup.listOffset.getAddress(infoSection.address + 0x08);
 					brawlReferenceVector collectionReferences;
 					collectionReferences.populate(contents, collectionRefListAddress);
-					std::cout << "Collection List Address(0x" << lava::numToHexStringWithPadding(collectionRefListAddress, 8) << ")\n";
+					std::cout << "Collection List Address(0x" << numToHexStringWithPadding(collectionRefListAddress, 8) << ")\n";
 					std::cout << "Collection Count: " << collectionReferences.refs.size() << "\n";
 					std::vector<brsarInfoGroupEntry> groupInfoEntries;
 					brsarInfoGroupEntry* currEntry = nullptr;
@@ -2024,16 +2120,16 @@ namespace lava
 					for (std::size_t i = 0; i < collectionReferences.refs.size(); i++)
 					{
 						currentCollectionAddress = collectionReferences.refs[i].getAddress(infoSection.address + 0x08);
-						std::cout << "Collection #" << i << ": Info Section Offset = 0x" << lava::numToHexStringWithPadding(currentCollectionAddress, 8) << "\n";
+						std::cout << "Collection #" << i << ": Info Section Offset = 0x" << numToHexStringWithPadding(currentCollectionAddress, 8) << "\n";
 						groupInfoEntries.push_back(brsarInfoGroupEntry());
 						currEntry = &groupInfoEntries.back();
 						currEntry->populate(contents, currentCollectionAddress);
 
-						std::cout << "\tFile ID: 0x" << lava::numToHexStringWithPadding(currEntry->fileID, 4) << "\n";
-						std::cout << "\tHeader Offset: 0x" << lava::numToHexStringWithPadding(currEntry->headerOffset, 4) << "\n";
-						std::cout << "\tHeader Length: 0x" << lava::numToHexStringWithPadding(currEntry->headerLength, 4) << "\n";
-						std::cout << "\tData Offset: 0x" << lava::numToHexStringWithPadding(currEntry->dataOffset, 4) << "\n";
-						std::cout << "\tData Length: 0x" << lava::numToHexStringWithPadding(currEntry->dataLength, 4) << "\n";
+						std::cout << "\tFile ID: 0x" << numToHexStringWithPadding(currEntry->fileID, 4) << "\n";
+						std::cout << "\tHeader Offset: 0x" << numToHexStringWithPadding(currEntry->headerOffset, 4) << "\n";
+						std::cout << "\tHeader Length: 0x" << numToHexStringWithPadding(currEntry->headerLength, 4) << "\n";
+						std::cout << "\tData Offset: 0x" << numToHexStringWithPadding(currEntry->dataOffset, 4) << "\n";
+						std::cout << "\tData Length: 0x" << numToHexStringWithPadding(currEntry->dataLength, 4) << "\n";
 
 						lava::writeRawDataToStream(sawndOutput, currEntry->fileID);
 						lava::writeRawDataToStream(sawndOutput, currEntry->dataOffset);

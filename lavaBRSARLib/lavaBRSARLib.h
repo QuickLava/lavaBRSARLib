@@ -10,8 +10,8 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.2.5";
-		const std::string targetBrsarName = "smashbros_sound";
+		const std::string version = "v0.5.0";
+		const std::string targetBrsarName = "revo_kart";
 		const std::string tempFileDumpBaseFolder = targetBrsarName + "/";
 
 		enum brsarHexTags
@@ -43,6 +43,8 @@ namespace lava
 		};
 		const unsigned long _EMPTY_SOUND_SOUND_LENGTH = 0x02;
 		const unsigned long _EMPTY_SOUND_TOTAL_LENGTH = 0x20;
+
+		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress);
 
 		struct brawlReference
 		{
@@ -102,15 +104,13 @@ namespace lava
 
 			unsigned long length = ULONG_MAX;
 			unsigned long stringListOffset = ULONG_MAX;
-			std::vector<unsigned long> stringEntryOffsets{};
-
-			/*std::vector<unsigned long> trieOffsets{};
-			std::vector<brsarSymbPTrie> tries{};*/
 
 			unsigned long soundTrieOffset;
 			unsigned long playerTrieOffset;
 			unsigned long groupTrieOffset;
 			unsigned long bankTrieOffset;
+
+			std::vector<unsigned long> stringEntryOffsets{};
 
 			brsarSymbPTrie soundTrie;
 			brsarSymbPTrie playerTrie;
@@ -121,6 +121,7 @@ namespace lava
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream) const;
+
 			std::string getString(std::size_t idIn) const;
 			bool dumpTrieStrings(std::ostream& destinationStream, const brsarSymbPTrie& sourceTrie) const;
 			bool dumpStrings(std::ostream& destinationStream) const;
@@ -337,6 +338,8 @@ namespace lava
 			// Footer
 
 			std::vector<brsarInfoFileHeader*> findFilesWithGroupID(unsigned long groupIDIn);
+			bool summarizeFileEntryData(std::ostream& output);
+
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -521,28 +524,36 @@ namespace lava
 			unsigned long address = ULONG_MAX;
 
 			unsigned long length = ULONG_MAX;
-			std::vector<brsarFileFileContents> neoFileContents{};
+			std::vector<brsarFileFileContents> fileContents{};
 			std::unordered_map<unsigned long, std::vector<std::size_t>> fileIDToIndex{};
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
+			bool exportContents(std::ostream& destinationStream);
 		};
 
 		struct brsar
 		{
 			lava::byteArray contents;
 
+			unsigned short byteOrderMarker = USHRT_MAX;
+			unsigned short version = USHRT_MAX;
+			unsigned long length = ULONG_MAX;
+			unsigned short headerLength = USHRT_MAX;
+			unsigned short sectionCount = USHRT_MAX;
+
 			brsarSymbSection symbSection;
 			brsarInfoSection infoSection;
 			brsarFileSection fileSection;
 
 			bool init(std::string filePathIn);
+			bool exportContents(std::ostream& destinationStream);
+			bool exportContents(std::string outputFilename);
 
 			std::string getSymbString(unsigned long indexIn);
-			bool summarizeSymbStringData(std::ostream& output = std::cout);
-			bool outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output = std::cout);
-
 			unsigned long getGroupOffset(unsigned long groupIDIn);
 
+			bool summarizeSymbStringData(std::ostream& output = std::cout);
+			bool outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output = std::cout);
 			bool doFileDump(std::string dumpRootFolder = tempFileDumpBaseFolder, bool joinHeaderAndData = 0);
 			bool exportSawnd(std::size_t groupID, std::string targetFilePath);
 		};

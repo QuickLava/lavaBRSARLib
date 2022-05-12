@@ -2,9 +2,6 @@
 
 namespace lava
 {
-
-
-	
 	std::string stringToUpper(const std::string& stringIn)
 	{
 		std::string result = stringIn;
