@@ -257,7 +257,7 @@ namespace lava
 		bool setBytes(std::vector<unsigned char> bytesIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr)
 		{
 			bool result = 0;
-			if ((atIndex + bytesIn.size()) > atIndex && atIndex + bytesIn.size() <= body.size())
+			if ((atIndex + bytesIn.size()) >= atIndex && atIndex + bytesIn.size() <= body.size())
 			{
 				/*int tempInt = 0;
 				char* tempPtr = body.data() + atIndex;
