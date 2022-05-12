@@ -10,9 +10,7 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.5.0";
-		const std::string targetBrsarName = "revo_kart";
-		const std::string tempFileDumpBaseFolder = targetBrsarName + "/";
+		const std::string version = "v0.7.0";
 
 		enum brsarHexTags
 		{
@@ -285,7 +283,7 @@ namespace lava
 		{
 			unsigned long address = ULONG_MAX;
 
-			unsigned long stringID = ULONG_MAX;
+			unsigned long groupID = ULONG_MAX;
 			unsigned long entryNum = ULONG_MAX;
 			brawlReference extFilePathRef = ULLONG_MAX;
 			unsigned long headerAddress = ULONG_MAX;
@@ -337,8 +335,15 @@ namespace lava
 			unsigned long reserved = ULONG_MAX;
 			// Footer
 
-			std::vector<brsarInfoFileHeader*> findFilesWithGroupID(unsigned long groupIDIn);
+			brsarInfoGroupHeader* getGroupWithID(unsigned long groupIDIn);
+			brsarInfoGroupHeader* getGroupWithInfoIndex(unsigned long infoIndexIn);
+
+			std::vector<brsarInfoFileHeader*> getFilesWithGroupID(unsigned long groupIDIn);
+			brsarInfoFileHeader* getFileHeaderPointer(unsigned long fileID);
+
+
 			bool summarizeFileEntryData(std::ostream& output);
+
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
@@ -512,11 +517,12 @@ namespace lava
 
 		struct brsarFileFileContents
 		{
+			unsigned long groupInfoIndex = ULONG_MAX;
 			unsigned long groupID = ULONG_MAX;
 			unsigned long fileID = ULONG_MAX;
-			std::size_t headerAddress = SIZE_MAX;
+			unsigned long headerAddress = SIZE_MAX;
 			std::vector<unsigned char> header{};
-			std::size_t dataAddress = SIZE_MAX;
+			unsigned long dataAddress = SIZE_MAX;
 			std::vector<unsigned char> data{};
 		};
 		struct brsarFileSection
@@ -527,14 +533,17 @@ namespace lava
 			std::vector<brsarFileFileContents> fileContents{};
 			std::unordered_map<unsigned long, std::vector<std::size_t>> fileIDToIndex{};
 
+			std::vector<brsarFileFileContents*> getFileContentsPointerVector(unsigned long fileID);
+			brsarFileFileContents* getFileContentsPointer(unsigned long fileID, unsigned long groupID = ULONG_MAX);
+
+			bool propogateFileLengthChange(signed long changeAmount, unsigned long pastThisAddress);
+
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
 
 		struct brsar
 		{
-			lava::byteArray contents;
-
 			unsigned short byteOrderMarker = USHRT_MAX;
 			unsigned short version = USHRT_MAX;
 			unsigned long length = ULONG_MAX;
@@ -552,9 +561,12 @@ namespace lava
 			std::string getSymbString(unsigned long indexIn);
 			unsigned long getGroupOffset(unsigned long groupIDIn);
 
+			bool updateInfoSectionFileOffsets();
+			bool overwriteFile(const std::vector<unsigned char>& headerIn, const std::vector<unsigned char>& dataIn, unsigned long fileIDIn);
+
 			bool summarizeSymbStringData(std::ostream& output = std::cout);
 			bool outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output = std::cout);
-			bool doFileDump(std::string dumpRootFolder = tempFileDumpBaseFolder, bool joinHeaderAndData = 0);
+			bool doFileDump(std::string dumpRootFolder, bool joinHeaderAndData = 0);
 			bool exportSawnd(std::size_t groupID, std::string targetFilePath);
 		};
 	}

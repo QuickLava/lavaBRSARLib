@@ -6,11 +6,12 @@ namespace lava
 	{
 		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress)
 		{
-			bool result = 1;
+			bool result = 0;
 
-			if (startingAddress <= relativeBaseOffset + offsetIn)
+			if (startingAddress < relativeBaseOffset + offsetIn)
 			{
 				offsetIn += adjustmentAmount;
+				result = 1;
 			}
 
 			return result;
@@ -812,7 +813,7 @@ namespace lava
 			{
 				address = addressIn;
 
-				stringID = bodyIn.getLong(address);
+				groupID = bodyIn.getLong(address);
 				entryNum = bodyIn.getLong(address + 0x04);
 				extFilePathRef = brawlReference(bodyIn.getLLong(address + 0x08));
 				headerAddress = bodyIn.getLong(address + 0x10);
@@ -832,7 +833,7 @@ namespace lava
 			if (destinationStream.good())
 			{
 				result = 1;
-				lava::writeRawDataToStream(destinationStream, stringID);
+				lava::writeRawDataToStream(destinationStream, groupID);
 				lava::writeRawDataToStream(destinationStream, entryNum);
 				lava::writeRawDataToStream(destinationStream, extFilePathRef.getHex());
 				lava::writeRawDataToStream(destinationStream, headerAddress);
@@ -850,25 +851,80 @@ namespace lava
 			return result;
 		}
 
-		std::vector<brsarInfoFileHeader*> brsarInfoSection::findFilesWithGroupID(unsigned long groupIDIn)
+		brsarInfoGroupHeader* brsarInfoSection::getGroupWithID(unsigned long groupIDIn)
 		{
-			std::vector<brsarInfoFileHeader*> result{};
+			brsarInfoGroupHeader* result = nullptr;
 
-			brsarInfoFileHeader* currHeader = nullptr;
-			for (std::size_t i = 0; i < fileHeaders.size(); i++)
+			unsigned long i = 0;
+
+			while (result == nullptr && i < groupHeaders.size())
 			{
-				currHeader = &fileHeaders[i];
-				for (std::size_t u = 0; u < currHeader->entries.size(); u++)
+				if (groupIDIn == groupHeaders[i].groupID)
 				{
-					if (currHeader->entries[u].groupID == groupIDIn)
-					{
-						result.push_back(currHeader);
-					}
+					result = &groupHeaders[i];
 				}
+				i++;
 			}
 
 			return result;
 		}
+		brsarInfoGroupHeader* brsarInfoSection::getGroupWithInfoIndex(unsigned long infoIndexIn)
+		{
+			brsarInfoGroupHeader* result = nullptr;
+
+			if (infoIndexIn < groupHeaders.size())
+			{
+				result = &groupHeaders[infoIndexIn];
+			}
+
+			return result;
+		}
+
+		std::vector<brsarInfoFileHeader*> brsarInfoSection::getFilesWithGroupID(unsigned long groupIDIn)
+		{
+			std::vector<brsarInfoFileHeader*> result{};
+
+			brsarInfoGroupHeader* targetGroupHeader = getGroupWithID(groupIDIn);
+			if (targetGroupHeader != nullptr)
+			{
+				for (unsigned long i = 0; i < targetGroupHeader->entries.size(); i++)
+				{
+					brsarInfoGroupEntry* currentGroupEntry = &targetGroupHeader->entries[i];
+					if (currentGroupEntry->fileID < fileHeaders.size())
+					{
+						result.push_back( &fileHeaders[currentGroupEntry->fileID]);
+					}
+				}
+			}
+
+			//brsarInfoFileHeader* currHeader = nullptr;
+			//for (std::size_t i = 0; i < fileHeaders.size(); i++)
+			//{
+			//	currHeader = &fileHeaders[i];
+			//	for (std::size_t u = 0; u < currHeader->entries.size(); u++)
+			//	{
+			//		if (currHeader->entries[u].groupID == groupIDIn)
+			//		{
+			//			result.push_back(currHeader);
+			//		}
+			//	}
+			//}
+
+			return result;
+		}
+		brsarInfoFileHeader* brsarInfoSection::getFileHeaderPointer(unsigned long fileID)
+		{
+			brsarInfoFileHeader* result = nullptr;
+
+			if (fileID < fileHeaders.size())
+			{
+				result = &fileHeaders[fileID];
+			}
+
+			return result;
+		}
+
+
 		bool brsarInfoSection::summarizeFileEntryData(std::ostream& output)
 		{
 			bool result = 0;
@@ -1795,6 +1851,56 @@ namespace lava
 		}
 		/* RWSD */
 
+		std::vector<brsarFileFileContents*> brsarFileSection::getFileContentsPointerVector(unsigned long fileID)
+		{
+			std::vector<brsarFileFileContents*> result{};
+
+			auto findRes = fileIDToIndex.find(fileID);
+			if (findRes != fileIDToIndex.end())
+			{
+				std::vector<std::size_t>* indexVecPtr = &findRes->second;
+				for (unsigned long i = 0; i < indexVecPtr->size(); i++)
+				{
+					brsarFileFileContents* currFileContentsPtr = &fileContents[(*indexVecPtr)[i]];
+					result.push_back(currFileContentsPtr);
+				}
+			}
+
+			return result;
+		}
+		brsarFileFileContents* brsarFileSection::getFileContentsPointer(unsigned long fileID, unsigned long groupID)
+		{
+			brsarFileFileContents* result = nullptr;
+
+			std::vector<brsarFileFileContents*> pointerVec = getFileContentsPointerVector(fileID);
+			unsigned long i = 0;
+			while (result == nullptr && i < pointerVec.size())
+			{
+				if (groupID == ULONG_MAX || pointerVec[i]->groupID == groupID)
+				{
+					result = pointerVec[i];
+				}
+				i++;
+			}
+
+			return result;
+		}
+
+		bool brsarFileSection::propogateFileLengthChange(signed long changeAmount, unsigned long pastThisAddress)
+		{
+			bool result = 1;
+
+			length += changeAmount;
+			for (unsigned long i = 0; i < fileContents.size(); i++)
+			{
+				brsarFileFileContents* currFile = &fileContents[i];
+				adjustOffset(0x00, currFile->headerAddress, changeAmount, pastThisAddress);
+				adjustOffset(0x00, currFile->dataAddress, changeAmount, pastThisAddress);
+			}
+
+			return result;
+		}
+
 		bool brsarFileSection::populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn)
 		{
 			bool result = 0;
@@ -1815,7 +1921,8 @@ namespace lava
 						std::size_t numGotten = ULONG_MAX;
 						fileContents.push_back(brsarFileFileContents());
 						fileContents.back().fileID = currEntry->fileID;
-						fileContents.back().groupID = currHeader->stringID;
+						fileContents.back().groupInfoIndex = i;
+						fileContents.back().groupID = currHeader->groupID;
 						fileContents.back().headerAddress = currHeader->headerAddress + currEntry->headerOffset;
 						fileContents.back().header = bodyIn.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset, numGotten);
 						fileContents.back().dataAddress = currHeader->dataAddress + currEntry->dataOffset;
@@ -1879,7 +1986,7 @@ namespace lava
 			{
 				result = 1;
 				std::cout << "Parsing \"" << filePathIn << "\"...\n";
-				contents.populate(fileIn);
+				byteArray contents(fileIn);
 				fileIn.close();
 				std::size_t cursor = 0x04;
 				byteOrderMarker = contents.getShort(cursor, &cursor);
@@ -1934,7 +2041,6 @@ namespace lava
 			return result;
 		}
 
-
 		std::string brsar::getSymbString(unsigned long indexIn)
 		{
 			return symbSection.getString(indexIn);
@@ -1950,7 +2056,7 @@ namespace lava
 			while (!done && i < infoSection.groupHeaders.size())
 			{
 				currentGroup = &infoSection.groupHeaders[i];
-				if (groupIDIn == currentGroup->stringID)
+				if (groupIDIn == currentGroup->groupID)
 				{
 					result = currentGroup->address;
 					done = 1;
@@ -1964,11 +2070,115 @@ namespace lava
 			return result;
 		}
 
+		bool brsar::updateInfoSectionFileOffsets()
+		{
+			bool result = 1;
+			// Update each groupHeader and its entries with current file location info
+			for (unsigned long i = 0; i < infoSection.groupHeaders.size(); i++)
+			{
+				// Grab a pointer to a given header
+				brsarInfoGroupHeader* currGroupHeader = &infoSection.groupHeaders[i];
+				// Reset its lengths to 0, because we'll be using this and building it as we go.
+				currGroupHeader->headerLength = 0x00;
+				currGroupHeader->dataLength = 0x00;
+				// Iterate through each of this headers entries, and update its info.
+				for (unsigned long u = 0; u < currGroupHeader->entries.size(); u++)
+				{
+					// Grab a pointer to the entry
+					brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
+					// Grab a pointer to the relevant fileContents entry
+					brsarFileFileContents* currFileContents = fileSection.getFileContentsPointer(currGroupEntry->fileID, currGroupHeader->groupID);
+					// If we grabbed the pointer successfully (this shouldn't ever fail, though)
+					if (currFileContents != nullptr)
+					{
+						// If this is the first entry...
+						if (u == 0)
+						{
+							// ... update the header and data address values to point to the right spots.
+							currGroupHeader->headerAddress = currFileContents->headerAddress;
+							currGroupHeader->dataAddress = currFileContents->dataAddress;
+						}
+						// Additionally, we'll always update the offset values if we're on the first entry.
+						if (u == 0)
+						{
+							// Update the offset values.
+							// These are tied to the current groupHeader's length values, which we update every run of this loop.
+							// As a result, each offset points to right after the previous item.
+							currGroupEntry->headerOffset = currGroupHeader->headerLength;
+							currGroupEntry->dataOffset = currGroupHeader->dataLength;
+						}
+						// We won't, however, always update them otherwise.
+						else
+						{
+							// In some instances, an entry after the first will have offsets of 0x00.
+							// We need to maintain this in the modified file, so we only update the offsets otherwise.
+							if (currGroupEntry->headerOffset != 0x00000000)
+							{
+								currGroupEntry->headerOffset = currGroupHeader->headerLength;
+							}
+							if (currGroupEntry->dataOffset != 0x00000000)
+							{
+								currGroupEntry->dataOffset = currGroupHeader->dataLength;
+							}
+						}
+						// Update the length values. Self explanatory.
+						currGroupEntry->headerLength = currFileContents->header.size();
+						currGroupEntry->dataLength = currFileContents->data.size();
+						// Update the groupHeader's length values. See above explanation.
+						currGroupHeader->headerLength += currGroupEntry->headerLength;
+						currGroupHeader->dataLength += currGroupEntry->dataLength;
+
+					}
+					else
+					{
+						result = 0;
+					}
+				}
+			}
+			return result;
+		}
+		bool brsar::overwriteFile(const std::vector<unsigned char>& headerIn, const std::vector<unsigned char>& dataIn, unsigned long fileIDIn)
+		{
+			bool result = 0;
+
+			std::vector<brsarFileFileContents*> fileOccurences = fileSection.getFileContentsPointerVector(fileIDIn);
+			if (!fileOccurences.empty())
+			{
+				brsarInfoFileHeader* fileHeaderPtr = infoSection.getFileHeaderPointer(fileIDIn);
+				if (fileHeaderPtr != nullptr)
+				{
+					// Handle File Section Adjustments
+					for (unsigned long i = 0; i < fileOccurences.size(); i++)
+					{
+						// Replace the header and data
+						brsarFileFileContents* currOccurence = fileOccurences[i];
+						signed long headerLengthChange = signed long(headerIn.size()) - signed long(currOccurence->header.size());
+						signed long dataLengthChange = signed long(dataIn.size()) - signed long(currOccurence->data.size());
+						currOccurence->header = headerIn;
+						currOccurence->data = dataIn;
+						// Propogate the changes in size across the fileSection
+						// Note that this needs to be done in two steps, because the dataAddress will likely change after the first step.
+						fileSection.propogateFileLengthChange(headerLengthChange, currOccurence->headerAddress);
+						fileSection.propogateFileLengthChange(dataLengthChange, currOccurence->dataAddress);
+						// Update BRSAR's length value.
+						// Note that the above propogation functions will update the FILE section's length.
+						length += headerLengthChange + dataLengthChange;
+					}
+					// Update this file's fileHeader (it's the only one that needs its length updated)
+					fileHeaderPtr->headerLength = headerIn.size();
+					fileHeaderPtr->dataLength = dataIn.size();
+					// Update the rest of the infoSection to correct the changes to file locations
+					updateInfoSectionFileOffsets();
+				}
+			}
+
+			return result;
+		}
+
 		bool brsar::summarizeSymbStringData(std::ostream& output)
 		{
 			return symbSection.dumpStrings(output);
 		}
-		
 		bool brsar::outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output)
 		{
 			bool result = 0;
@@ -2000,7 +2210,7 @@ namespace lava
 			for (std::size_t i = 0; i < infoSection.groupHeaders.size(); i++)
 			{
 				currHeader = &infoSection.groupHeaders[i];
-				std::string groupName = symbSection.getString(currHeader->stringID);
+				std::string groupName = symbSection.getString(currHeader->groupID);
 				if (groupName.size() == 0x00)
 				{
 					groupName = "[NAMELESS]";
@@ -2008,7 +2218,7 @@ namespace lava
 				std::string groupFolder = dumpRootFolder + groupName + "/";
 				std::filesystem::create_directory(groupFolder);
 				metadataOutput << "File(s) in \"" << groupName << "\" (Raw ID: " 
-					<< numToDecStringWithPadding(currHeader->stringID, 0x03) << " / 0x" << numToHexStringWithPadding(currHeader->stringID, 0x03) << 
+					<< numToDecStringWithPadding(currHeader->groupID, 0x03) << " / 0x" << numToHexStringWithPadding(currHeader->groupID, 0x03) << 
 					", Info Index: " << numToDecStringWithPadding(i, 0x03) << " / 0x" << numToHexStringWithPadding(i, 0x03) << ")...\n";
 				for (std::size_t u = 0; u < currHeader->entries.size(); u++)
 				{
@@ -2020,7 +2230,7 @@ namespace lava
 					while(!entryExported)
 					{
 						brsarFileFileContents* fileContentsPtr = &fileSection.fileContents[(*idToIndexVecPtr)[y]];
-						if (fileContentsPtr->groupID == currHeader->stringID)
+						if (fileContentsPtr->groupID == currHeader->groupID)
 						{
 							metadataOutput << "\tFile " << numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << numToHexStringWithPadding(fileContentsPtr->headerAddress, 0x08) << "\n";
 							metadataOutput << "\t\tFile Type: ";
@@ -2090,54 +2300,35 @@ namespace lava
 			sawndOutput.open(targetFilePath, std::ios_base::out | std::ios_base::binary);
 			if (sawndOutput.is_open())
 			{
-				std::size_t groupOffset = getGroupOffset(groupID);
-				std::cout << "\nGroup found @ 0x" << numToHexStringWithPadding(groupOffset, 8) << "!\n";
-
-				if (groupOffset != SIZE_MAX)
+				const brsarInfoGroupHeader* targetGroup = infoSection.getGroupWithID(groupID);
+				if (targetGroup != nullptr)
 				{
-					brsarInfoGroupHeader targetGroup;
-					targetGroup.populate(contents, groupOffset);
-
-					std::cout << "Address: 0x" << numToHexStringWithPadding(targetGroup.address, 8) << "\n";
-					std::cout << "Header: Offset = 0x" << numToHexStringWithPadding(targetGroup.headerAddress, 8) <<
-						", Length = 0x" << numToHexStringWithPadding(targetGroup.headerLength, 8) << " bytes\n";
-					std::cout << "Wave Data: Offset = 0x" << numToHexStringWithPadding(targetGroup.dataAddress, 8) <<
-						", Length = 0x" << numToHexStringWithPadding(targetGroup.dataLength, 8) << " bytes\n";
-
 					sawndOutput.put(2);
 					lava::writeRawDataToStream(sawndOutput, groupID);
-					lava::writeRawDataToStream(sawndOutput, targetGroup.dataLength);
+					lava::writeRawDataToStream(sawndOutput, targetGroup->dataLength);
 
-					std::size_t collectionRefListAddress = targetGroup.listOffset.getAddress(infoSection.address + 0x08);
-					brawlReferenceVector collectionReferences;
-					collectionReferences.populate(contents, collectionRefListAddress);
-					std::cout << "Collection List Address(0x" << numToHexStringWithPadding(collectionRefListAddress, 8) << ")\n";
-					std::cout << "Collection Count: " << collectionReferences.refs.size() << "\n";
-					std::vector<brsarInfoGroupEntry> groupInfoEntries;
-					brsarInfoGroupEntry* currEntry = nullptr;
-					unsigned long currentCollectionAddress = ULONG_MAX;
-
-					for (std::size_t i = 0; i < collectionReferences.refs.size(); i++)
+					for (std::size_t i = 0; i < targetGroup->entries.size(); i++)
 					{
-						currentCollectionAddress = collectionReferences.refs[i].getAddress(infoSection.address + 0x08);
-						std::cout << "Collection #" << i << ": Info Section Offset = 0x" << numToHexStringWithPadding(currentCollectionAddress, 8) << "\n";
-						groupInfoEntries.push_back(brsarInfoGroupEntry());
-						currEntry = &groupInfoEntries.back();
-						currEntry->populate(contents, currentCollectionAddress);
-
-						std::cout << "\tFile ID: 0x" << numToHexStringWithPadding(currEntry->fileID, 4) << "\n";
-						std::cout << "\tHeader Offset: 0x" << numToHexStringWithPadding(currEntry->headerOffset, 4) << "\n";
-						std::cout << "\tHeader Length: 0x" << numToHexStringWithPadding(currEntry->headerLength, 4) << "\n";
-						std::cout << "\tData Offset: 0x" << numToHexStringWithPadding(currEntry->dataOffset, 4) << "\n";
-						std::cout << "\tData Length: 0x" << numToHexStringWithPadding(currEntry->dataLength, 4) << "\n";
-
+						const brsarInfoGroupEntry* currEntry = &targetGroup->entries[i];
+						//std::cout << "Collection #" << i << " (@ 0x" << numToHexStringWithPadding(currEntry->address, 8) << ")\n";
+						//std::cout << "\tFile ID: 0x" << numToHexStringWithPadding(currEntry->fileID, 4) << "\n";
+						//std::cout << "\tHeader Offset: 0x" << numToHexStringWithPadding(currEntry->headerOffset, 4) << "\n";
+						//std::cout << "\tHeader Length: 0x" << numToHexStringWithPadding(currEntry->headerLength, 4) << "\n";
+						//std::cout << "\tData Offset: 0x" << numToHexStringWithPadding(currEntry->dataOffset, 4) << "\n";
+						//std::cout << "\tData Length: 0x" << numToHexStringWithPadding(currEntry->dataLength, 4) << "\n";
 						lava::writeRawDataToStream(sawndOutput, currEntry->fileID);
 						lava::writeRawDataToStream(sawndOutput, currEntry->dataOffset);
 						lava::writeRawDataToStream(sawndOutput, currEntry->dataLength);
 					}
-
-					std::cout << "Total Size:" << targetGroup.headerLength + targetGroup.dataLength << "\n";
-					sawndOutput.write(contents.data() + targetGroup.headerAddress, targetGroup.headerLength + targetGroup.dataLength);
+					byteArray fileContentsExportArr(targetGroup->dataLength + targetGroup->headerLength);
+					for (std::size_t i = 0; i < targetGroup->entries.size(); i++)
+					{
+						const brsarInfoGroupEntry* currEntry = &targetGroup->entries[i];
+						const brsarFileFileContents* currFileContentsPtr = fileSection.getFileContentsPointer(currEntry->fileID, targetGroup->groupID);
+						fileContentsExportArr.setBytes(currFileContentsPtr->header, currEntry->headerOffset);
+						fileContentsExportArr.setBytes(currFileContentsPtr->data, targetGroup->headerLength + currEntry->dataOffset);
+					}
+					fileContentsExportArr.dumpToStream(sawndOutput);
 				}
 				else
 				{
