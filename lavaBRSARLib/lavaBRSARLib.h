@@ -10,11 +10,11 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.7.0";
+		const std::string version = "v0.8.0";
 
 		enum brsarHexTags
 		{
-			// File Sections
+			// BRSAR Sections
 			bht_RSAR = 0x52534152,
 			bht_SYMB = 0x53594D42,
 			bht_INFO = 0x494E464F,
@@ -24,6 +24,11 @@ namespace lava
 			bht_RBNK = 0x52424E4B,
 			bht_RSEQ = 0x52534551,
 			bht_RWAR = 0x52574152,
+		};
+		enum brsarHexTagType
+		{
+			bhtt_RSAR_SECTION = 1,
+			bhtt_FILE_SECTION
 		};
 		enum brsarAddressConsts
 		{
@@ -42,7 +47,16 @@ namespace lava
 		const unsigned long _EMPTY_SOUND_SOUND_LENGTH = 0x02;
 		const unsigned long _EMPTY_SOUND_TOTAL_LENGTH = 0x20;
 
+		/* Misc. */
+
+		unsigned long validateHexTag(unsigned long tagIn);
 		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress);
+
+		/* Misc. */
+
+
+
+		/* Brawl Reference */
 
 		struct brawlReference
 		{
@@ -63,6 +77,12 @@ namespace lava
 			std::vector<unsigned long> getHex();
 			bool exportContents(std::ostream& destinationStream);
 		};
+
+		/* Brawl Reference */
+
+
+
+		/* BRSAR Symb Section */
 
 		struct brsarSymbPTrieNode
 		{
@@ -124,6 +144,12 @@ namespace lava
 			bool dumpTrieStrings(std::ostream& destinationStream, const brsarSymbPTrie& sourceTrie) const;
 			bool dumpStrings(std::ostream& destinationStream) const;
 		};
+
+		/* BRSAR Symb Section */
+
+
+
+		/* BRSAR Info Section */
 
 		struct brsarInfo3DSoundInfo
 		{
@@ -294,6 +320,7 @@ namespace lava
 			lava::brawl::brawlReferenceVector entryReferenceList;
 			std::vector<brsarInfoGroupEntry> entries;
 
+			bool usesFileID(unsigned long fileIDIn = ULONG_MAX) const;
 			bool populate(lava::byteArray& bodyIn, std::size_t address);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -349,6 +376,11 @@ namespace lava
 			bool exportContents(std::ostream& destinationStream);
 		};
 
+		/* BRSAR Info Section */
+
+
+
+		/* BRSAR File Section */
 
 		struct dataInfo
 		{
@@ -542,6 +574,12 @@ namespace lava
 			bool exportContents(std::ostream& destinationStream);
 		};
 
+		/* BRSAR File Section */
+
+
+
+		/* BRSAR */
+
 		struct brsar
 		{
 			unsigned short byteOrderMarker = USHRT_MAX;
@@ -568,7 +606,43 @@ namespace lava
 			bool outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output = std::cout);
 			bool doFileDump(std::string dumpRootFolder, bool joinHeaderAndData = 0);
 			bool exportSawnd(std::size_t groupID, std::string targetFilePath);
+			bool importSawnd(std::string sourceFilePath);
 		};
+
+		/* BRSAR */
+
+
+
+		/* SAWND */
+
+		struct sawndFileEntry
+		{
+			unsigned long fileID = ULONG_MAX;
+			unsigned long headerOffset = ULONG_MAX;
+			unsigned long headerLength = ULONG_MAX;
+			std::vector<unsigned char> headerContent{};
+			unsigned long dataOffset = ULONG_MAX;
+			unsigned long dataLength = ULONG_MAX;
+			std::vector<unsigned char> dataContent{};
+		};
+		struct sawnd
+		{
+		public:
+			unsigned char address = ULONG_MAX;
+
+			unsigned char sawndVersion = ULONG_MAX;
+			unsigned long groupID = ULONG_MAX;
+			unsigned long waveDataLength = ULONG_MAX;
+
+			unsigned long headerSectionOffset = ULONG_MAX;
+			unsigned long dataSectionOffset = ULONG_MAX;
+
+			std::vector<sawndFileEntry> fileEntries{};
+		public:
+			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
+		};
+
+		/* SAWND */
 	}
 }
 

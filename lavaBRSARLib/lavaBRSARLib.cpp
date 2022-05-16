@@ -4,6 +4,34 @@ namespace lava
 {
 	namespace brawl
 	{
+		/* Misc. */
+
+		unsigned long validateHexTag(unsigned long tagIn)
+		{
+			unsigned long result = 0;
+
+			switch (tagIn)
+			{
+				case brsarHexTags::bht_RSAR:
+				case brsarHexTags::bht_SYMB:
+				case brsarHexTags::bht_INFO:
+				case brsarHexTags::bht_FILE:
+				{
+					result = brsarHexTagType::bhtt_RSAR_SECTION;
+					break;
+				}
+				case brsarHexTags::bht_RWSD:
+				case brsarHexTags::bht_RBNK:
+				case brsarHexTags::bht_RSEQ:
+				case brsarHexTags::bht_RWAR:
+				{
+					result = brsarHexTagType::bhtt_FILE_SECTION;
+					break;
+				}
+			}
+
+			return result;
+		}
 		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress)
 		{
 			bool result = 0;
@@ -16,6 +44,10 @@ namespace lava
 
 			return result;
 		}
+
+		/* Misc. */
+
+
 
 		/* Brawl Reference */
 
@@ -323,40 +355,6 @@ namespace lava
 			}
 			return result;
 		}
-
-		/*bool brsarSymbSection::addSpace(unsigned long startingAddress, unsigned long adjustmentAmount)
-		{
-			bool result = 0;
-
-			// If the starting address comes before the start of this section...
-			if (startingAddress < address)
-			{
-				address += adjustmentAmount;
-			}
-			// If the starting address is somewhere within this section...
-			else if (startingAddress >= address && startingAddress < (address + length))
-			{
-				length += adjustmentAmount;
-				adjustOffset(address + 0x08, stringListOffset, adjustmentAmount, startingAddress);
-				adjustOffset(address + 0x08, soundTrieOffset, adjustmentAmount, startingAddress);
-				adjustOffset(address + 0x08, playerTrieOffset, adjustmentAmount, startingAddress);
-				adjustOffset(address + 0x08, groupTrieOffset, adjustmentAmount, startingAddress);
-				adjustOffset(address + 0x08, bankTrieOffset, adjustmentAmount, startingAddress);
-				for (std::size_t i = 0; i < stringEntryOffsets.size(); i++)
-				{
-					adjustOffset(address + 0x08, stringEntryOffsets[i], adjustmentAmount, startingAddress);
-				}
-			}
-			// If the starting address comes after the end of this section...
-			else if (startingAddress >= (address + length))
-			{
-				// do nothing?
-			}
-
-			return result;
-		}*/
-
-
 		std::string brsarSymbSection::getString(std::size_t idIn) const
 		{
 			std::string result = "";
@@ -803,6 +801,17 @@ namespace lava
 
 				result = destinationStream.good();
 			}
+			return result;
+		}
+		bool brsarInfoGroupHeader::usesFileID(unsigned long fileIDIn) const
+		{
+			bool result = 0;
+
+			for (unsigned long i = 0; !result && i < entries.size(); i++)
+			{
+				result = fileIDIn == entries[i].fileID;
+			}
+
 			return result;
 		}
 		bool brsarInfoGroupHeader::populate(lava::byteArray& bodyIn, std::size_t addressIn)
@@ -2081,57 +2090,73 @@ namespace lava
 				// Reset its lengths to 0, because we'll be using this and building it as we go.
 				currGroupHeader->headerLength = 0x00;
 				currGroupHeader->dataLength = 0x00;
-				// Iterate through each of this headers entries, and update its info.
-				for (unsigned long u = 0; u < currGroupHeader->entries.size(); u++)
+				// If there are entries to iterate through...
+				if (!currGroupHeader->entries.empty())
 				{
-					// Grab a pointer to the entry
-					brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
-					// Grab a pointer to the relevant fileContents entry
-					brsarFileFileContents* currFileContents = fileSection.getFileContentsPointer(currGroupEntry->fileID, currGroupHeader->groupID);
-					// If we grabbed the pointer successfully (this shouldn't ever fail, though)
-					if (currFileContents != nullptr)
+					// Iterate through each of this headers entries, and update its info.
+					for (unsigned long u = 0; u < currGroupHeader->entries.size(); u++)
 					{
-						// If this is the first entry...
-						if (u == 0)
+						// Grab a pointer to the entry
+						brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
+						// Grab a pointer to the relevant fileContents entry
+						brsarFileFileContents* currFileContents = fileSection.getFileContentsPointer(currGroupEntry->fileID, currGroupHeader->groupID);
+						// If we grabbed the pointer successfully (this shouldn't ever fail, though)
+						if (currFileContents != nullptr)
 						{
-							// ... update the header and data address values to point to the right spots.
-							currGroupHeader->headerAddress = currFileContents->headerAddress;
-							currGroupHeader->dataAddress = currFileContents->dataAddress;
-						}
-						// Additionally, we'll always update the offset values if we're on the first entry.
-						if (u == 0)
-						{
-							// Update the offset values.
-							// These are tied to the current groupHeader's length values, which we update every run of this loop.
-							// As a result, each offset points to right after the previous item.
-							currGroupEntry->headerOffset = currGroupHeader->headerLength;
-							currGroupEntry->dataOffset = currGroupHeader->dataLength;
-						}
-						// We won't, however, always update them otherwise.
-						else
-						{
-							// In some instances, an entry after the first will have offsets of 0x00.
-							// We need to maintain this in the modified file, so we only update the offsets otherwise.
-							if (currGroupEntry->headerOffset != 0x00000000)
+							// If this is the first entry...
+							if (u == 0)
 							{
-								currGroupEntry->headerOffset = currGroupHeader->headerLength;
+								// ... update the header and data address values to point to the right spots.
+								currGroupHeader->headerAddress = currFileContents->headerAddress;
+								currGroupHeader->dataAddress = currFileContents->dataAddress;
 							}
-							if (currGroupEntry->dataOffset != 0x00000000)
+							// Additionally, we'll always update the offset values if we're on the first entry.
+							if (u == 0)
 							{
+								// Update the offset values.
+								// These are tied to the current groupHeader's length values, which we update every run of this loop.
+								// As a result, each offset points to right after the previous item.
+								currGroupEntry->headerOffset = currGroupHeader->headerLength;
 								currGroupEntry->dataOffset = currGroupHeader->dataLength;
 							}
-						}
-						// Update the length values. Self explanatory.
-						currGroupEntry->headerLength = currFileContents->header.size();
-						currGroupEntry->dataLength = currFileContents->data.size();
-						// Update the groupHeader's length values. See above explanation.
-						currGroupHeader->headerLength += currGroupEntry->headerLength;
-						currGroupHeader->dataLength += currGroupEntry->dataLength;
+							// We won't, however, always update them otherwise.
+							else
+							{
+								// In some instances, an entry after the first will have offsets of 0x00.
+								// We need to maintain this in the modified file, so we only update the offsets otherwise.
+								if (currGroupEntry->headerOffset != 0x00000000)
+								{
+									currGroupEntry->headerOffset = currGroupHeader->headerLength;
+								}
+								if (currGroupEntry->dataOffset != 0x00000000)
+								{
+									currGroupEntry->dataOffset = currGroupHeader->dataLength;
+								}
+							}
+							// Update the length values. Self explanatory.
+							currGroupEntry->headerLength = currFileContents->header.size();
+							currGroupEntry->dataLength = currFileContents->data.size();
+							// Update the groupHeader's length values. See above explanation.
+							currGroupHeader->headerLength += currGroupEntry->headerLength;
+							currGroupHeader->dataLength += currGroupEntry->dataLength;
 
+						}
+						else
+						{
+							result = 0;
+						}
 					}
-					else
+				}
+				else
+				{
+					// Otherwise, just point the header and data address fields to just after the previous data section.
+					// I don't expect that this actually has any practical effect, since I don't expect the addresses of an empty group to ever be called.
+					// However, vBrawl handles it this way, so that's how we'll do it as well.
+					if (i > 0)
 					{
-						result = 0;
+						brsarInfoGroupHeader* prevGroupHeader = &infoSection.groupHeaders[i - 1];
+						currGroupHeader->headerAddress = prevGroupHeader->dataAddress + prevGroupHeader->dataLength;
+						currGroupHeader->dataAddress = currGroupHeader->headerAddress;
 					}
 				}
 			}
@@ -2147,6 +2172,7 @@ namespace lava
 				brsarInfoFileHeader* fileHeaderPtr = infoSection.getFileHeaderPointer(fileIDIn);
 				if (fileHeaderPtr != nullptr)
 				{
+					result = 1;
 					// Handle File Section Adjustments
 					for (unsigned long i = 0; i < fileOccurences.size(); i++)
 					{
@@ -2158,8 +2184,8 @@ namespace lava
 						currOccurence->data = dataIn;
 						// Propogate the changes in size across the fileSection
 						// Note that this needs to be done in two steps, because the dataAddress will likely change after the first step.
-						fileSection.propogateFileLengthChange(headerLengthChange, currOccurence->headerAddress);
-						fileSection.propogateFileLengthChange(dataLengthChange, currOccurence->dataAddress);
+						result &= fileSection.propogateFileLengthChange(headerLengthChange, currOccurence->headerAddress);
+						result &= fileSection.propogateFileLengthChange(dataLengthChange, currOccurence->dataAddress);
 						// Update BRSAR's length value.
 						// Note that the above propogation functions will update the FILE section's length.
 						length += headerLengthChange + dataLengthChange;
@@ -2168,7 +2194,7 @@ namespace lava
 					fileHeaderPtr->headerLength = headerIn.size();
 					fileHeaderPtr->dataLength = dataIn.size();
 					// Update the rest of the infoSection to correct the changes to file locations
-					updateInfoSectionFileOffsets();
+					result &= updateInfoSectionFileOffsets();
 				}
 			}
 
@@ -2294,7 +2320,7 @@ namespace lava
 		bool brsar::exportSawnd(std::size_t groupID, std::string targetFilePath)
 		{
 			bool result = 0;
-			std::cout << "Creating \"" << targetFilePath << "\" from Group #" << groupID << "...\n";
+			std::cout << "Creating \"" << targetFilePath << "\" from Group #" << numToDecStringWithPadding(groupID, 0x03) << " / 0x"  << numToHexStringWithPadding(groupID, 0x03) << "...\n";
 
 			std::ofstream sawndOutput;
 			sawndOutput.open(targetFilePath, std::ios_base::out | std::ios_base::binary);
@@ -2342,8 +2368,147 @@ namespace lava
 			}
 			return result;
 		}
+		bool brsar::importSawnd(std::string sourceFilePath)
+		{
+			bool result = 0;
 
+			std::ifstream sawndIn(sourceFilePath, std::ios_base::in | std::ios_base::binary);
+			if (sawndIn.is_open())
+			{
+				byteArray sawndBody(sawndIn);
+				sawndIn.close();
+				if (sawndBody.populated())
+				{
+					sawnd sawndContent;
+					sawndContent.populate(sawndBody, 0x00);
+					const brsarInfoGroupHeader* targetGroupHeader = infoSection.getGroupWithID(sawndContent.groupID);
+					std::cout << "Importing .sawnd (for Group #" << lava::numToDecStringWithPadding(sawndContent.groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(sawndContent.groupID, 0x03) << ")...\n";
+					if (targetGroupHeader != nullptr)
+					{
+						if (targetGroupHeader->entries.size() == sawndContent.fileEntries.size())
+						{
+							if (!sawndContent.fileEntries.empty())
+							{
+								for (unsigned long i = 0; i < sawndContent.fileEntries.size(); i++)
+								{
+									sawndFileEntry* currEntry = &sawndContent.fileEntries[i];
+									if (targetGroupHeader->usesFileID(currEntry->fileID))
+									{
+										std::cout << "\tOverwriting File (ID: " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ")...";
+										if (overwriteFile(currEntry->headerContent, currEntry->dataContent, currEntry->fileID))
+										{
+											std::cout << " Success!\n";
+										}
+										else
+										{
+											std::cerr << " Failure! Something has gone wrong!\n";
+										}
+									}
+									else
+									{
+										std::cout << "\t[ERROR] Unable to import File (ID: " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ") from \"" << sourceFilePath << "\" into Group (" << lava::numToDecStringWithPadding(targetGroupHeader->groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(targetGroupHeader->groupID, 0x03) << ")! The specified file isn't used in the target group!\n";
+									}
+								}
+							}
+							else
+							{
+								std::cout << "\t[WARNING] Successfully loaded provided .sawnd, but no file entries could be found!\n";
+							}
+						}
+						else
+						{
+							std::cout << "\t[ERROR] Unable to import content of \"" << sourceFilePath << "\"! The targeted Group (" << lava::numToDecStringWithPadding(sawndContent.groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(sawndContent.groupID, 0x03) << ") contains a different number of files (" << targetGroupHeader->entries.size() << ") than the provided .sawnd (" << sawndContent.fileEntries.size() << ")!\n";
+						}
+					}
+					else
+					{
+						std::cout << "\t[ERROR] Unable to import content of \"" << sourceFilePath << "\"! The targeted Group (" << lava::numToDecStringWithPadding(sawndContent.groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(sawndContent.groupID, 0x03) << ") couldn't be found in this .brsar!\n";
+					}
+				}
+				else
+				{
+					std::cout << "[ERROR] Was able to open \"" << sourceFilePath << "\", but was unable to build a byteArray!\n";
+				}
+			}
+			else
+			{
+				std::cout << "[ERROR] Unable to open \"" << sourceFilePath << "\" for import!\n";
+			}
+
+			return result;
+		}
 		/* BRSAR */
 
+
+
+		/* SAWND */
+		bool sawnd::populate(const lava::byteArray& bodyIn, unsigned long addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				address = addressIn;
+
+				sawndVersion = bodyIn.getChar(address);
+				groupID = bodyIn.getLong(address + 0x01);
+				waveDataLength = bodyIn.getLong(address + 0x05);
+
+				bool firstEntryReached = 0;
+				std::size_t cursor = address + 0x09;
+				std::vector<unsigned long> currFileTriple(3, ULONG_MAX);
+				unsigned long currFileTripleSlot = 0;
+				while (!firstEntryReached)
+				{
+					unsigned long harvestedLong = bodyIn.getLong(cursor);
+					if (!(validateHexTag(harvestedLong) == brsarHexTagType::bhtt_FILE_SECTION))
+					{
+						currFileTriple[currFileTripleSlot] = harvestedLong;
+						currFileTripleSlot++;
+						if (currFileTripleSlot >= 3)
+						{
+							fileEntries.push_back(sawndFileEntry());
+							fileEntries.back().fileID = currFileTriple[0];
+							fileEntries.back().dataOffset = currFileTriple[1];
+							fileEntries.back().dataLength = currFileTriple[2];
+							currFileTripleSlot = 0;
+							currFileTriple = {ULONG_MAX, ULONG_MAX, ULONG_MAX};
+						}
+						cursor += 0x4;
+					}
+					else
+					{
+						firstEntryReached = 1;
+					}
+				}
+				headerSectionOffset = cursor;
+				for (unsigned long currFileIndex = 0; cursor < bodyIn.size() && currFileIndex < fileEntries.size(); currFileIndex++)
+				{
+					if (validateHexTag(bodyIn.getLong(cursor)) == brsarHexTagType::bhtt_FILE_SECTION)
+					{
+						sawndFileEntry* currEntry = &fileEntries[currFileIndex];
+						currEntry->headerOffset = cursor - headerSectionOffset;
+						currEntry->headerLength = bodyIn.getLong(cursor + 0x08);
+						std::size_t numGotten = SIZE_MAX;
+						currEntry->headerContent = bodyIn.getBytes(currEntry->headerLength, headerSectionOffset + currEntry->headerOffset, numGotten);
+						cursor += currEntry->headerLength;
+					}
+					else
+					{
+						cursor = SIZE_MAX;
+					}
+				}
+				dataSectionOffset = cursor;
+				for (unsigned long currFileIndex = 0; currFileIndex < fileEntries.size(); currFileIndex++)
+				{
+					sawndFileEntry* currEntry = &fileEntries[currFileIndex];
+					std::size_t numGotten = SIZE_MAX;
+					currEntry->dataContent = bodyIn.getBytes(currEntry->dataLength, dataSectionOffset + currEntry->dataOffset, numGotten);
+				}
+				result = 1;
+			}
+			return result;
+		}
+		/* SAWND */
 	}
 }
