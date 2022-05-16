@@ -208,21 +208,28 @@ namespace lava
 			return body.size();
 		}
 
-		std::vector<unsigned char> getBytes(std::size_t numToGet, std::size_t startIndex, std::size_t& numGot) const
+		std::vector<unsigned char> getBytes(std::size_t numToGet, std::size_t startIndex, std::size_t& numGotten = nullptr) const
 		{
-			numGot = ULONG_MAX;
+			numGotten = SIZE_MAX;
 			if (startIndex < body.size())
 			{
 				if (startIndex + numToGet >= body.size())
 				{
-					numGot = body.size() - startIndex;
-					return std::vector<unsigned char>(body.begin() + startIndex, body.end());
+					numToGet = body.size() - startIndex;
 				}
-				numGot = numToGet;
+				numGotten = numToGet;
+				/*if (nextIndexOut != nullptr)
+				{
+					*nextIndexOut = startIndex + numToGet;
+				}*/
 				return std::vector<unsigned char>(body.begin() + startIndex, body.begin() + startIndex + numToGet);
 			}
 			else
 			{
+				/*if (nextIndexOut != nullptr)
+				{
+					*nextIndexOut = SIZE_MAX;
+				}*/
 				std::cerr << "[ERROR] Requested region startpoint was invalid. Specified index was [" << startIndex << "], max valid index is [" << body.size() - 1 << "].\n";
 			}
 			return std::vector<unsigned char>();
