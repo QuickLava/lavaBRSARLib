@@ -20,6 +20,7 @@ namespace lava
 	std::string doubleToStringWithPadding(double dblIn, unsigned long paddingLength, unsigned long precisionIn = 2);
 	std::string floatToStringWithPadding(float fltIn, unsigned long paddingLength, unsigned long precisionIn = 2);
 	std::string numberToOrdinal(unsigned int numberIn);
+	std::string pruneFileExtension(std::string filepathIn);
 
 	enum byteLevels
 	{

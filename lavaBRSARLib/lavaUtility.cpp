@@ -90,6 +90,17 @@ namespace lava
 		}
 		return result;
 	}
+	std::string pruneFileExtension(std::string filepathIn)
+	{
+		std::string result = filepathIn;
+		std::size_t finalPeriodPos = filepathIn.rfind('.');
+		if (finalPeriodPos != std::string::npos)
+		{
+			result = result.substr(0, finalPeriodPos);
+		}
+		return result;
+	}
+
 
 	double bytesToHigherBytes(long long int bytesIn, char byteLevel)
 	{
