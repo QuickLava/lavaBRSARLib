@@ -459,24 +459,34 @@ namespace lava
 			return findFundamentalMultiple<float>(searchCriteria, startItr, endItr, endianIn);
 		}
 
-		bool dumpToStream(std::ostream& outputStream) const
+		bool dumpToStream(std::ostream& outputStream, std::size_t startIndex = 0x00, std::size_t endIndex = SIZE_MAX) const
 		{
 			bool result = 0;
 			if (outputStream.good())
 			{
-				outputStream.write(body.data(), body.size());
-				result = outputStream.good();
+				if (startIndex < body.size())
+				{
+					if (endIndex > startIndex)
+					{
+						if (endIndex > body.size())
+						{
+							endIndex = body.size();
+						}
+						outputStream.write(body.data() + startIndex, endIndex - startIndex);
+						result = outputStream.good();
+					}
+				}
 			}
 			return result;
 		}
-		bool dumpToFile(std::string targetPath) const
+		bool dumpToFile(std::string targetPath, std::size_t startIndex = 0x00, std::size_t endIndex = SIZE_MAX) const
 		{
 			bool result = 0;
 			std::ofstream output;
 			output.open(targetPath, std::ios_base::binary | std::ios_base::out);
 			if (output.is_open())
 			{
-				result = dumpToStream(output);
+				result = dumpToStream(output, startIndex, endIndex);
 				std::cout << "Dumped body to \"" << targetPath << "\".\n";
 			}
 			return result;
