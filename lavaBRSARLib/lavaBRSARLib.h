@@ -46,10 +46,12 @@ namespace lava
 		};
 		const unsigned long _EMPTY_SOUND_SOUND_LENGTH = 0x02;
 		const unsigned long _EMPTY_SOUND_TOTAL_LENGTH = 0x20;
+		const unsigned long _MAX_SUPPORTED_SAWND_VERSION = 0x0002;
 
 		/* Misc. */
 
 		unsigned long validateHexTag(unsigned long tagIn);
+		bool detectHexTags(const byteArray& bodyIn, unsigned long startingAddress = 0x00);
 		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress);
 
 		/* Misc. */
@@ -320,6 +322,7 @@ namespace lava
 			lava::brawl::brawlReferenceVector entryReferenceList;
 			std::vector<brsarInfoGroupEntry> entries;
 
+			unsigned long getSynonymFileID(std::size_t headerLengthIn = SIZE_MAX) const;
 			bool usesFileID(unsigned long fileIDIn = ULONG_MAX) const;
 			bool populate(lava::byteArray& bodyIn, std::size_t address);
 			bool exportContents(std::ostream& destinationStream);
@@ -628,20 +631,21 @@ namespace lava
 		struct sawnd
 		{
 		public:
-			unsigned char address = ULONG_MAX;
+			unsigned long address = ULONG_MAX;
 
 			unsigned char sawndVersion = ULONG_MAX;
 			unsigned long groupID = ULONG_MAX;
-			unsigned long waveDataLength = ULONG_MAX;
-
 			unsigned long headerSectionOffset = ULONG_MAX;
+			unsigned long headerSectionLength = ULONG_MAX;
 			unsigned long dataSectionOffset = ULONG_MAX;
+			unsigned long dataSectionLength = ULONG_MAX;
 
 			std::vector<sawndFileEntry> fileEntries{};
 		public:
 			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
+			bool exportContents(std::ostream& destinationStream);
 		};
-
+		std::vector<sawnd> parseSawndFie(std::string fileIn);
 		/* SAWND */
 	}
 }

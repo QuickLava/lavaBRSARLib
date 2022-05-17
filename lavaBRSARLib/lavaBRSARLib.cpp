@@ -32,6 +32,25 @@ namespace lava
 
 			return result;
 		}
+		bool detectHexTags(const byteArray& bodyIn, unsigned long startingAddress)
+		{
+			bool result = 0;
+
+			if (startingAddress < bodyIn.size())
+			{
+				std::vector<std::size_t> findResults = bodyIn.searchMultipleChar('R', startingAddress);
+				if (!findResults.empty())
+				{
+					for (std::size_t i = 0; !result && i < findResults.size(); i++)
+					{
+						unsigned long harvestedLong = bodyIn.getLong(findResults[i]);
+						result = validateHexTag(harvestedLong);
+					}
+				}
+			}
+
+			return result;
+		}
 		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress)
 		{
 			bool result = 0;
@@ -801,6 +820,20 @@ namespace lava
 
 				result = destinationStream.good();
 			}
+			return result;
+		}
+		unsigned long brsarInfoGroupHeader::getSynonymFileID(std::size_t headerLengthIn) const
+		{
+			unsigned long result = ULONG_MAX;
+
+			for (unsigned long i = 0; result == ULONG_MAX && i < entries.size(); i++)
+			{
+				if (headerLengthIn == entries[i].headerLength)
+				{
+					result = entries[i].fileID;
+				}
+			}
+
 			return result;
 		}
 		bool brsarInfoGroupHeader::usesFileID(unsigned long fileIDIn) const
@@ -2320,7 +2353,7 @@ namespace lava
 		bool brsar::exportSawnd(std::size_t groupID, std::string targetFilePath)
 		{
 			bool result = 0;
-			std::cout << "Creating \"" << targetFilePath << "\" from Group #" << numToDecStringWithPadding(groupID, 0x03) << " / 0x"  << numToHexStringWithPadding(groupID, 0x03) << "...\n";
+			std::cout << "Creating \"" << targetFilePath << "\" from Group #" << numToDecStringWithPadding(groupID, 0x03) << " / 0x"  << numToHexStringWithPadding(groupID, 0x03) << "...";
 
 			std::ofstream sawndOutput;
 			sawndOutput.open(targetFilePath, std::ios_base::out | std::ios_base::binary);
@@ -2355,6 +2388,7 @@ namespace lava
 						fileContentsExportArr.setBytes(currFileContentsPtr->data, targetGroup->headerLength + currEntry->dataOffset);
 					}
 					fileContentsExportArr.dumpToStream(sawndOutput);
+					result = sawndOutput.good();
 				}
 				else
 				{
@@ -2365,6 +2399,14 @@ namespace lava
 			else
 			{
 				std::cerr << "[ERROR] Couldn't write to target file location (\"" << targetFilePath << "\").\n";
+			}
+			if (result)
+			{
+				std::cout << " Success!\n";
+			}
+			else
+			{
+				std::cout << " Failure!\n";
 			}
 			return result;
 		}
@@ -2379,50 +2421,101 @@ namespace lava
 				sawndIn.close();
 				if (sawndBody.populated())
 				{
-					sawnd sawndContent;
-					sawndContent.populate(sawndBody, 0x00);
-					const brsarInfoGroupHeader* targetGroupHeader = infoSection.getGroupWithID(sawndContent.groupID);
-					std::cout << "Importing .sawnd (for Group #" << lava::numToDecStringWithPadding(sawndContent.groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(sawndContent.groupID, 0x03) << ")...\n";
-					if (targetGroupHeader != nullptr)
+					std::vector<sawnd> sawndFileContents = parseSawndFie(sourceFilePath);
+					if (sawndFileContents.size() == 1)
 					{
-						if (targetGroupHeader->entries.size() == sawndContent.fileEntries.size())
+						const sawnd& sawndContent = sawndFileContents.front();
+						const brsarInfoGroupHeader* targetGroupHeader = infoSection.getGroupWithID(sawndContent.groupID);
+						std::cout << "Importing \"" << sourceFilePath << "\" (for Group #" << lava::numToDecStringWithPadding(sawndContent.groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(sawndContent.groupID, 0x03) << ")...\n";
+						if (targetGroupHeader != nullptr)
 						{
-							if (!sawndContent.fileEntries.empty())
+							if (targetGroupHeader->entries.size() == sawndContent.fileEntries.size())
 							{
-								for (unsigned long i = 0; i < sawndContent.fileEntries.size(); i++)
+								if (!sawndContent.fileEntries.empty())
 								{
-									sawndFileEntry* currEntry = &sawndContent.fileEntries[i];
-									if (targetGroupHeader->usesFileID(currEntry->fileID))
+									for (unsigned long i = 0; i < sawndContent.fileEntries.size(); i++)
 									{
-										std::cout << "\tOverwriting File (ID: " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ")...";
-										if (overwriteFile(currEntry->headerContent, currEntry->dataContent, currEntry->fileID))
+										const sawndFileEntry* currEntry = &sawndContent.fileEntries[i];
+										if (targetGroupHeader->usesFileID(currEntry->fileID))
 										{
-											std::cout << " Success!\n";
+											std::cout << "\tOverwriting File (ID: " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ")...";
+											if (overwriteFile(currEntry->headerContent, currEntry->dataContent, currEntry->fileID))
+											{
+												std::cout << " Success!\n";
+											}
+											else
+											{
+												std::cerr << " Failure! Something has gone wrong!\n";
+											}
 										}
 										else
 										{
-											std::cerr << " Failure! Something has gone wrong!\n";
+											unsigned long synonymousID = targetGroupHeader->getSynonymFileID(currEntry->headerLength);
+											if (synonymousID != ULONG_MAX)
+											{
+												std::cout << "\t[WARNING] This File's ID isn't used in this group, but one with the same header length is.\n";
+												std::cout << "\tThe two files are likely different-region versions of each other: import will continue.\n";
+												std::cout << "\tOverwriting File (ID: " << lava::numToDecStringWithPadding(synonymousID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(synonymousID, 0x03) << ")...";
+												if (overwriteFile(currEntry->headerContent, currEntry->dataContent, synonymousID))
+												{
+													std::cout << " Success!\n";
+												}
+												else
+												{
+													std::cerr << " Failure! Something has gone wrong!\n";
+												}
+											}
+											else
+											{
+												std::cout << "\t[ERROR] Unable to import File (ID: " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ") from \"" << sourceFilePath << "\" into Group (" << lava::numToDecStringWithPadding(targetGroupHeader->groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(targetGroupHeader->groupID, 0x03) << ")! The specified file isn't used in the target group!\n";
+											}
 										}
 									}
-									else
-									{
-										std::cout << "\t[ERROR] Unable to import File (ID: " << lava::numToDecStringWithPadding(currEntry->fileID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(currEntry->fileID, 0x03) << ") from \"" << sourceFilePath << "\" into Group (" << lava::numToDecStringWithPadding(targetGroupHeader->groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(targetGroupHeader->groupID, 0x03) << ")! The specified file isn't used in the target group!\n";
-									}
+								}
+								else
+								{
+									std::cout << "\t[WARNING] Successfully loaded provided .sawnd, but no file entries could be found!\n";
 								}
 							}
 							else
 							{
-								std::cout << "\t[WARNING] Successfully loaded provided .sawnd, but no file entries could be found!\n";
+								std::cout << "\t[ERROR] Unable to import content of \"" << sourceFilePath << "\"! The targeted Group (" << lava::numToDecStringWithPadding(sawndContent.groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(sawndContent.groupID, 0x03) << ") contains a different number of files (" << targetGroupHeader->entries.size() << ") than the provided .sawnd (" << sawndContent.fileEntries.size() << ")!\n";
 							}
 						}
 						else
 						{
-							std::cout << "\t[ERROR] Unable to import content of \"" << sourceFilePath << "\"! The targeted Group (" << lava::numToDecStringWithPadding(sawndContent.groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(sawndContent.groupID, 0x03) << ") contains a different number of files (" << targetGroupHeader->entries.size() << ") than the provided .sawnd (" << sawndContent.fileEntries.size() << ")!\n";
+							std::cout << "\t[ERROR] Unable to import content of \"" << sourceFilePath << "\"! The targeted Group (" << lava::numToDecStringWithPadding(sawndContent.groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(sawndContent.groupID, 0x03) << ") couldn't be found in this .brsar!\n";
 						}
+					}
+					else if (!sawndFileContents.empty())
+					{
+						std::cout << "[ERROR] The provided .sawnd file had additional .sawnd files appended to it.\n";
+						std::cout << "None of the files will be imported, they will instead be split into the following files:\n";
+						unsigned char rand1 = rand();
+						unsigned char rand2 = rand();
+						unsigned short randNum = (unsigned short (rand1) << 0x08) | rand2;
+						std::string splitBaseName = "ResawndzSplit_" + numToHexStringWithPadding(randNum, 0x04);
+						for (std::size_t i = 0; i < sawndFileContents.size(); i++)
+						{
+							sawnd* currSawnd = &sawndFileContents[i];
+							std::string groupIDStr = "(Group_" + lava::numToDecStringWithPadding(currSawnd->groupID, 0x03) + "_0x" + lava::numToHexStringWithPadding(currSawnd->groupID, 0x03) + ")";
+							std::string fullName = splitBaseName + "_" + numToDecStringWithPadding(i, 2) + "_" + groupIDStr + ".sawnd";
+							std::cout << " - \"" << fullName << "\"... ";
+							std::ofstream splitOutput(fullName, std::ios_base::out | std::ios_base::binary);
+							if (currSawnd->exportContents(splitOutput))
+							{
+								std::cout << "Export successful!\n";
+							}
+							else
+							{
+								std::cout << "Export failed!\n";
+							}
+						}
+						std::cout << "You can find the produced files in this program's directory.\n";
 					}
 					else
 					{
-						std::cout << "\t[ERROR] Unable to import content of \"" << sourceFilePath << "\"! The targeted Group (" << lava::numToDecStringWithPadding(sawndContent.groupID, 0x03) << " / 0x" << lava::numToHexStringWithPadding(sawndContent.groupID, 0x03) << ") couldn't be found in this .brsar!\n";
+						std::cout << "[ERROR] Was able to open \"" << sourceFilePath << "\", but its contents couldn't be parsed correctly!\n";
 					}
 				}
 				else
@@ -2452,7 +2545,7 @@ namespace lava
 
 				sawndVersion = bodyIn.getChar(address);
 				groupID = bodyIn.getLong(address + 0x01);
-				waveDataLength = bodyIn.getLong(address + 0x05);
+				dataSectionLength = bodyIn.getLong(address + 0x05);
 
 				bool firstEntryReached = 0;
 				std::size_t cursor = address + 0x09;
@@ -2481,16 +2574,18 @@ namespace lava
 						firstEntryReached = 1;
 					}
 				}
-				headerSectionOffset = cursor;
+				headerSectionOffset = cursor - address;
+				headerSectionLength = 0;
 				for (unsigned long currFileIndex = 0; cursor < bodyIn.size() && currFileIndex < fileEntries.size(); currFileIndex++)
 				{
 					if (validateHexTag(bodyIn.getLong(cursor)) == brsarHexTagType::bhtt_FILE_SECTION)
 					{
 						sawndFileEntry* currEntry = &fileEntries[currFileIndex];
-						currEntry->headerOffset = cursor - headerSectionOffset;
+						currEntry->headerOffset = (cursor - address) - headerSectionOffset;
 						currEntry->headerLength = bodyIn.getLong(cursor + 0x08);
+						headerSectionLength += currEntry->headerLength;
 						std::size_t numGotten = SIZE_MAX;
-						currEntry->headerContent = bodyIn.getBytes(currEntry->headerLength, headerSectionOffset + currEntry->headerOffset, numGotten);
+						currEntry->headerContent = bodyIn.getBytes(currEntry->headerLength, address + headerSectionOffset + currEntry->headerOffset, numGotten);
 						cursor += currEntry->headerLength;
 					}
 					else
@@ -2498,15 +2593,95 @@ namespace lava
 						cursor = SIZE_MAX;
 					}
 				}
-				dataSectionOffset = cursor;
+				dataSectionOffset = cursor - address;
 				for (unsigned long currFileIndex = 0; currFileIndex < fileEntries.size(); currFileIndex++)
 				{
 					sawndFileEntry* currEntry = &fileEntries[currFileIndex];
 					std::size_t numGotten = SIZE_MAX;
-					currEntry->dataContent = bodyIn.getBytes(currEntry->dataLength, dataSectionOffset + currEntry->dataOffset, numGotten);
+					currEntry->dataContent = bodyIn.getBytes(currEntry->dataLength, address + dataSectionOffset + currEntry->dataOffset, numGotten);
 				}
 				result = 1;
 			}
+			return result;
+		}
+		bool sawnd::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				switch (sawndVersion)
+				{
+					case 0x02:
+					{
+						byteArray bodyArray(headerSectionOffset + headerSectionLength + dataSectionLength, 0xCC);
+						std::size_t cursor = 0x00;
+						bodyArray.setChar(sawndVersion, cursor, &cursor);
+						bodyArray.setLong(groupID, cursor, &cursor);
+						bodyArray.setLong(dataSectionLength, cursor, &cursor);
+						for (std::size_t i = 0; i < fileEntries.size(); i++)
+						{
+							sawndFileEntry* currEntry = &fileEntries[i];
+							bodyArray.setLong(currEntry->fileID, cursor, &cursor);
+							bodyArray.setLong(currEntry->dataOffset, cursor, &cursor);
+							bodyArray.setLong(currEntry->dataLength, cursor, &cursor);
+						}
+						for (std::size_t i = 0; i < fileEntries.size(); i++)
+						{
+							sawndFileEntry* currEntry = &fileEntries[i];
+							bodyArray.setBytes(currEntry->headerContent, headerSectionOffset + currEntry->headerOffset);
+							bodyArray.setBytes(currEntry->dataContent, dataSectionOffset + currEntry->dataOffset);
+						}
+						bodyArray.dumpToStream(destinationStream);
+						result = destinationStream.good();
+						break;
+					}
+					default:
+					{
+						std::cerr << "Unsupported .sawnd version detected. Export aborted!\n";
+						break;
+					}
+				}
+			}
+
+			return result;
+		}
+
+		std::vector<sawnd> parseSawndFie(std::string fileIn)
+		{
+			std::vector<sawnd> result{};
+
+			std::ifstream fileStream(fileIn, std::ios_base::in | std::ios_base::binary);
+			if (fileStream.is_open())
+			{
+				byteArray fileByteArr(fileStream);
+				if (fileByteArr.populated())
+				{
+					std::size_t cursor = 0x00;
+					while (cursor < fileByteArr.size())
+					{
+						sawnd temp;
+						temp.populate(fileByteArr, cursor);
+						if (temp.sawndVersion <= _MAX_SUPPORTED_SAWND_VERSION && !temp.fileEntries.empty())
+						{
+							if (detectHexTags(fileByteArr, temp.address + temp.dataSectionOffset + temp.dataSectionLength))
+							{
+								cursor = temp.address + temp.dataSectionOffset + temp.dataSectionLength;
+							}
+							else
+							{
+								cursor = ULONG_MAX;
+							}
+							result.push_back(temp);
+						}
+						else
+						{
+							cursor = ULONG_MAX;
+						}
+					}
+				}
+			}
+
 			return result;
 		}
 		/* SAWND */

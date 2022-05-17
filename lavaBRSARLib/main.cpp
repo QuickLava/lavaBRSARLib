@@ -102,6 +102,7 @@ int main()
 int resawndzmain(int argc, char** argv)
 {
 	setvbuf(stdout, NULL, _IONBF, 0);
+	srand(time(0));
 	std::cout << "Resawndz v1.00\n";
 	std::cout << "Written by QuickLava\n";
 	std::cout << "Based directly on work by:\n";
