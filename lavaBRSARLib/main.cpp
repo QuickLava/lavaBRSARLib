@@ -17,7 +17,7 @@ const unsigned long fileOverwriteTestTargetFile = 0x50;
 #define ENABLE_INFO_SECTION_EXPORT_TEST	false
 // Test which exports the full FILE section.
 #define ENABLE_FILE_SECTION_EXPORT_TEST	false
-// Test which exports a sawnd file of the specified name for the specified group.
+// Test which summarizes and dumps every file in the .brsar, grouped by group.
 #define ENABLE_FILE_DUMP_TEST false
 // Test which dumps all the strings in the SYMB section.
 #define ENABLE_STRING_DUMP_TEST false
