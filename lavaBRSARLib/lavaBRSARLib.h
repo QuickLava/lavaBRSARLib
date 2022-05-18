@@ -10,7 +10,7 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.8.0";
+		const std::string version = "v0.8.1";
 
 		enum brsarHexTags
 		{
@@ -46,7 +46,6 @@ namespace lava
 		};
 		const unsigned long _EMPTY_SOUND_SOUND_LENGTH = 0x02;
 		const unsigned long _EMPTY_SOUND_TOTAL_LENGTH = 0x20;
-		const unsigned long _MAX_SUPPORTED_SAWND_VERSION = 0x0002;
 
 		/* Misc. */
 
@@ -182,7 +181,7 @@ namespace lava
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
-		}; 
+		};
 		struct brsarInfoStreamSoundInfo
 		{
 			unsigned long address = ULONG_MAX;
@@ -194,7 +193,7 @@ namespace lava
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
-		}; 
+		};
 		struct brsarInfoWaveSoundInfo
 		{
 			unsigned long address = ULONG_MAX;
@@ -608,45 +607,10 @@ namespace lava
 			bool summarizeSymbStringData(std::ostream& output = std::cout);
 			bool outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output = std::cout);
 			bool doFileDump(std::string dumpRootFolder, bool joinHeaderAndData = 0);
-			bool exportSawnd(std::size_t groupID, std::string targetFilePath);
-			bool importSawnd(std::string sourceFilePath);
 		};
 
 		/* BRSAR */
 
-
-
-		/* SAWND */
-
-		struct sawndFileEntry
-		{
-			unsigned long fileID = ULONG_MAX;
-			unsigned long headerOffset = ULONG_MAX;
-			unsigned long headerLength = ULONG_MAX;
-			std::vector<unsigned char> headerContent{};
-			unsigned long dataOffset = ULONG_MAX;
-			unsigned long dataLength = ULONG_MAX;
-			std::vector<unsigned char> dataContent{};
-		};
-		struct sawnd
-		{
-		public:
-			unsigned long address = ULONG_MAX;
-
-			unsigned char sawndVersion = ULONG_MAX;
-			unsigned long groupID = ULONG_MAX;
-			unsigned long headerSectionOffset = ULONG_MAX;
-			unsigned long headerSectionLength = ULONG_MAX;
-			unsigned long dataSectionOffset = ULONG_MAX;
-			unsigned long dataSectionLength = ULONG_MAX;
-
-			std::vector<sawndFileEntry> fileEntries{};
-		public:
-			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
-			bool exportContents(std::ostream& destinationStream);
-		};
-		std::vector<sawnd> parseSawndFie(std::string fileIn);
-		/* SAWND */
 	}
 }
 
