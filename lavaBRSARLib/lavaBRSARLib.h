@@ -10,7 +10,7 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.8.1";
+		const std::string version = "v0.8.2";
 
 		enum brsarHexTags
 		{
@@ -181,7 +181,7 @@ namespace lava
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
-		};
+		}; 
 		struct brsarInfoStreamSoundInfo
 		{
 			unsigned long address = ULONG_MAX;
@@ -193,7 +193,7 @@ namespace lava
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
-		};
+		}; 
 		struct brsarInfoWaveSoundInfo
 		{
 			unsigned long address = ULONG_MAX;
