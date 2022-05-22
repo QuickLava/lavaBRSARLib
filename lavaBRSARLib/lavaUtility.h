@@ -37,8 +37,10 @@ namespace lava
 	};
 	std::string bytesToFileSizeString(long long int bytesIn, char byteLevel = CHAR_MAX, bool abbrv = 0);
 
+	std::vector<unsigned char> streamContentsToVec(std::istream& streamIn);
+
 	template<typename objectType>
-	bool writeFundamentalToBuffer(const objectType& objectIn, unsigned char* destinationBuffer, endType endianIn = endType::et_BIG_ENDIAN)
+	bool writeFundamentalToBuffer(objectType objectIn, unsigned char* destinationBuffer, endType endianIn = endType::et_BIG_ENDIAN)
 	{
 		bool result = 0;
 		if (destinationBuffer != nullptr)
@@ -67,6 +69,11 @@ namespace lava
 		}
 		return result;
 	}
+	template<>
+	bool writeFundamentalToBuffer<float>(float objectIn, unsigned char* destinationBuffer, endType endianIn);
+	template<>
+	bool writeFundamentalToBuffer<double>(double objectIn, unsigned char* destinationBuffer, endType endianIn);
+
 	template<typename objectType>
 	std::vector<unsigned char> fundamentalToBytes(const objectType& objectIn, endType endianIn = endType::et_BIG_ENDIAN)
 	{
