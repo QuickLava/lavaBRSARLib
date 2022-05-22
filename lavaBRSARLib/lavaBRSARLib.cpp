@@ -1334,19 +1334,6 @@ namespace lava
 				}
 			}
 
-			//brsarInfoFileHeader* currHeader = nullptr;
-			//for (std::size_t i = 0; i < fileHeaders.size(); i++)
-			//{
-			//	currHeader = &fileHeaders[i];
-			//	for (std::size_t u = 0; u < currHeader->entries.size(); u++)
-			//	{
-			//		if (currHeader->entries[u].groupID == groupIDIn)
-			//		{
-			//			result.push_back(currHeader);
-			//		}
-			//	}
-			//}
-
 			return result;
 		}
 		brsarInfoFileHeader* brsarInfoSection::getFileHeaderPointer(unsigned long fileID)
@@ -1943,7 +1930,7 @@ namespace lava
 				targetWaveInfo->packetContents.body = rawDataIn;
 				targetWaveInfo->packetContents.padding = std::vector<unsigned char> (0x10 - (targetWaveInfo->packetContents.body.size() % 0x10), 0x00);
 				targetWaveInfo->nibbles = targetWaveInfo->packetContents.body.size() * 2;
-				updateWaveEntryDataLocations();
+				result = updateWaveEntryDataLocations();
 			}
 
 			return result;
@@ -1986,37 +1973,10 @@ namespace lava
 				{
 					waveInfo* currWave = &waveSection.entries[i];
 					waveInfo* nextWave = &waveSection.entries[i + 1];
-					/*unsigned long length = currWave->getLengthInBytes();
-					unsigned long paddingLength = 0x00;
-					unsigned long currWaveDataEndpoint = currWave->dataLocation + length;
-					if (currWaveDataEndpoint <= nextWave->dataLocation)
-					{
-						paddingLength = nextWave->dataLocation - currWaveDataEndpoint;
-					}
-					else
-					{
-						unsigned long overflowAmount = currWaveDataEndpoint - nextWave->dataLocation;
-						length -= overflowAmount;
-						currWave->nibbles -= overflowAmount * 2;
-					}*/
 					result &= populateWavePacket(bodyIn, i, waveDataAddressIn, waveDataAddressIn + nextWave->dataLocation);
 				}
 				waveInfo* finalWave = &waveSection.entries.back();
-				/*unsigned long length = finalWave->getLengthInBytes();
-				unsigned long paddingLength = 0x00;
-				unsigned long finalWaveDataEndpoint = finalWave->dataLocation + length;
-				if (finalWaveDataEndpoint <= waveDataLengthIn)
-				{
-					paddingLength = waveDataLengthIn - finalWaveDataEndpoint;
-				}
-				else
-				{
-					unsigned long overflowAmount = finalWaveDataEndpoint - waveDataLengthIn;
-					length -= overflowAmount;
-					finalWave->nibbles -= overflowAmount * 2;
-				}*/
 				result &= populateWavePacket(bodyIn, waveSection.entries.size() - 1, waveDataAddressIn, waveDataAddressIn + waveDataLengthIn);
-				//result &= finalWave->packetContents.populate(bodyIn, waveDataAddressIn + finalWave->dataLocation, length, paddingLength);
 			}
 
 			return result;
@@ -2079,10 +2039,6 @@ namespace lava
 					waveInfo* currWave = &waveSection.entries[i];
 					destinationStream.write((const char*)currWave->packetContents.body.data(), currWave->packetContents.body.size());
 					destinationStream.write((const char*)currWave->packetContents.padding.data(), currWave->packetContents.padding.size());
-					/*for (unsigned long u = 0; u < currWave->packetContents.paddingLength; u++)
-					{
-						destinationStream.put(0);
-					}*/
 				}
 				result = destinationStream.good();
 			}
