@@ -101,7 +101,7 @@ namespace lava
 			return result;
 		}
 
-		bool brawlReferenceVector::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		bool brawlReferenceVector::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
@@ -152,6 +152,401 @@ namespace lava
 		}
 
 		/* Brawl Reference */
+
+
+
+		/*Sound Data Structs*/
+
+		bool channelInfo::populate(const lava::byteArray& bodyIn, unsigned long addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated() && (addressIn + 0x1C) <= bodyIn.size())
+			{
+				result = 1;
+				address = addressIn;
+
+				std::size_t cursor = addressIn;
+				channelDataOffset = bodyIn.getLong(cursor, &cursor);
+				adpcmInfoOffset = bodyIn.getLong(cursor, &cursor);
+				volFrontLeft = bodyIn.getLong(cursor, &cursor);
+				volFrontRight = bodyIn.getLong(cursor, &cursor);
+				volBackLeft = bodyIn.getLong(cursor, &cursor);
+				volBackRight = bodyIn.getLong(cursor, &cursor);
+				reserved = bodyIn.getLong(cursor, &cursor);
+			}
+
+			return result;
+		}
+		bool channelInfo::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, channelDataOffset);
+				lava::writeRawDataToStream(destinationStream, adpcmInfoOffset);
+				lava::writeRawDataToStream(destinationStream, volFrontLeft);
+				lava::writeRawDataToStream(destinationStream, volFrontRight);
+				lava::writeRawDataToStream(destinationStream, volBackLeft);
+				lava::writeRawDataToStream(destinationStream, volBackRight);
+				lava::writeRawDataToStream(destinationStream, reserved);
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		bool adpcmInfo::populate(const lava::byteArray& bodyIn, unsigned long addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated() && (addressIn + 0x30) <= bodyIn.size())
+			{
+				result = 1;
+				address = addressIn;
+
+				std::size_t cursor = addressIn;
+				for (unsigned long i = 0; i < coefficients.size(); i++)
+				{
+					coefficients[i] = bodyIn.getShort(cursor, &cursor);
+				}
+				gain = bodyIn.getShort(cursor, &cursor);
+				ps = bodyIn.getShort(cursor, &cursor);
+				yn1 = bodyIn.getShort(cursor, &cursor);
+				yn2 = bodyIn.getShort(cursor, &cursor);
+				lps = bodyIn.getShort(cursor, &cursor);
+				lyn1 = bodyIn.getShort(cursor, &cursor);
+				lyn2 = bodyIn.getShort(cursor, &cursor);
+				pad = bodyIn.getShort(cursor, &cursor);
+			}
+
+			return result;
+		}
+		bool adpcmInfo::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				for (std::size_t i = 0; i < coefficients.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, coefficients[i]);
+				}
+				lava::writeRawDataToStream(destinationStream, gain);
+				lava::writeRawDataToStream(destinationStream, ps);
+				lava::writeRawDataToStream(destinationStream, yn1);
+				lava::writeRawDataToStream(destinationStream, yn2);
+				lava::writeRawDataToStream(destinationStream, lps);
+				lava::writeRawDataToStream(destinationStream, lyn1);
+				lava::writeRawDataToStream(destinationStream, lyn2);
+				lava::writeRawDataToStream(destinationStream, pad);
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		bool spt::populate(const byteArray& bodyIn, unsigned long addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated() && (addressIn + 0x48 <= bodyIn.size()))
+			{
+				result = 1;
+				std::size_t cursor = addressIn + 0x20;
+				for (unsigned long i = 0; i < coefficients.size(); i++)
+				{
+					coefficients[i] = bodyIn.getShort(cursor, &cursor);
+				}
+				ps = bodyIn.getShort(0x42);
+			}
+
+			return result;
+		}
+		bool spt::populate(std::string pathIn, unsigned long addressIn)
+		{
+			bool result = 0;
+
+			std::ifstream sptStream(pathIn, std::ios_base::in | std::ios_base::binary);
+			if (sptStream.is_open())
+			{
+				byteArray tempArr(sptStream);
+				result = populate(tempArr, addressIn);
+			}
+
+			return result;
+		}
+
+		bool wavePacket::populate(const lava::byteArray& bodyIn, unsigned long addressIn, unsigned long dataLengthIn, unsigned long paddingLengthIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated() && (addressIn + dataLengthIn + paddingLengthIn) <= bodyIn.size())
+			{
+				address = addressIn;
+
+				std::size_t numGotten = SIZE_MAX;
+				body = bodyIn.getBytes(dataLengthIn, addressIn, numGotten);
+				result = numGotten == dataLengthIn;
+				padding = bodyIn.getBytes(paddingLengthIn, addressIn + dataLengthIn, numGotten);
+				result &= numGotten == paddingLengthIn;
+				populated = result;
+				if (!result)
+				{
+					address = ULONG_MAX;
+					body.clear();
+				}
+			}
+
+			return result;
+		}
+
+		unsigned long waveInfo::getLengthInBytes() const
+		{
+			unsigned long result = ULONG_MAX;
+
+			if (address != ULONG_MAX)
+			{
+				auto divResult = ldiv(nibbles, 2);
+				result = divResult.quot + divResult.rem;
+			}
+
+			return result;
+		}
+		void waveInfo::copyOverWaveInfoProperties(const waveInfo& sourceInfo)
+		{
+			address = brsarAddressConsts::bac_NOT_IN_FILE;
+
+			encoding = sourceInfo.encoding;
+			looped = sourceInfo.looped;
+			channels = sourceInfo.channels;
+			sampleRate24 = sourceInfo.sampleRate24;
+			sampleRate = sourceInfo.sampleRate;
+			pad = sourceInfo.pad;
+			loopStartSample = sourceInfo.loopStartSample;
+			nibbles = sourceInfo.nibbles;
+			channelInfoTableOffset = sourceInfo.channelInfoTableOffset;
+			reserved = sourceInfo.reserved;
+			channelInfoTable = sourceInfo.channelInfoTable;
+			channelInfoEntries = sourceInfo.channelInfoEntries;
+			adpcmInfoEntries = sourceInfo.adpcmInfoEntries;
+		}
+		bool waveInfo::populate(const lava::byteArray& bodyIn, unsigned long addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				address = addressIn;
+
+				std::size_t cursor = address;
+				encoding = bodyIn.getChar(cursor, &cursor);
+				looped = bodyIn.getChar(cursor, &cursor);
+				channels = bodyIn.getChar(cursor, &cursor);
+				sampleRate24 = bodyIn.getChar(cursor, &cursor);
+				sampleRate = bodyIn.getShort(cursor, &cursor);
+				dataLocationType = bodyIn.getChar(cursor, &cursor);
+				pad = bodyIn.getChar(cursor, &cursor);
+				loopStartSample = bodyIn.getLong(cursor, &cursor);
+				nibbles = bodyIn.getLong(cursor, &cursor);
+				channelInfoTableOffset = bodyIn.getLong(cursor, &cursor);
+				dataLocation = bodyIn.getLong(cursor, &cursor);
+				reserved = bodyIn.getLong(cursor, &cursor);
+
+				for (unsigned long i = 0; i < channels; i++)
+				{
+					channelInfoTable.push_back(bodyIn.getLong(cursor, &cursor));
+					channelInfoEntries.push_back(channelInfo());
+					unsigned long infoAddress = address + channelInfoTable.back();
+					channelInfoEntries.back().populate(bodyIn, infoAddress);
+					if (encoding == 2)
+					{
+						adpcmInfoEntries.push_back(adpcmInfo());
+						adpcmInfoEntries.back().populate(bodyIn, infoAddress + 0x1C);
+					}
+				}
+				result = 1;
+			}
+
+			return result;
+		}
+		bool waveInfo::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, encoding);
+				lava::writeRawDataToStream(destinationStream, looped);
+				lava::writeRawDataToStream(destinationStream, channels);
+				lava::writeRawDataToStream(destinationStream, sampleRate24);
+				lava::writeRawDataToStream(destinationStream, sampleRate);
+				lava::writeRawDataToStream(destinationStream, dataLocationType);
+				lava::writeRawDataToStream(destinationStream, pad);
+				lava::writeRawDataToStream(destinationStream, loopStartSample);
+				lava::writeRawDataToStream(destinationStream, nibbles);
+				lava::writeRawDataToStream(destinationStream, channelInfoTableOffset);
+				lava::writeRawDataToStream(destinationStream, dataLocation);
+				lava::writeRawDataToStream(destinationStream, reserved);
+
+				for (unsigned long i = 0x0; i < channelInfoTable.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, channelInfoTable[i]);
+				}
+				for (unsigned long i = 0x0; i < channelInfoEntries.size(); i++)
+				{
+					channelInfoEntries[i].exportContents(destinationStream);
+					if (encoding == 2)
+					{
+						adpcmInfoEntries[i].exportContents(destinationStream);
+					}
+				}
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		void dataInfo::copyOverDataInfoProperties(const dataInfo& sourceInfo)
+		{
+			address = brsarAddressConsts::bac_NOT_IN_FILE;
+
+			wsdPitch = sourceInfo.wsdPitch;
+			wsdPan = sourceInfo.wsdPan;
+			wsdSurroundPan = sourceInfo.wsdSurroundPan;
+			wsdFxSendA = sourceInfo.wsdFxSendA;
+			wsdFxSendB = sourceInfo.wsdFxSendB;
+			wsdFxSendC = sourceInfo.wsdFxSendC;
+			wsdMainSend = sourceInfo.wsdMainSend;
+			wsdPad1 = sourceInfo.wsdPad1;
+			wsdPad2 = sourceInfo.wsdPad2;
+
+			ttPosition = sourceInfo.ttPosition;
+			ttLength = sourceInfo.ttLength;
+			ttNoteIndex = sourceInfo.ttNoteIndex;
+
+			ntAttack = sourceInfo.ntAttack;
+			ntDecay = sourceInfo.ntDecay;
+			ntSustain = sourceInfo.ntSustain;
+			ntRelease = sourceInfo.ntRelease;
+			ntHold = sourceInfo.ntHold;
+			ntPad1 = sourceInfo.ntPad1;
+			ntPad2 = sourceInfo.ntPad2;
+			ntPad3 = sourceInfo.ntPad3;
+			ntOriginalKey = sourceInfo.ntOriginalKey;
+			ntVolume = sourceInfo.ntVolume;
+			ntPan = sourceInfo.ntPan;
+			ntSurroundPan = sourceInfo.ntSurroundPan;
+			ntPitch = sourceInfo.ntPitch;
+		}
+		bool dataInfo::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				address = addressIn;
+				wsdInfo = brawlReference(bodyIn.getLLong(address));
+				trackTable = brawlReference(bodyIn.getLLong(address + 0x08));
+				noteTable = brawlReference(bodyIn.getLLong(address + 0x10));
+
+				wsdPitch = bodyIn.getFloat(address + 0x18);
+				wsdPan = bodyIn.getChar(address + 0x1C);
+				wsdSurroundPan = bodyIn.getChar(address + 0x1D);
+				wsdFxSendA = bodyIn.getChar(address + 0x1E);
+				wsdFxSendB = bodyIn.getChar(address + 0x1F);
+				wsdFxSendC = bodyIn.getChar(address + 0x20);
+				wsdMainSend = bodyIn.getChar(address + 0x21);
+				wsdPad1 = bodyIn.getChar(address + 0x22);
+				wsdPad2 = bodyIn.getChar(address + 0x23);
+				wsdGraphEnvTableRef = brawlReference(bodyIn.getLLong(address + 0x24));
+				wsdRandomizerTableRef = brawlReference(bodyIn.getLLong(address + 0x2C));
+				wsdPadding = bodyIn.getLong(address + 0x34);
+
+				ttReferenceList1.populate(bodyIn, address + 0x38);
+				ttIntermediateReference = brawlReference(bodyIn.getLLong(address + 0x44));
+				ttReferenceList2.populate(bodyIn, address + 0x4C);
+				ttPosition = bodyIn.getFloat(address + 0x58);
+				ttLength = bodyIn.getFloat(address + 0x5C);
+				ttNoteIndex = bodyIn.getLong(address + 0x60);
+				ttReserved = bodyIn.getLong(address + 0x64);
+
+				ntReferenceList.populate(bodyIn, address + 0x68);
+				ntWaveIndex = bodyIn.getLong(address + 0x74);
+				ntAttack = bodyIn.getChar(address + 0x78);
+				ntDecay = bodyIn.getChar(address + 0x79);
+				ntSustain = bodyIn.getChar(address + 0x7A);
+				ntRelease = bodyIn.getChar(address + 0x7B);
+				ntHold = bodyIn.getChar(address + 0x7C);
+				ntPad1 = bodyIn.getChar(address + 0x7D);
+				ntPad2 = bodyIn.getChar(address + 0x7E);
+				ntPad3 = bodyIn.getChar(address + 0x7F);
+				ntOriginalKey = bodyIn.getChar(address + 0x80);
+				ntVolume = bodyIn.getChar(address + 0x81);
+				ntPan = bodyIn.getChar(address + 0x82);
+				ntSurroundPan = bodyIn.getChar(address + 0x83);
+				ntPitch = bodyIn.getFloat(address + 0x84);
+				ntIfoTableRef = brawlReference(bodyIn.getLLong(address + 0x88));
+				ntGraphEnvTableRef = brawlReference(bodyIn.getLLong(address + 0x90));
+				ntRandomizerTableRef = brawlReference(bodyIn.getLLong(address + 0x98));
+				ntReserved = bodyIn.getLong(address + 0xA0);
+
+				result = 1;
+			}
+
+			return result;
+		}
+		bool dataInfo::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, wsdInfo.getHex());
+				lava::writeRawDataToStream(destinationStream, trackTable.getHex());
+				lava::writeRawDataToStream(destinationStream, noteTable.getHex());
+				lava::writeRawDataToStream(destinationStream, wsdPitch);
+				lava::writeRawDataToStream(destinationStream, wsdPan);
+				lava::writeRawDataToStream(destinationStream, wsdSurroundPan);
+				lava::writeRawDataToStream(destinationStream, wsdFxSendA);
+				lava::writeRawDataToStream(destinationStream, wsdFxSendB);
+				lava::writeRawDataToStream(destinationStream, wsdFxSendC);
+				lava::writeRawDataToStream(destinationStream, wsdMainSend);
+				lava::writeRawDataToStream(destinationStream, wsdPad1);
+				lava::writeRawDataToStream(destinationStream, wsdPad2);
+				lava::writeRawDataToStream(destinationStream, wsdGraphEnvTableRef.getHex());
+				lava::writeRawDataToStream(destinationStream, wsdRandomizerTableRef.getHex());
+				lava::writeRawDataToStream(destinationStream, wsdPadding);
+
+				ttReferenceList1.exportContents(destinationStream);
+				lava::writeRawDataToStream(destinationStream, ttIntermediateReference.getHex());
+				ttReferenceList2.exportContents(destinationStream);
+				lava::writeRawDataToStream(destinationStream, ttPosition);
+				lava::writeRawDataToStream(destinationStream, ttLength);
+				lava::writeRawDataToStream(destinationStream, ttNoteIndex);
+				lava::writeRawDataToStream(destinationStream, ttReserved);
+
+				ntReferenceList.exportContents(destinationStream);
+				lava::writeRawDataToStream(destinationStream, ntWaveIndex);
+				lava::writeRawDataToStream(destinationStream, ntAttack);
+				lava::writeRawDataToStream(destinationStream, ntDecay);
+				lava::writeRawDataToStream(destinationStream, ntSustain);
+				lava::writeRawDataToStream(destinationStream, ntRelease);
+				lava::writeRawDataToStream(destinationStream, ntHold);
+				lava::writeRawDataToStream(destinationStream, ntPad1);
+				lava::writeRawDataToStream(destinationStream, ntPad2);
+				lava::writeRawDataToStream(destinationStream, ntPad3);
+				lava::writeRawDataToStream(destinationStream, ntOriginalKey);
+				lava::writeRawDataToStream(destinationStream, ntVolume);
+				lava::writeRawDataToStream(destinationStream, ntPan);
+				lava::writeRawDataToStream(destinationStream, ntSurroundPan);
+				lava::writeRawDataToStream(destinationStream, ntPitch);
+				lava::writeRawDataToStream(destinationStream, ntIfoTableRef.getHex());
+				lava::writeRawDataToStream(destinationStream, ntGraphEnvTableRef.getHex());
+				lava::writeRawDataToStream(destinationStream, ntRandomizerTableRef.getHex());
+				lava::writeRawDataToStream(destinationStream, ntReserved);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		/*Sound Data Structs*/
 
 
 
@@ -1191,708 +1586,6 @@ namespace lava
 
 		/* BRSAR File Section */
 
-		/* RWSD */
-		void dataInfo::copyOverDataInfoProperties(const dataInfo& sourceInfo)
-		{
-			address = brsarAddressConsts::bac_NOT_IN_FILE;
-
-			wsdPitch = sourceInfo.wsdPitch;
-			wsdPan = sourceInfo.wsdPan;
-			wsdSurroundPan = sourceInfo.wsdSurroundPan;
-			wsdFxSendA = sourceInfo.wsdFxSendA;
-			wsdFxSendB = sourceInfo.wsdFxSendB;
-			wsdFxSendC = sourceInfo.wsdFxSendC;
-			wsdMainSend = sourceInfo.wsdMainSend;
-			wsdPad1 = sourceInfo.wsdPad1;
-			wsdPad2 = sourceInfo.wsdPad2;
-
-			ttPosition = sourceInfo.ttPosition;
-			ttLength = sourceInfo.ttLength;
-			ttNoteIndex = sourceInfo.ttNoteIndex;
-
-			ntAttack = sourceInfo.ntAttack;
-			ntDecay = sourceInfo.ntDecay;
-			ntSustain = sourceInfo.ntSustain;
-			ntRelease = sourceInfo.ntRelease;
-			ntHold = sourceInfo.ntHold;
-			ntPad1 = sourceInfo.ntPad1;
-			ntPad2 = sourceInfo.ntPad2;
-			ntPad3 = sourceInfo.ntPad3;
-			ntOriginalKey = sourceInfo.ntOriginalKey;
-			ntVolume = sourceInfo.ntVolume;
-			ntPan = sourceInfo.ntPan;
-			ntSurroundPan = sourceInfo.ntSurroundPan;
-			ntPitch = sourceInfo.ntPitch;
-		}
-
-		bool dataInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				address = addressIn;
-				wsdInfo = brawlReference(bodyIn.getLLong(address));
-				trackTable = brawlReference(bodyIn.getLLong(address + 0x08));
-				noteTable = brawlReference(bodyIn.getLLong(address + 0x10));
-
-				wsdPitch = bodyIn.getFloat(address + 0x18);
-				wsdPan = bodyIn.getChar(address + 0x1C);
-				wsdSurroundPan = bodyIn.getChar(address + 0x1D);
-				wsdFxSendA = bodyIn.getChar(address + 0x1E);
-				wsdFxSendB = bodyIn.getChar(address + 0x1F);
-				wsdFxSendC = bodyIn.getChar(address + 0x20);
-				wsdMainSend = bodyIn.getChar(address + 0x21);
-				wsdPad1 = bodyIn.getChar(address + 0x22);
-				wsdPad2 = bodyIn.getChar(address + 0x23);
-				wsdGraphEnvTableRef = brawlReference(bodyIn.getLLong(address + 0x24));
-				wsdRandomizerTableRef = brawlReference(bodyIn.getLLong(address + 0x2C));
-				wsdPadding = bodyIn.getLong(address + 0x34);
-
-				ttReferenceList1.populate(bodyIn, address + 0x38);
-				ttIntermediateReference = brawlReference(bodyIn.getLLong(address + 0x44));
-				ttReferenceList2.populate(bodyIn, address + 0x4C);
-				ttPosition = bodyIn.getFloat(address + 0x58);
-				ttLength = bodyIn.getFloat(address + 0x5C);
-				ttNoteIndex = bodyIn.getLong(address + 0x60);
-				ttReserved = bodyIn.getLong(address + 0x64);
-
-				ntReferenceList.populate(bodyIn, address + 0x68);
-				ntWaveIndex = bodyIn.getLong(address + 0x74);
-				ntAttack = bodyIn.getChar(address + 0x78);
-				ntDecay = bodyIn.getChar(address + 0x79);
-				ntSustain = bodyIn.getChar(address + 0x7A);
-				ntRelease = bodyIn.getChar(address + 0x7B);
-				ntHold = bodyIn.getChar(address + 0x7C);
-				ntPad1 = bodyIn.getChar(address + 0x7D);
-				ntPad2 = bodyIn.getChar(address + 0x7E);
-				ntPad3 = bodyIn.getChar(address + 0x7F);
-				ntOriginalKey = bodyIn.getChar(address + 0x80);
-				ntVolume = bodyIn.getChar(address + 0x81);
-				ntPan = bodyIn.getChar(address + 0x82);
-				ntSurroundPan = bodyIn.getChar(address + 0x83);
-				ntPitch = bodyIn.getFloat(address + 0x84);
-				ntIfoTableRef = brawlReference(bodyIn.getLLong(address + 0x88));
-				ntGraphEnvTableRef = brawlReference(bodyIn.getLLong(address + 0x90));
-				ntRandomizerTableRef = brawlReference(bodyIn.getLLong(address + 0x98));
-				ntReserved = bodyIn.getLong(address + 0xA0);
-
-				result = 1;
-			}
-
-			return result;
-		}
-		bool dataInfo::exportContents(std::ostream& destinationStream)
-		{
-			bool result = 0;
-			if (destinationStream.good())
-			{
-				lava::writeRawDataToStream(destinationStream, wsdInfo.getHex());
-				lava::writeRawDataToStream(destinationStream, trackTable.getHex());
-				lava::writeRawDataToStream(destinationStream, noteTable.getHex());
-				lava::writeRawDataToStream(destinationStream, wsdPitch);
-				lava::writeRawDataToStream(destinationStream, wsdPan);
-				lava::writeRawDataToStream(destinationStream, wsdSurroundPan);
-				lava::writeRawDataToStream(destinationStream, wsdFxSendA);
-				lava::writeRawDataToStream(destinationStream, wsdFxSendB);
-				lava::writeRawDataToStream(destinationStream, wsdFxSendC);
-				lava::writeRawDataToStream(destinationStream, wsdMainSend);
-				lava::writeRawDataToStream(destinationStream, wsdPad1);
-				lava::writeRawDataToStream(destinationStream, wsdPad2);
-				lava::writeRawDataToStream(destinationStream, wsdGraphEnvTableRef.getHex());
-				lava::writeRawDataToStream(destinationStream, wsdRandomizerTableRef.getHex());
-				lava::writeRawDataToStream(destinationStream, wsdPadding);
-
-				ttReferenceList1.exportContents(destinationStream);
-				lava::writeRawDataToStream(destinationStream, ttIntermediateReference.getHex());
-				ttReferenceList2.exportContents(destinationStream);
-				lava::writeRawDataToStream(destinationStream, ttPosition);
-				lava::writeRawDataToStream(destinationStream, ttLength);
-				lava::writeRawDataToStream(destinationStream, ttNoteIndex);
-				lava::writeRawDataToStream(destinationStream, ttReserved);
-
-				ntReferenceList.exportContents(destinationStream);
-				lava::writeRawDataToStream(destinationStream, ntWaveIndex);
-				lava::writeRawDataToStream(destinationStream, ntAttack);
-				lava::writeRawDataToStream(destinationStream, ntDecay);
-				lava::writeRawDataToStream(destinationStream, ntSustain);
-				lava::writeRawDataToStream(destinationStream, ntRelease);
-				lava::writeRawDataToStream(destinationStream, ntHold);
-				lava::writeRawDataToStream(destinationStream, ntPad1);
-				lava::writeRawDataToStream(destinationStream, ntPad2);
-				lava::writeRawDataToStream(destinationStream, ntPad3);
-				lava::writeRawDataToStream(destinationStream, ntOriginalKey);
-				lava::writeRawDataToStream(destinationStream, ntVolume);
-				lava::writeRawDataToStream(destinationStream, ntPan);
-				lava::writeRawDataToStream(destinationStream, ntSurroundPan);
-				lava::writeRawDataToStream(destinationStream, ntPitch);
-				lava::writeRawDataToStream(destinationStream, ntIfoTableRef.getHex());
-				lava::writeRawDataToStream(destinationStream, ntGraphEnvTableRef.getHex());
-				lava::writeRawDataToStream(destinationStream, ntRandomizerTableRef.getHex());
-				lava::writeRawDataToStream(destinationStream, ntReserved);
-
-				result = destinationStream.good();
-			}
-			return result;
-		}
-		bool rwsdDataSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				address = addressIn;
-				length = bodyIn.getLong(addressIn + 0x04);
-				entryReferences.populate(bodyIn, addressIn + 0x08);
-				std::vector<brawlReference>* refVecPtr = &entryReferences.refs;
-				std::size_t entryCount = refVecPtr->size();
-				unsigned long entryTargetAddress = ULONG_MAX;
-				entries.resize(entryCount);
-				for (std::size_t i = 0; i < entryCount; i++)
-				{
-					entryTargetAddress = address + 0x08 + refVecPtr->at(i).getAddress();
-					if (bodyIn.getLong(entryTargetAddress) == 0x01000000)
-					{
-						entries[i].populate(bodyIn, entryTargetAddress);
-					}
-					else
-					{
-						std::cerr << "Skipping Data Entry @ " << entryTargetAddress << "\n";
-					}
-				}
-
-				result = 1;
-			}
-
-			return result;
-		}
-		bool rwsdDataSection::exportContents(std::ostream& destinationStream)
-		{
-			bool result = 0;
-			if (destinationStream.good())
-			{
-				unsigned long initialStreamPos = destinationStream.tellp();
-				destinationStream << "DATA";
-				lava::writeRawDataToStream(destinationStream, length);
-				entryReferences.exportContents(destinationStream);
-				for (std::size_t i = 0; i < entries.size(); i++)
-				{
-					entries[i].exportContents(destinationStream);
-				}
-				unsigned long finalStreamPos = destinationStream.tellp();
-				unsigned long lengthOfExport = finalStreamPos - initialStreamPos;
-				if (lengthOfExport != length)
-				{
-					if (lengthOfExport < length)
-					{
-						std::vector<char> padding{};
-						padding.resize(length - lengthOfExport, 0x00);
-						destinationStream.write(padding.data(), padding.size());
-					}
-				}
-				result = destinationStream.good();
-			}
-			return result;
-		}
-
-		bool wavePacket::populate(lava::byteArray& bodyIn, unsigned long addressIn, unsigned long lengthIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				address = addressIn;
-				length = lengthIn;
-
-				std::size_t numGotten = SIZE_MAX;
-				body = bodyIn.getBytes(lengthIn, addressIn, numGotten);
-				result = numGotten == lengthIn;
-				populated = result;
-				if (!result)
-				{
-					length = ULONG_MAX;
-					address = ULONG_MAX;
-					body.clear();
-				}
-			}
-
-			return result;
-		}
-
-		unsigned long waveInfo::getLengthInBytes() const
-		{
-			unsigned long result = ULONG_MAX;
-
-			if (address != ULONG_MAX)
-			{
-				auto divResult = ldiv(nibbles, 2);
-				result = divResult.quot + divResult.rem;
-			}
-
-			return result;
-		}
-		void waveInfo::copyOverWaveInfoProperties(const waveInfo& sourceInfo)
-		{
-			address = brsarAddressConsts::bac_NOT_IN_FILE;
-
-			encoding = sourceInfo.encoding;
-			looped = sourceInfo.looped;
-			channels = sourceInfo.channels;
-			sampleRate24 = sourceInfo.sampleRate24;
-			sampleRate = sourceInfo.sampleRate;
-			//dataLocationType = sourceInfo.dataLocationType;
-			pad = sourceInfo.pad;
-			loopStartSample = sourceInfo.loopStartSample;
-			nibbles = sourceInfo.nibbles;
-			channelInfoTableOffset = sourceInfo.channelInfoTableOffset;
-			//dataLocation = sourceInfo.dataLocation;
-			reserved = sourceInfo.reserved;
-
-			channelInfoTableLength = sourceInfo.channelInfoTableLength;
-			channelInfoTable = sourceInfo.channelInfoTable;
-		}
-		bool waveInfo::populate(lava::byteArray& bodyIn, unsigned long addressIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				address = addressIn;
-
-				encoding = bodyIn.getChar(address);
-				looped = bodyIn.getChar(address + 0x01);
-				channels = bodyIn.getChar(address + 0x02);
-				sampleRate24 = bodyIn.getChar(address + 0x03);
-				sampleRate = bodyIn.getShort(address + 0x04);
-				dataLocationType = bodyIn.getChar(address + 0x06);
-				pad = bodyIn.getChar(address + 0x07);
-				loopStartSample = bodyIn.getLong(address + 0x08);
-				nibbles = bodyIn.getLong(address + 0x0C);
-				channelInfoTableOffset = bodyIn.getLong(address + 0x10);
-				dataLocation = bodyIn.getLong(address + 0x14);
-				reserved = bodyIn.getLong(address + 0x18);
-
-				channelInfoTableLength = channels * (0x20 + (encoding == 2 ? 0x30 : 0x00));
-				for (unsigned long cursor = 0x0; cursor < channelInfoTableLength; cursor += 0x04)
-				{
-					channelInfoTable.push_back(bodyIn.getLong(address + channelInfoTableOffset + cursor));
-				}
-				result = 1;
-			}
-
-			return result;
-		}
-		bool waveInfo::exportContents(std::ostream& destinationStream)
-		{
-			bool result = 0;
-			if (destinationStream.good())
-			{
-				lava::writeRawDataToStream(destinationStream, encoding);
-				lava::writeRawDataToStream(destinationStream, looped);
-				lava::writeRawDataToStream(destinationStream, channels);
-				lava::writeRawDataToStream(destinationStream, sampleRate24);
-				lava::writeRawDataToStream(destinationStream, sampleRate);
-				lava::writeRawDataToStream(destinationStream, dataLocationType);
-				lava::writeRawDataToStream(destinationStream, pad);
-				lava::writeRawDataToStream(destinationStream, loopStartSample);
-				lava::writeRawDataToStream(destinationStream, nibbles);
-				lava::writeRawDataToStream(destinationStream, channelInfoTableOffset);
-				lava::writeRawDataToStream(destinationStream, dataLocation);
-				lava::writeRawDataToStream(destinationStream, reserved);
-
-				for (unsigned long i = 0x0; i < channelInfoTable.size(); i++)
-				{
-					lava::writeRawDataToStream(destinationStream, channelInfoTable[i]);
-				}
-
-				result = destinationStream.good();
-			}
-			return result;
-		}
-
-		void rwsdWaveSection::pushEntry(const waveInfo& entryIn)
-		{
-			if (!entryOffsets.empty())
-			{
-				for (unsigned long i = 0; i < entryOffsets.size(); i++)
-				{
-					entryOffsets[i] += 0x04;
-				}
-				entryOffsets.push_back(entryOffsets.back() + 0x1C + entryIn.channelInfoTableLength);
-			}
-			else
-			{
-				entryOffsets.push_back(0x10);
-			}
-
-			entries.push_back(entryIn);
-			entries.back().address = brsarAddressConsts::bac_NOT_IN_FILE;
-			if (entries.size() > 1)
-			{
-				waveInfo* formerFinalEntry = &entries[entries.size() - 2];
-				unsigned long newDataLocation = formerFinalEntry->dataLocation + formerFinalEntry->getLengthInBytes();
-				if (formerFinalEntry->packetContents.populated)
-				{
-					newDataLocation += formerFinalEntry->packetContents.paddingLength;
-				}
-				entries.back().dataLocation = newDataLocation;
-			}
-			else
-			{
-				entries.back().dataLocation = 0x00;
-			}
-
-			length += 0x04 + 0x1C + entryIn.channelInfoTableLength;
-		}
-
-		bool rwsdWaveSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				address = addressIn;
-
-				length = bodyIn.getLong(addressIn + 0x04);
-				unsigned long entryCount = bodyIn.getLong(addressIn + 0x08);
-
-				for (unsigned long cursor = 0x0; cursor < (entryCount * 4); cursor += 0x04)
-				{
-					entryOffsets.push_back(bodyIn.getLong(address + 0x0C + cursor));
-					entries.push_back(waveInfo());
-					entries.back().populate(bodyIn, address + entryOffsets.back());
-				}
-
-				result = 1;
-			}
-
-			return result;
-		}
-		bool rwsdWaveSection::exportContents(std::ostream& destinationStream)
-		{
-			bool result = 0;
-			if (destinationStream.good())
-			{
-				unsigned long initialStreamPos = destinationStream.tellp();
-
-				destinationStream << "WAVE";
-				lava::writeRawDataToStream(destinationStream, length);
-				lava::writeRawDataToStream<unsigned long>(destinationStream, entries.size());
-
-				for (unsigned long i = 0x0; i < entryOffsets.size(); i++)
-				{
-					lava::writeRawDataToStream(destinationStream, entryOffsets[i]);
-				}
-				for (unsigned long i = 0x0; i < entries.size(); i++)
-				{
-					entries[i].exportContents(destinationStream);
-				}
-
-				unsigned long finalStreamPos = destinationStream.tellp();
-				unsigned long lengthOfExport = finalStreamPos - initialStreamPos;
-				if (lengthOfExport != length)
-				{
-					if (lengthOfExport < length)
-					{
-						std::vector<char> padding{};
-						padding.resize(length - lengthOfExport, 0x00);
-						destinationStream.write(padding.data(), padding.size());
-					}
-				}
-
-				result = destinationStream.good();
-			}
-			return result;
-		}
-
-		bool rwsdHeader::populate(lava::byteArray& bodyIn, std::size_t addressIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				address = addressIn;
-				endianType = bodyIn.getShort(addressIn + 0x04);
-				version = bodyIn.getShort(addressIn + 0x06);
-				headerLength = bodyIn.getLong(addressIn + 0x08);
-				entriesOffset = bodyIn.getShort(addressIn + 0x0C);
-				entriesCount = bodyIn.getShort(addressIn + 0x0E);
-
-				dataOffset = bodyIn.getLong(addressIn + 0x10);
-				dataLength = bodyIn.getLong(addressIn + 0x14);
-				waveOffset = bodyIn.getLong(addressIn + 0x18);
-				waveLength = bodyIn.getLong(addressIn + 0x1C);
-				result = 1;
-			}
-
-			return result;
-		}
-		bool rwsdHeader::exportContents(std::ostream& destinationStream)
-		{
-			bool result = 0;
-			if (destinationStream.good())
-			{
-				destinationStream << "RWSD";
-				lava::writeRawDataToStream(destinationStream, endianType);
-				lava::writeRawDataToStream(destinationStream, version);
-				lava::writeRawDataToStream(destinationStream, headerLength);
-				lava::writeRawDataToStream(destinationStream, entriesOffset);
-				lava::writeRawDataToStream(destinationStream, entriesCount);
-				lava::writeRawDataToStream(destinationStream, dataOffset);
-				lava::writeRawDataToStream(destinationStream, dataLength);
-				lava::writeRawDataToStream(destinationStream, waveOffset);
-				lava::writeRawDataToStream(destinationStream, waveLength);
-
-				result = destinationStream.good();
-			}
-			return result;
-		}
-
-		bool rwsd::hasExclusiveWave(unsigned long dataSectionIndex)
-		{
-			bool result = 1;
-			if (dataSectionIndex < dataSection.entries.size())
-			{
-				dataInfo* dataInfoEntry = &dataSection.entries[dataSectionIndex];
-				unsigned long dataWaveIndex = dataInfoEntry->ntWaveIndex;
-
-				std::size_t i = 0;
-				while (result && i < dataSection.entries.size())
-				{
-					if (i != dataSectionIndex)
-					{
-						result = dataWaveIndex != dataSection.entries[i].ntWaveIndex;
-					}
-					i++;
-				}
-			}
-			return result;
-		}
-		bool rwsd::isFirstToUseWave(unsigned long dataSectionIndex)
-		{
-			bool result = 1;
-			if (dataSectionIndex < dataSection.entries.size())
-			{
-				dataInfo* dataInfoEntry = &dataSection.entries[dataSectionIndex];
-				unsigned long dataWaveIndex = dataInfoEntry->ntWaveIndex;
-
-				std::size_t i = 0;
-				while (result && i < dataSectionIndex)
-				{
-					result = dataWaveIndex != dataSection.entries[i].ntWaveIndex;
-					i++;
-				}
-			}
-			return result;
-		}
-		waveInfo* rwsd::getWaveInfoAssociatedWithDataInfo(unsigned long dataSectionIndex)
-		{
-			waveInfo* result = nullptr;
-
-			if (dataSectionIndex < dataSection.entries.size())
-			{
-				unsigned long waveIndex = dataSection.entries[dataSectionIndex].ntWaveIndex;
-				if (waveIndex < waveSection.entries.size())
-				{
-					result = &waveSection.entries[waveIndex];
-				}
-			}
-
-			return result;
-		}
-		bool rwsd::populateWavePacket(lava::byteArray& bodyIn, unsigned long parentGroupWaveDataAddress, unsigned long collectionDataOffset, unsigned long dataSectionIndex)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				waveInfo* associatedWaveInfo = getWaveInfoAssociatedWithDataInfo(dataSectionIndex);
-				if (associatedWaveInfo != nullptr && !associatedWaveInfo->packetContents.populated)
-				{
-					dataInfo* associatedDataInfo = &dataSection.entries[dataSectionIndex];
-					unsigned long waveDataStartLocation = parentGroupWaveDataAddress + collectionDataOffset + associatedWaveInfo->dataLocation;
-					unsigned long waveDataLength = associatedWaveInfo->getLengthInBytes();
-					if (waveDataStartLocation + waveDataLength < bodyIn.size())
-					{
-						result = associatedWaveInfo->packetContents.populate(bodyIn, waveDataStartLocation, waveDataLength);
-						if (associatedDataInfo->ntWaveIndex < (waveSection.entries.size() - 1))
-						{
-							unsigned long nextEntryDataLocation = waveSection.entries[associatedDataInfo->ntWaveIndex + 1].dataLocation;
-							unsigned long currentEntryWaveInfoEnd = associatedWaveInfo->dataLocation + associatedWaveInfo->getLengthInBytes();
-							if (nextEntryDataLocation >= currentEntryWaveInfoEnd)
-							{
-								associatedWaveInfo->packetContents.paddingLength = nextEntryDataLocation - currentEntryWaveInfoEnd;
-							}
-							else
-							{
-								unsigned long overlapSize = currentEntryWaveInfoEnd - nextEntryDataLocation;
-								associatedWaveInfo->nibbles -= overlapSize * 2;
-								associatedWaveInfo->packetContents.length -= overlapSize;
-								associatedWaveInfo->packetContents.body.resize(associatedWaveInfo->packetContents.body.size() - overlapSize);
-								associatedWaveInfo->packetContents.paddingLength = 0x00;
-								std::cout << "[WARNING] Wave Packet Truncation performed! Lost 0x" << numToHexStringWithPadding(overlapSize, 0x02) << " byte(s) as a result.\n";
-							}
-						}
-						else
-						{
-							associatedWaveInfo->packetContents.paddingLength = (0x10 - (associatedWaveInfo->packetContents.length % 0x10));
-						}
-					}
-				}
-			}
-
-			return result;
-		}
-
-
-		signed long rwsd::overwriteSound(unsigned long dataSectionIndex, const dataInfo& dataInfoIn, const waveInfo& waveInfoIn, bool allowSharedWaveSplit)
-		{
-			signed long changeInWaveDataSize = LONG_MAX;
-
-			if (waveInfoIn.packetContents.populated)
-			{
-				dataInfo* dataEntryPtr = &dataSection.entries[dataSectionIndex];
-				dataEntryPtr->copyOverDataInfoProperties(dataInfoIn);
-
-				if (isFirstToUseWave(dataSectionIndex))
-				{
-					waveInfo* associatedWaveInfo = getWaveInfoAssociatedWithDataInfo(dataSectionIndex);
-					if (associatedWaveInfo != nullptr && associatedWaveInfo->packetContents.populated)
-					{
-						signed long differenceInWaveLength = signed long(waveInfoIn.getLengthInBytes()) - signed long(associatedWaveInfo->getLengthInBytes());
-						signed long differenceInPaddingLength = signed long(waveInfoIn.packetContents.paddingLength) - signed long(associatedWaveInfo->packetContents.paddingLength);
-
-						changeInWaveDataSize = differenceInWaveLength + differenceInPaddingLength;
-						associatedWaveInfo->copyOverWaveInfoProperties(waveInfoIn);
-						associatedWaveInfo->packetContents = waveInfoIn.packetContents;
-						associatedWaveInfo->packetContents.address = brsarAddressConsts::bac_NOT_IN_FILE;
-
-						for (std::size_t i = dataEntryPtr->ntWaveIndex + 1; i < waveSection.entries.size(); i++)
-						{
-							waveSection.entries[i].address = brsarAddressConsts::bac_NOT_IN_FILE;
-							waveSection.entries[i].dataLocation += changeInWaveDataSize;
-						}
-					}
-				}
-				else
-				{
-					if (allowSharedWaveSplit)
-					{
-						std::cout << "Inserting new Wave!\n";
-						waveSection.pushEntry(waveInfoIn);
-						dataEntryPtr->ntWaveIndex = waveSection.entries.size() - 1;
-						header.waveLength += 0x04 + 0x1C + waveInfoIn.channelInfoTableLength;
-						header.headerLength += 0x04 + 0x1C + waveInfoIn.channelInfoTableLength;
-						changeInWaveDataSize = (signed long)waveSection.entries.back().getLengthInBytes();
-						changeInWaveDataSize += (signed long)waveSection.entries.back().packetContents.paddingLength;
-					}
-					else
-					{
-						changeInWaveDataSize = brsarErrorReturnCodes::berc_OVERWRITE_SOUND_SHARED_WAVE;
-					}
-				}
-			}
-			return changeInWaveDataSize;
-		}
-		signed long rwsd::shareWaveTargetBetweenDataEntries(unsigned long recipientDataSectionIndex, unsigned long donorDataSectionIndex, const dataInfo* dataInfoIn, bool voidOutExistingSound)
-		{
-			signed long changeInWaveDataSize = LONG_MAX;
-
-			if (recipientDataSectionIndex < dataSection.entries.size())
-			{
-				if (donorDataSectionIndex < dataSection.entries.size())
-				{
-					dataInfo* dataEntryPtr = &dataSection.entries[recipientDataSectionIndex];
-					if (dataInfoIn != nullptr)
-					{
-						dataEntryPtr->copyOverDataInfoProperties(*dataInfoIn);
-					}
-					if (voidOutExistingSound)
-					{
-						if (isFirstToUseWave(recipientDataSectionIndex))
-						{
-							waveInfo* associatedWaveInfo = getWaveInfoAssociatedWithDataInfo(recipientDataSectionIndex);
-							if (associatedWaveInfo != nullptr && associatedWaveInfo->packetContents.populated)
-							{
-								// Create an empty wavePacket.
-								wavePacket tempEmptyPacket;
-								tempEmptyPacket.body = std::vector<unsigned char>(_EMPTY_SOUND_SOUND_LENGTH, 0x00);
-								tempEmptyPacket.length = _EMPTY_SOUND_SOUND_LENGTH;
-								tempEmptyPacket.paddingLength = _EMPTY_SOUND_TOTAL_LENGTH - _EMPTY_SOUND_SOUND_LENGTH;
-								tempEmptyPacket.populated = 1;
-								tempEmptyPacket.address = brsarAddressConsts::bac_NOT_IN_FILE;
-
-								// Record the difference in size between the new empty packet and the old one.
-								signed long differenceInWaveLength = signed long(tempEmptyPacket.length) - signed long(associatedWaveInfo->getLengthInBytes());
-								signed long differenceInPaddingLength = signed long(tempEmptyPacket.paddingLength) - signed long(associatedWaveInfo->packetContents.paddingLength);
-								changeInWaveDataSize = differenceInWaveLength + differenceInPaddingLength;
-
-								// Overwrite old wavePacket with new one.
-								associatedWaveInfo->address = brsarAddressConsts::bac_NOT_IN_FILE;
-								associatedWaveInfo->nibbles = _EMPTY_SOUND_SOUND_LENGTH * 2;
-								associatedWaveInfo->packetContents = tempEmptyPacket;
-
-								// Propogate change in size through all other waves.
-								for (std::size_t i = dataEntryPtr->ntWaveIndex + 1; i < waveSection.entries.size(); i++)
-								{
-									waveSection.entries[i].address = brsarAddressConsts::bac_NOT_IN_FILE;
-									waveSection.entries[i].dataLocation += changeInWaveDataSize;
-								}
-							}
-						}
-						else
-						{
-							changeInWaveDataSize = brsarErrorReturnCodes::berc_OVERWRITE_SOUND_SHARED_WAVE;
-						}
-					}
-					else
-					{
-						changeInWaveDataSize = 0;
-					}
-					dataInfo* donorDataEntryPtr = &dataSection.entries[donorDataSectionIndex];
-					dataEntryPtr->ntWaveIndex = donorDataEntryPtr->ntWaveIndex;
-				}
-			}
-
-			return changeInWaveDataSize;
-		}
-
-		bool rwsd::populate(lava::byteArray& bodyIn, std::size_t addressIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				if (bodyIn.getLong(addressIn) == brsarHexTags::bht_RWSD)
-				{
-					address = addressIn;
-
-					if (header.populate(bodyIn, address))
-					{
-						result = dataSection.populate(bodyIn, address + header.dataOffset);
-						result &= waveSection.populate(bodyIn, address + header.waveOffset);
-					}
-				}
-			}
-
-			return result;
-		}
-		bool rwsd::exportContents(std::ostream& destinationStream)
-		{
-			bool result = 0;
-
-			if (destinationStream.good())
-			{
-				destinationStream << std::hex;
-				result &= header.exportContents(destinationStream);
-				result &= dataSection.exportContents(destinationStream);
-				result &= waveSection.exportContents(destinationStream);
-			}
-
-			return result;
-		}
-		/* RWSD */
-
 		std::vector<brsarFileFileContents*> brsarFileSection::getFileContentsPointerVector(unsigned long fileID)
 		{
 			std::vector<brsarFileFileContents*> result{};
@@ -1927,7 +1620,6 @@ namespace lava
 
 			return result;
 		}
-
 		bool brsarFileSection::propogateFileLengthChange(signed long changeAmount, unsigned long pastThisAddress)
 		{
 			bool result = 1;
@@ -1942,7 +1634,6 @@ namespace lava
 
 			return result;
 		}
-
 		bool brsarFileSection::populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn)
 		{
 			bool result = 0;
@@ -2012,11 +1703,425 @@ namespace lava
 			return result;
 		}
 
+		/* RWSD */
+
+		bool rwsdWaveSection::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				address = addressIn;
+
+				length = bodyIn.getLong(addressIn + 0x04);
+				unsigned long entryCount = bodyIn.getLong(addressIn + 0x08);
+
+				for (unsigned long cursor = 0x0; cursor < (entryCount * 4); cursor += 0x04)
+				{
+					entryOffsets.push_back(bodyIn.getLong(address + 0x0C + cursor));
+					entries.push_back(waveInfo());
+					entries.back().populate(bodyIn, address + entryOffsets.back());
+				}
+
+				result = 1;
+			}
+
+			return result;
+		}
+		bool rwsdWaveSection::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				unsigned long initialStreamPos = destinationStream.tellp();
+
+				destinationStream << "WAVE";
+				lava::writeRawDataToStream(destinationStream, length);
+				lava::writeRawDataToStream<unsigned long>(destinationStream, entries.size());
+
+				for (unsigned long i = 0x0; i < entryOffsets.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, entryOffsets[i]);
+				}
+				for (unsigned long i = 0x0; i < entries.size(); i++)
+				{
+					entries[i].exportContents(destinationStream);
+				}
+
+				unsigned long finalStreamPos = destinationStream.tellp();
+				unsigned long lengthOfExport = finalStreamPos - initialStreamPos;
+				if (lengthOfExport != length)
+				{
+					if (lengthOfExport < length)
+					{
+						std::vector<char> padding{};
+						padding.resize(length - lengthOfExport, 0x00);
+						destinationStream.write(padding.data(), padding.size());
+					}
+				}
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
+		bool rwsdDataSection::hasExclusiveWave(unsigned long dataSectionIndex)
+		{
+			bool result = 1;
+			if (dataSectionIndex < entries.size())
+			{
+				dataInfo* dataInfoEntry = &entries[dataSectionIndex];
+				unsigned long dataWaveIndex = dataInfoEntry->ntWaveIndex;
+
+				std::size_t i = 0;
+				while (result && i < entries.size())
+				{
+					if (i != dataSectionIndex)
+					{
+						result = dataWaveIndex != entries[i].ntWaveIndex;
+					}
+					i++;
+				}
+			}
+			return result;
+		}
+		bool rwsdDataSection::isFirstToUseWave(unsigned long dataSectionIndex)
+		{
+			bool result = 1;
+			if (dataSectionIndex < entries.size())
+			{
+				dataInfo* dataInfoEntry = &entries[dataSectionIndex];
+				unsigned long dataWaveIndex = dataInfoEntry->ntWaveIndex;
+
+				std::size_t i = 0;
+				while (result && i < dataSectionIndex)
+				{
+					result = dataWaveIndex != entries[i].ntWaveIndex;
+					i++;
+				}
+			}
+			return result;
+		}
+		bool rwsdDataSection::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				address = addressIn;
+				length = bodyIn.getLong(addressIn + 0x04);
+				entryReferences.populate(bodyIn, addressIn + 0x08);
+				std::vector<brawlReference>* refVecPtr = &entryReferences.refs;
+				std::size_t entryCount = refVecPtr->size();
+				unsigned long entryTargetAddress = ULONG_MAX;
+				entries.resize(entryCount);
+				for (std::size_t i = 0; i < entryCount; i++)
+				{
+					entryTargetAddress = address + 0x08 + refVecPtr->at(i).getAddress();
+					if (bodyIn.getLong(entryTargetAddress) == 0x01000000)
+					{
+						entries[i].populate(bodyIn, entryTargetAddress);
+					}
+					else
+					{
+						std::cerr << "Skipping Data Entry @ " << entryTargetAddress << "\n";
+					}
+				}
+
+				result = 1;
+			}
+
+			return result;
+		}
+		bool rwsdDataSection::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				unsigned long initialStreamPos = destinationStream.tellp();
+				destinationStream << "DATA";
+				lava::writeRawDataToStream(destinationStream, length);
+				entryReferences.exportContents(destinationStream);
+				for (std::size_t i = 0; i < entries.size(); i++)
+				{
+					entries[i].exportContents(destinationStream);
+				}
+				unsigned long finalStreamPos = destinationStream.tellp();
+				unsigned long lengthOfExport = finalStreamPos - initialStreamPos;
+				if (lengthOfExport != length)
+				{
+					if (lengthOfExport < length)
+					{
+						std::vector<char> padding{};
+						padding.resize(length - lengthOfExport, 0x00);
+						destinationStream.write(padding.data(), padding.size());
+					}
+				}
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		bool rwsdHeader::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				address = addressIn;
+				endianType = bodyIn.getShort(addressIn + 0x04);
+				version = bodyIn.getShort(addressIn + 0x06);
+				headerLength = bodyIn.getLong(addressIn + 0x08);
+				entriesOffset = bodyIn.getShort(addressIn + 0x0C);
+				entriesCount = bodyIn.getShort(addressIn + 0x0E);
+
+				dataOffset = bodyIn.getLong(addressIn + 0x10);
+				dataLength = bodyIn.getLong(addressIn + 0x14);
+				waveOffset = bodyIn.getLong(addressIn + 0x18);
+				waveLength = bodyIn.getLong(addressIn + 0x1C);
+				result = 1;
+			}
+
+			return result;
+		}
+		bool rwsdHeader::exportContents(std::ostream& destinationStream)
+		{
+			bool result = 0;
+			if (destinationStream.good())
+			{
+				destinationStream << "RWSD";
+				lava::writeRawDataToStream(destinationStream, endianType);
+				lava::writeRawDataToStream(destinationStream, version);
+				lava::writeRawDataToStream(destinationStream, headerLength);
+				lava::writeRawDataToStream(destinationStream, entriesOffset);
+				lava::writeRawDataToStream(destinationStream, entriesCount);
+				lava::writeRawDataToStream(destinationStream, dataOffset);
+				lava::writeRawDataToStream(destinationStream, dataLength);
+				lava::writeRawDataToStream(destinationStream, waveOffset);
+				lava::writeRawDataToStream(destinationStream, waveLength);
+
+				result = destinationStream.good();
+			}
+			return result;
+		}
+
+		bool rwsd::updateWaveEntryDataLocations()
+		{
+			bool result = 1;
+
+			unsigned long positionAccumulator = 0x00;
+			for (unsigned long i = 0; i < waveSection.entries.size(); i++)
+			{
+				waveInfo* currEntry = &waveSection.entries[i];
+				currEntry->dataLocation = positionAccumulator;
+				positionAccumulator += currEntry->packetContents.body.size() + currEntry->packetContents.padding.size();
+			}
+
+			return result;
+		}
+		waveInfo* rwsd::getWaveInfoAssociatedWithDataInfo(unsigned long dataSectionIndex)
+		{
+			waveInfo* result = nullptr;
+
+			if (dataSectionIndex < dataSection.entries.size())
+			{
+				unsigned long waveIndex = dataSection.entries[dataSectionIndex].ntWaveIndex;
+				if (waveIndex < waveSection.entries.size())
+				{
+					result = &waveSection.entries[waveIndex];
+				}
+			}
+
+			return result;
+		}
+		bool rwsd::overwriteWaveRawData(unsigned long waveSectionIndex, const std::vector<unsigned char>& rawDataIn)
+		{
+			bool result = 0;
+
+			if (waveSectionIndex < waveSection.entries.size())
+			{
+				waveInfo* targetWaveInfo = &waveSection.entries[waveSectionIndex];
+				targetWaveInfo->packetContents.body = rawDataIn;
+				targetWaveInfo->packetContents.padding = std::vector<unsigned char> (0x10 - (targetWaveInfo->packetContents.body.size() % 0x10), 0x00);
+				targetWaveInfo->nibbles = targetWaveInfo->packetContents.body.size() * 2;
+				updateWaveEntryDataLocations();
+			}
+
+			return result;
+		}
+
+		bool rwsd::populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long rawDataAddressIn, unsigned long specificDataEndAddressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				waveInfo* currWave = &waveSection.entries[waveIndex];
+				unsigned long length = currWave->getLengthInBytes();
+				unsigned long paddingLength = 0x00;
+				unsigned long currWaveDataEndpoint = rawDataAddressIn + currWave->dataLocation + length;
+				if (currWaveDataEndpoint <= specificDataEndAddressIn)
+				{
+					paddingLength = specificDataEndAddressIn - currWaveDataEndpoint;
+				}
+				else
+				{
+					unsigned long overflowAmount = currWaveDataEndpoint - specificDataEndAddressIn;
+					length -= overflowAmount;
+					currWave->nibbles -= overflowAmount * 2;
+				}
+				result &= currWave->packetContents.populate(bodyIn, rawDataAddressIn + currWave->dataLocation, length, paddingLength);
+			}
+
+			return result;
+		}
+		bool rwsd::populateWavePackets(const lava::byteArray& bodyIn, unsigned long waveDataAddressIn, unsigned long waveDataLengthIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				for (std::size_t i = 0; i < (waveSection.entries.size() - 1); i++)
+				{
+					waveInfo* currWave = &waveSection.entries[i];
+					waveInfo* nextWave = &waveSection.entries[i + 1];
+					/*unsigned long length = currWave->getLengthInBytes();
+					unsigned long paddingLength = 0x00;
+					unsigned long currWaveDataEndpoint = currWave->dataLocation + length;
+					if (currWaveDataEndpoint <= nextWave->dataLocation)
+					{
+						paddingLength = nextWave->dataLocation - currWaveDataEndpoint;
+					}
+					else
+					{
+						unsigned long overflowAmount = currWaveDataEndpoint - nextWave->dataLocation;
+						length -= overflowAmount;
+						currWave->nibbles -= overflowAmount * 2;
+					}*/
+					result &= populateWavePacket(bodyIn, i, waveDataAddressIn, waveDataAddressIn + nextWave->dataLocation);
+				}
+				waveInfo* finalWave = &waveSection.entries.back();
+				/*unsigned long length = finalWave->getLengthInBytes();
+				unsigned long paddingLength = 0x00;
+				unsigned long finalWaveDataEndpoint = finalWave->dataLocation + length;
+				if (finalWaveDataEndpoint <= waveDataLengthIn)
+				{
+					paddingLength = waveDataLengthIn - finalWaveDataEndpoint;
+				}
+				else
+				{
+					unsigned long overflowAmount = finalWaveDataEndpoint - waveDataLengthIn;
+					length -= overflowAmount;
+					finalWave->nibbles -= overflowAmount * 2;
+				}*/
+				result &= populateWavePacket(bodyIn, waveSection.entries.size() - 1, waveDataAddressIn, waveDataAddressIn + waveDataLengthIn);
+				//result &= finalWave->packetContents.populate(bodyIn, waveDataAddressIn + finalWave->dataLocation, length, paddingLength);
+			}
+
+			return result;
+		}
+		bool rwsd::populate(const byteArray& fileBodyIn, unsigned long fileBodyAddressIn, const byteArray& rawDataIn, unsigned long rawDataAddressIn, unsigned long rawDataLengthIn)
+		{
+			bool result = 0;
+
+			if (fileBodyIn.getLong(fileBodyAddressIn) == brsarHexTags::bht_RWSD)
+			{
+				if (header.populate(fileBodyIn, fileBodyAddressIn))
+				{
+					result = dataSection.populate(fileBodyIn, fileBodyAddressIn + header.dataOffset);
+					result &= waveSection.populate(fileBodyIn, fileBodyAddressIn + header.waveOffset);
+					if (result)
+					{
+						result &= populateWavePackets(rawDataIn, rawDataAddressIn, rawDataLengthIn);
+					}
+				}
+			}
+
+			return result;
+		}
+		bool rwsd::populate(const brsarFileFileContents& fileContentsIn)
+		{
+			bool result = 0;
+
+			if (bytesToFundamental<unsigned long>(fileContentsIn.header.data()) == brsarHexTags::bht_RWSD)
+			{
+				byteArray headerArr(fileContentsIn.header.data(), fileContentsIn.header.size());
+				byteArray dataArr(fileContentsIn.data.data(), fileContentsIn.data.size());
+				result = populate(headerArr, 0x00, dataArr, 0x00, dataArr.size());
+			}
+
+			return result;
+		}
+
+		bool rwsd::exportFileSection(std::ostream& destinationStream)
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				result = 1;
+				result &= header.exportContents(destinationStream);
+				result &= dataSection.exportContents(destinationStream);
+				result &= waveSection.exportContents(destinationStream);
+			}
+
+			return result;
+		}
+		bool rwsd::exportRawDataSection(std::ostream& destinationStream)
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				for (unsigned long i = 0; i < waveSection.entries.size(); i++)
+				{
+					waveInfo* currWave = &waveSection.entries[i];
+					destinationStream.write((const char*)currWave->packetContents.body.data(), currWave->packetContents.body.size());
+					destinationStream.write((const char*)currWave->packetContents.padding.data(), currWave->packetContents.padding.size());
+					/*for (unsigned long u = 0; u < currWave->packetContents.paddingLength; u++)
+					{
+						destinationStream.put(0);
+					}*/
+				}
+				result = destinationStream.good();
+			}
+
+			return result;
+		}
+		std::vector<unsigned char> rwsd::fileSectionToVec()
+		{
+			std::vector<unsigned char> result;
+
+			std::stringstream tempStream(std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+			if (exportFileSection(tempStream))
+			{
+				result = streamContentsToVec(tempStream);
+			}
+
+			return result;
+		}
+		std::vector<unsigned char> rwsd::rawDataSectionToVec()
+		{
+			std::vector<unsigned char> result;
+
+			std::stringstream tempStream(std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+			if (exportRawDataSection(tempStream))
+			{
+				result = streamContentsToVec(tempStream);
+			}
+
+			return result;
+		}
+
+		/* RWSD */
+
 		/* BRSAR File Section */
 
 
 
 		/* BRSAR */
+
 		bool brsar::init(std::string filePathIn)
 		{
 			bool result = 0;
@@ -2351,6 +2456,7 @@ namespace lava
 
 			return result = 1;
 		}
+
 		/* BRSAR */
 	}
 }

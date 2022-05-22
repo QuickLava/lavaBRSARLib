@@ -3,6 +3,8 @@
 
 #include <unordered_map>
 #include <filesystem>
+#include <sstream>
+#include <array>
 #include "lavaByteArray.h"
 #include "md5.h"
 
@@ -10,7 +12,7 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.8.2";
+		const std::string version = "v0.9.0";
 
 		enum brsarHexTags
 		{
@@ -56,7 +58,6 @@ namespace lava
 		/* Misc. */
 
 
-
 		/* Brawl Reference */
 
 		struct brawlReference
@@ -74,12 +75,158 @@ namespace lava
 		{
 			std::vector<brawlReference> refs{};
 
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn = SIZE_MAX);
+			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn = SIZE_MAX);
 			std::vector<unsigned long> getHex();
 			bool exportContents(std::ostream& destinationStream);
 		};
 
 		/* Brawl Reference */
+
+
+		/*Sound Data Structs*/
+
+		struct channelInfo
+		{
+			unsigned long address = ULONG_MAX;
+
+			unsigned long channelDataOffset = ULONG_MAX;
+			unsigned long adpcmInfoOffset = ULONG_MAX;
+			unsigned long volFrontLeft = ULONG_MAX;
+			unsigned long volFrontRight = ULONG_MAX;
+			unsigned long volBackLeft = ULONG_MAX;
+			unsigned long volBackRight = ULONG_MAX;
+			unsigned long reserved = ULONG_MAX;
+
+			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
+			bool exportContents(std::ostream& destinationStream);
+		};
+		struct adpcmInfo
+		{
+			unsigned long address = ULONG_MAX;
+
+			std::array<unsigned short, 0x10> coefficients;
+			unsigned short gain = USHRT_MAX;
+			unsigned short ps = USHRT_MAX;
+			unsigned short yn1 = USHRT_MAX;
+			unsigned short yn2 = USHRT_MAX;
+			unsigned short lps = USHRT_MAX;
+			unsigned short lyn1 = USHRT_MAX;
+			unsigned short lyn2 = USHRT_MAX;
+			unsigned short pad = USHRT_MAX;
+
+			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
+			bool exportContents(std::ostream& destinationStream);
+		};
+		struct spt
+		{
+			unsigned short ps = USHRT_MAX;
+			std::array<unsigned short, 0x10> coefficients{};
+
+			bool populate(const byteArray& bodyIn, unsigned long addressIn);
+			bool populate(std::string pathIn, unsigned long addressIn);
+		};
+		struct wavePacket
+		{
+			bool populated = 0;
+
+			unsigned long address = ULONG_MAX;
+
+			//unsigned long paddingLength = ULONG_MAX;
+
+			std::vector<unsigned char> body{};
+			std::vector<unsigned char> padding{};
+
+			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn, unsigned long dataLengthIn, unsigned long paddingLengthIn);
+		};
+		struct waveInfo
+		{
+			unsigned long address = ULONG_MAX;
+
+			unsigned char encoding = UCHAR_MAX;
+			unsigned char looped = UCHAR_MAX;
+			unsigned char channels = UCHAR_MAX;
+			unsigned char sampleRate24 = UCHAR_MAX;
+			unsigned short sampleRate = USHRT_MAX;
+			unsigned char dataLocationType = UCHAR_MAX;
+			unsigned char pad = UCHAR_MAX;
+			unsigned long loopStartSample = ULONG_MAX;
+			unsigned long nibbles = ULONG_MAX;
+			unsigned long channelInfoTableOffset = ULONG_MAX;
+			unsigned long dataLocation = ULONG_MAX;
+			unsigned long reserved = ULONG_MAX;
+			std::vector<unsigned long> channelInfoTable{};
+
+			std::vector<channelInfo> channelInfoEntries;
+			std::vector<adpcmInfo> adpcmInfoEntries;
+
+			wavePacket packetContents;
+
+			unsigned long getLengthInBytes() const;
+			void copyOverWaveInfoProperties(const waveInfo& sourceInfo);
+
+			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
+			bool exportContents(std::ostream& destinationStream);
+		};
+		struct dataInfo
+		{
+			unsigned long address = ULONG_MAX;
+
+			// References
+			brawlReference wsdInfo;
+			brawlReference trackTable;
+			brawlReference noteTable;
+
+			// "WSD" Data
+			float wsdPitch = FLT_MAX;
+			unsigned char wsdPan = UCHAR_MAX;
+			unsigned char wsdSurroundPan = UCHAR_MAX;
+			unsigned char wsdFxSendA = UCHAR_MAX;
+			unsigned char wsdFxSendB = UCHAR_MAX;
+			unsigned char wsdFxSendC = UCHAR_MAX;
+			unsigned char wsdMainSend = UCHAR_MAX;
+			unsigned char wsdPad1 = UCHAR_MAX;
+			unsigned char wsdPad2 = UCHAR_MAX;
+			brawlReference wsdGraphEnvTableRef = ULLONG_MAX;
+			brawlReference wsdRandomizerTableRef = ULLONG_MAX;
+			unsigned long wsdPadding = ULONG_MAX;
+
+			// "Track Table" Data
+			brawlReferenceVector ttReferenceList1;
+			brawlReference ttIntermediateReference = ULLONG_MAX;
+			brawlReferenceVector ttReferenceList2;
+			float ttPosition = FLT_MAX;
+			float ttLength = FLT_MAX;
+			unsigned long ttNoteIndex = ULONG_MAX;
+			unsigned long ttReserved = ULONG_MAX;
+
+			// "Note Table" Data
+			brawlReferenceVector ntReferenceList;
+			unsigned long ntWaveIndex = ULONG_MAX;
+			unsigned char ntAttack = UCHAR_MAX;
+			unsigned char ntDecay = UCHAR_MAX;
+			unsigned char ntSustain = UCHAR_MAX;
+			unsigned char ntRelease = UCHAR_MAX;
+			unsigned char ntHold = UCHAR_MAX;
+			unsigned char ntPad1 = UCHAR_MAX;
+			unsigned char ntPad2 = UCHAR_MAX;
+			unsigned char ntPad3 = UCHAR_MAX;
+			unsigned char ntOriginalKey = UCHAR_MAX;
+			unsigned char ntVolume = UCHAR_MAX;
+			unsigned char ntPan = UCHAR_MAX;
+			unsigned char ntSurroundPan = UCHAR_MAX;
+			float ntPitch = FLT_MAX;
+			brawlReference ntIfoTableRef = ULLONG_MAX;
+			brawlReference ntGraphEnvTableRef = ULLONG_MAX;
+			brawlReference ntRandomizerTableRef = ULLONG_MAX;
+			unsigned long ntReserved = ULONG_MAX;
+
+			void copyOverDataInfoProperties(const dataInfo& sourceInfo);
+
+			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
+			bool exportContents(std::ostream& destinationStream);
+		};
+
+		/*Sound Data Structs*/
 
 
 
@@ -384,171 +531,6 @@ namespace lava
 
 		/* BRSAR File Section */
 
-		struct dataInfo
-		{
-			unsigned long address = ULONG_MAX;
-
-			// References
-			brawlReference wsdInfo;
-			brawlReference trackTable;
-			brawlReference noteTable;
-
-			// "WSD" Data
-			float wsdPitch = FLT_MAX;
-			unsigned char wsdPan = UCHAR_MAX;
-			unsigned char wsdSurroundPan = UCHAR_MAX;
-			unsigned char wsdFxSendA = UCHAR_MAX;
-			unsigned char wsdFxSendB = UCHAR_MAX;
-			unsigned char wsdFxSendC = UCHAR_MAX;
-			unsigned char wsdMainSend = UCHAR_MAX;
-			unsigned char wsdPad1 = UCHAR_MAX;
-			unsigned char wsdPad2 = UCHAR_MAX;
-			brawlReference wsdGraphEnvTableRef = ULLONG_MAX;
-			brawlReference wsdRandomizerTableRef = ULLONG_MAX;
-			unsigned long wsdPadding = ULONG_MAX;
-
-			// "Track Table" Data
-			brawlReferenceVector ttReferenceList1;
-			brawlReference ttIntermediateReference = ULLONG_MAX;
-			brawlReferenceVector ttReferenceList2;
-			float ttPosition = FLT_MAX;
-			float ttLength = FLT_MAX;
-			unsigned long ttNoteIndex = ULONG_MAX;
-			unsigned long ttReserved = ULONG_MAX;
-
-			// "Note Table" Data
-			brawlReferenceVector ntReferenceList;
-			unsigned long ntWaveIndex = ULONG_MAX;
-			unsigned char ntAttack = UCHAR_MAX;
-			unsigned char ntDecay = UCHAR_MAX;
-			unsigned char ntSustain = UCHAR_MAX;
-			unsigned char ntRelease = UCHAR_MAX;
-			unsigned char ntHold = UCHAR_MAX;
-			unsigned char ntPad1 = UCHAR_MAX;
-			unsigned char ntPad2 = UCHAR_MAX;
-			unsigned char ntPad3 = UCHAR_MAX;
-			unsigned char ntOriginalKey = UCHAR_MAX;
-			unsigned char ntVolume = UCHAR_MAX;
-			unsigned char ntPan = UCHAR_MAX;
-			unsigned char ntSurroundPan = UCHAR_MAX;
-			float ntPitch = FLT_MAX;
-			brawlReference ntIfoTableRef = ULLONG_MAX;
-			brawlReference ntGraphEnvTableRef = ULLONG_MAX;
-			brawlReference ntRandomizerTableRef = ULLONG_MAX;
-			unsigned long ntReserved = ULONG_MAX;
-
-			void copyOverDataInfoProperties(const dataInfo& sourceInfo);
-
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
-			bool exportContents(std::ostream& destinationStream);
-		};
-		struct rwsdDataSection
-		{
-			unsigned long address = ULONG_MAX;
-
-			unsigned long length = ULONG_MAX;
-
-			brawlReferenceVector entryReferences;
-			std::vector<dataInfo> entries{};
-
-			bool populate(lava::byteArray& bodyIn, std::size_t address);
-			bool exportContents(std::ostream& destinationStream);
-		};
-
-		struct wavePacket
-		{
-			bool populated = 0;
-
-			unsigned long address = ULONG_MAX;
-
-			unsigned long length = ULONG_MAX;
-			unsigned long paddingLength = ULONG_MAX;
-
-			std::vector<unsigned char> body{};
-
-			bool populate(lava::byteArray& bodyIn, unsigned long addressIn, unsigned long lengthIn);
-		};
-		struct waveInfo
-		{
-			unsigned long address = ULONG_MAX;
-
-			unsigned char encoding = UCHAR_MAX;
-			unsigned char looped = UCHAR_MAX;
-			unsigned char channels = UCHAR_MAX;
-			unsigned char sampleRate24 = UCHAR_MAX;
-			unsigned short sampleRate = USHRT_MAX;
-			unsigned char dataLocationType = UCHAR_MAX;
-			unsigned char pad = UCHAR_MAX;
-			unsigned long loopStartSample = ULONG_MAX;
-			unsigned long nibbles = ULONG_MAX;
-			unsigned long channelInfoTableOffset = ULONG_MAX;
-			unsigned long dataLocation = ULONG_MAX;
-			unsigned long reserved = ULONG_MAX;
-
-			unsigned long channelInfoTableLength = ULONG_MAX;
-			std::vector<unsigned long> channelInfoTable{};
-
-			wavePacket packetContents;
-
-			unsigned long getLengthInBytes() const;
-			void copyOverWaveInfoProperties(const waveInfo& sourceInfo);
-
-			bool populate(lava::byteArray& bodyIn, unsigned long addressIn);
-			bool exportContents(std::ostream& destinationStream);
-		};
-		struct rwsdWaveSection
-		{
-			unsigned long address = ULONG_MAX;
-
-			unsigned long length = ULONG_MAX;
-
-			std::vector<unsigned long> entryOffsets{};
-			std::vector<waveInfo> entries{};
-
-			void pushEntry(const waveInfo& entryIn);
-
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
-			bool exportContents(std::ostream& destinationStream);
-		};
-
-		struct rwsdHeader
-		{
-			unsigned long address = ULONG_MAX;
-
-			unsigned short endianType = USHRT_MAX;
-			unsigned short version = USHRT_MAX;
-			unsigned long headerLength = ULONG_MAX;
-			unsigned short entriesOffset = USHRT_MAX;
-			unsigned short entriesCount = USHRT_MAX;
-
-			unsigned long dataOffset = ULONG_MAX;
-			unsigned long dataLength = ULONG_MAX;
-			unsigned long waveOffset = ULONG_MAX;
-			unsigned long waveLength = ULONG_MAX;
-
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
-			bool exportContents(std::ostream& destinationStream);
-		};
-		struct rwsd
-		{
-			unsigned long address = ULONG_MAX;
-
-			rwsdHeader header;
-			rwsdDataSection dataSection;
-			rwsdWaveSection waveSection;
-
-			bool hasExclusiveWave(unsigned long dataSectionIndex);
-			bool isFirstToUseWave(unsigned long dataSectionIndex);
-			waveInfo* getWaveInfoAssociatedWithDataInfo(unsigned long dataSectionIndex);
-			bool populateWavePacket(lava::byteArray& bodyIn, unsigned long parentGroupWaveDataAddress, unsigned long collectionDataOffset, unsigned long dataSectionIndex);
-
-			signed long overwriteSound(unsigned long dataSectionIndex, const dataInfo& dataInfoIn, const waveInfo& waveInfoIn, bool allowSharedWaveSplit = 0);
-			signed long shareWaveTargetBetweenDataEntries(unsigned long recipientDataSectionIndex, unsigned long donorDataSectionIndex, const dataInfo* dataInfoIn = nullptr, bool voidOutExistingSound = 0);
-
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
-			bool exportContents(std::ostream& destinationStream);
-		};
-
 		struct brsarFileFileContents
 		{
 			unsigned long groupInfoIndex = ULONG_MAX;
@@ -574,6 +556,90 @@ namespace lava
 
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
 			bool exportContents(std::ostream& destinationStream);
+		};
+		
+		struct rwsdDataSection
+		{
+			unsigned long address = ULONG_MAX;
+
+			unsigned long length = ULONG_MAX;
+
+			brawlReferenceVector entryReferences;
+			std::vector<dataInfo> entries{};
+
+			bool hasExclusiveWave(unsigned long dataSectionIndex);
+			bool isFirstToUseWave(unsigned long dataSectionIndex);
+
+			bool populate(const lava::byteArray& bodyIn, std::size_t address);
+			bool exportContents(std::ostream& destinationStream);
+		};
+		struct rwsdWaveSection
+		{
+			unsigned long address = ULONG_MAX;
+
+			unsigned long length = ULONG_MAX;
+
+			std::vector<unsigned long> entryOffsets{};
+			std::vector<waveInfo> entries{};
+
+			void pushEntry(const waveInfo& entryIn);
+			unsigned long sumWavePacketLengths();
+			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
+			bool exportContents(std::ostream& destinationStream);
+		};
+		struct rwsdHeader
+		{
+			unsigned long address = ULONG_MAX;
+
+			unsigned short endianType = USHRT_MAX;
+			unsigned short version = USHRT_MAX;
+			unsigned long headerLength = ULONG_MAX;
+			unsigned short entriesOffset = USHRT_MAX;
+			unsigned short entriesCount = USHRT_MAX;
+
+			unsigned long dataOffset = ULONG_MAX;
+			unsigned long dataLength = ULONG_MAX;
+			unsigned long waveOffset = ULONG_MAX;
+			unsigned long waveLength = ULONG_MAX;
+
+			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
+			bool exportContents(std::ostream& destinationStream);
+		};
+		struct rwsd
+		{
+			rwsdHeader header;
+			rwsdDataSection dataSection;
+			rwsdWaveSection waveSection;
+
+			// Utility + Maintenance Funcs
+
+			bool updateWaveEntryDataLocations();
+			waveInfo* getWaveInfoAssociatedWithDataInfo(unsigned long dataSectionIndex);
+
+
+			// Edit Funcs
+
+			bool overwriteDataWSDInfo(unsigned long dataSectionIndex, const dataInfo& dataInfoIn);
+			bool overwriteDataTrackInfo(unsigned long dataSectionIndex, const dataInfo& dataInfoIn);
+			bool overwriteDataNoteInfo(unsigned long dataSectionIndex, const dataInfo& dataInfoIn);
+			bool overwriteWave(unsigned long waveSectionIndex, const waveInfo& waveInfoIn);
+			bool overwriteWaveRawData(unsigned long waveSectionIndex, const std::vector<unsigned char>& rawDataIn);
+
+
+			// Populate Funcs
+
+			bool populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long specificDataAddressIn, unsigned long specificDataMaxLengthIn);
+			bool populateWavePackets(const lava::byteArray& bodyIn, unsigned long waveDataAddressIn, unsigned long waveDataLengthIn);
+			bool populate(const byteArray& fileBodyIn, unsigned long fileBodyAddressIn, const byteArray& rawDataIn, unsigned long rawDataAddressIn, unsigned long rawDataLengthIn);
+			bool populate(const brsarFileFileContents& fileContentsIn);
+
+
+			// Export Funcs
+
+			bool exportFileSection(std::ostream& destinationStream);
+			std::vector<unsigned char> fileSectionToVec();
+			bool exportRawDataSection(std::ostream& destinationStream);
+			std::vector<unsigned char> rawDataSectionToVec();
 		};
 
 		/* BRSAR File Section */
