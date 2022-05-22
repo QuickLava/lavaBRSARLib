@@ -17,17 +17,6 @@ namespace lava
 		std::vector<char> body = {};
 	private:
 
-		// --- Fundamentals ---
-		// Functions for converting fundamentals to and from bytes and general manipulations
-		// Note: May need to use template args to only allow funds?
-		// Template Signature for Prims Only via Type Traits
-		// template<typename objectType, typename std::enable_if<std::is_fundamental<objectType>::value>::type* = nullptr>
-		// See the following:
-		// https://stackoverflow.com/questions/40496602/limit-range-of-type-template-arguments-for-class#40496746
-		// https://stackoverflow.com/questions/874298/c-templates-that-accept-only-certain-types
-		// https://community.ibm.com/community/user/ibmz-and-linuxone/blogs/fang-lu2/2020/03/24/introduction-to-type-traits-in-the-c-standard-library?lang=en
-		// https://www.cplusplus.com/reference/type_traits/is_fundamental/
-
 		template<typename objectType>
 		objectType getFundamental(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian) const
 		{
@@ -151,13 +140,19 @@ namespace lava
 			return result;
 		}
 
-		// --- Fundamentals ---
-
 	public:
 		_byteArray(std::size_t lengthIn = 0x00, char defaultChar = 0x00) 
 		{
 			populate(lengthIn, defaultChar);
 		};
+		_byteArray(const unsigned char* dataIn, std::size_t lengthIn)
+		{
+			populate((const char*)dataIn, lengthIn);
+		}
+		_byteArray(const char* dataIn, std::size_t lengthIn)
+		{
+			populate(dataIn, lengthIn);
+		}
 		_byteArray(std::vector<char>& sourceVec)
 		{
 			populate(sourceVec);
@@ -175,6 +170,11 @@ namespace lava
 			}
 			_populated = 1;
 			body.resize(lengthIn, defaultChar);
+		}
+		void populate(const char* sourceData, std::size_t lengthIn)
+		{
+			_populated = 1;
+			body = std::vector<char>(sourceData, sourceData + lengthIn);
 		}
 		void populate(std::vector<char>& sourceVec)
 		{
@@ -206,6 +206,22 @@ namespace lava
 		std::size_t size() const
 		{
 			return body.size();
+		}
+		const std::vector<char>::const_iterator begin() const
+		{
+			return body.begin();
+		}
+		const std::vector<char>::const_iterator end() const
+		{
+			return body.end();
+		}
+		const char& front() const
+		{
+			return body.front();
+		}
+		const char& back() const
+		{
+			return body.back();
 		}
 
 		std::vector<unsigned char> getBytes(std::size_t numToGet, std::size_t startIndex, std::size_t& numGotten = nullptr) const
