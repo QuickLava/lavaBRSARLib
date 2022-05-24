@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <sstream>
 #include <array>
+#include "lavaDSP.h"
 #include "lavaByteArray.h"
 #include "md5.h"
 
@@ -85,53 +86,11 @@ namespace lava
 
 		/*Sound Data Structs*/
 
-		struct channelInfo
-		{
-			unsigned long address = ULONG_MAX;
-
-			unsigned long channelDataOffset = ULONG_MAX;
-			unsigned long adpcmInfoOffset = ULONG_MAX;
-			unsigned long volFrontLeft = ULONG_MAX;
-			unsigned long volFrontRight = ULONG_MAX;
-			unsigned long volBackLeft = ULONG_MAX;
-			unsigned long volBackRight = ULONG_MAX;
-			unsigned long reserved = ULONG_MAX;
-
-			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
-			bool exportContents(std::ostream& destinationStream);
-		};
-		struct adpcmInfo
-		{
-			unsigned long address = ULONG_MAX;
-
-			std::array<unsigned short, 0x10> coefficients;
-			unsigned short gain = USHRT_MAX;
-			unsigned short ps = USHRT_MAX;
-			unsigned short yn1 = USHRT_MAX;
-			unsigned short yn2 = USHRT_MAX;
-			unsigned short lps = USHRT_MAX;
-			unsigned short lyn1 = USHRT_MAX;
-			unsigned short lyn2 = USHRT_MAX;
-			unsigned short pad = USHRT_MAX;
-
-			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
-			bool exportContents(std::ostream& destinationStream);
-		};
-		struct spt
-		{
-			unsigned short ps = USHRT_MAX;
-			std::array<unsigned short, 0x10> coefficients{};
-
-			bool populate(const byteArray& bodyIn, unsigned long addressIn);
-			bool populate(std::string pathIn, unsigned long addressIn);
-		};
 		struct wavePacket
 		{
 			bool populated = 0;
 
 			unsigned long address = ULONG_MAX;
-
-			//unsigned long paddingLength = ULONG_MAX;
 
 			std::vector<unsigned char> body{};
 			std::vector<unsigned char> padding{};

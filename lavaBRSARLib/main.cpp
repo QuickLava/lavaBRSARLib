@@ -6,11 +6,11 @@ const std::string tempFileDumpBaseFolder = targetBrsarName + "/";
 const unsigned long fileOverwriteTestTargetFile = 0x50;
 
 // Test which overwrites File 0x06 with itself, shouldn't actually change anything.
-#define ENABLE_FILE_OVERWRITE_TEST_1 true
+#define ENABLE_FILE_OVERWRITE_TEST_1 false
 // Test which overwrites File 0x06's header and data with zeroes-out 0x20 byte vectors.
 #define ENABLE_FILE_OVERWRITE_TEST_2 false
 // Test which exports the entire .brsar.
-#define ENABLE_BRSAR_EXPORT_TEST true
+#define ENABLE_BRSAR_EXPORT_TEST false
 // Test which exports the full SYMB section.
 #define ENABLE_SYMB_SECTION_EXPORT_TEST false
 // Test which exports the full INFO section.
@@ -23,6 +23,8 @@ const unsigned long fileOverwriteTestTargetFile = 0x50;
 #define ENABLE_STRING_DUMP_TEST false
 // Test which summarizes data for every brsarInfoFileHeader in the .brsar.
 #define ENABLE_FILE_INFO_SUMMARY_TEST false
+// Tests the .spt to .dsp header conversion system (see "lavaDSP.h").
+#define ENABLE_SPT_TO_DSP_HEADER_TEST true
 
 int main()
 {
@@ -81,6 +83,22 @@ int main()
 	{
 		testBrsar.infoSection.summarizeFileEntryData(infoFileDataTest);
 		infoFileDataTest.close();
+	}
+#endif
+#if ENABLE_SPT_TO_DSP_HEADER_TEST
+	lava::brawl::spt testSPT;
+	testSPT.populate("sawnd.spt", 0x04);
+	lava::brawl::dspHeader testDSP = lava::brawl::sptToDSPHeader(testSPT);
+	std::ofstream dspFileOut("sawnd_new.dsp", std::ios_base::out | std::ios_base::binary);
+	if (dspFileOut.is_open())
+	{
+		testDSP.exportContents(dspFileOut);
+		std::ifstream testSPD("sawnd.spd", std::ios_base::in | std::ios_base::binary);
+		if (testSPD.is_open())
+		{
+			dspFileOut << testSPD.rdbuf();
+		}
+		dspFileOut.close();
 	}
 #endif
 	return 0;

@@ -7,6 +7,9 @@ lavaBRSARLib/Debug/**
 lavaBRSARLib/Release/**
 lavaBRSARLib/Junk/**
 lavaBRSARLib/filedump/**
+lavaBRSARLib/*.spt
+lavaBRSARLib/*.spd
+lavaBRSARLib/*.dsp
 lavaBRSARLib/*.sawnd
 lavaBRSARLib/*.brsar
 lavaBRSARLib/*.bak
