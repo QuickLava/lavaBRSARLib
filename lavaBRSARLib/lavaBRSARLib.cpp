@@ -1944,7 +1944,6 @@ namespace lava
 					result.loopEnd = 0x00;
 				}
 				result.soundInfo = targetWaveInfo->adpcmInfoEntries.back();
-				//result.padding3.fill(0x00);
 				result.body = targetWaveInfo->packetContents.body;
 			}
 

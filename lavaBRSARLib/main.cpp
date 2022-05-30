@@ -10,7 +10,7 @@ const unsigned long dspTestTargetWaveIndex = 0x01;
 
 // Test which overwrites File 0x06 with itself, shouldn't actually change anything.
 #define ENABLE_FILE_OVERWRITE_TEST_1 false
-// Test which overwrites File 0x06's header and data with zeroes-out 0x20 byte vectors.
+// Test which overwrites File 0x06's header and data with zeroed-out 0x20 byte vectors.
 #define ENABLE_FILE_OVERWRITE_TEST_2 false
 // Test which exports the entire .brsar.
 #define ENABLE_BRSAR_EXPORT_TEST false
