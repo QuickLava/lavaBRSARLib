@@ -211,6 +211,7 @@ namespace lava
 			channelInfoEntries = sourceInfo.channelInfoEntries;
 			adpcmInfoEntries = sourceInfo.adpcmInfoEntries;
 		}
+
 		bool waveInfo::populate(const lava::byteArray& bodyIn, unsigned long addressIn)
 		{
 			bool result = 0;
@@ -1818,6 +1819,30 @@ namespace lava
 
 			return result;
 		}
+		bool rwsd::overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, const dsp& dspIn)
+		{
+			bool result = 0;
+
+			if (waveSectionIndex < waveSection.entries.size())
+			{
+				waveInfo* targetWaveInfo = &waveSection.entries[waveSectionIndex];
+				targetWaveInfo->encoding = 2;
+				targetWaveInfo->channels = 1;
+				targetWaveInfo->looped = dspIn.loops;
+				targetWaveInfo->loopStartSample = dspIn.loopStart;
+				targetWaveInfo->nibbles = dspIn.nibbleCount;
+				targetWaveInfo->sampleRate24 = dspIn.sampleRate >> 16;
+				targetWaveInfo->sampleRate = 0x0000FFFF & dspIn.sampleRate;
+				targetWaveInfo->channelInfoTable.resize(1);
+				targetWaveInfo->channelInfoEntries.resize(1);
+				targetWaveInfo->adpcmInfoEntries.resize(1);
+				targetWaveInfo->adpcmInfoEntries.back() = dspIn.soundInfo;
+				result = overwriteWaveRawData(waveSectionIndex, dspIn.body);
+			}
+
+			return result;
+		}
+
 
 		bool rwsd::populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long rawDataAddressIn, unsigned long specificDataEndAddressIn)
 		{
@@ -1897,6 +1922,34 @@ namespace lava
 			return result;
 		}
 
+		dsp rwsd::exportWaveRawDataToDSP(unsigned long waveSectionIndex)
+		{
+			dsp result;
+
+			if (waveSectionIndex < waveSection.entries.size())
+			{
+				const waveInfo* targetWaveInfo = &waveSection.entries[waveSectionIndex];
+				result.sampleCount = (targetWaveInfo->nibbles * 7) / 8;
+				result.nibbleCount = targetWaveInfo->nibbles;
+				result.sampleRate = unsigned long(targetWaveInfo->sampleRate24) << 16;
+				result.sampleRate |= targetWaveInfo->sampleRate;
+				result.loops = targetWaveInfo->looped;
+				result.loopStart = targetWaveInfo->loopStartSample;
+				if (result.loops)
+				{
+					result.loopEnd = result.sampleCount - 1;
+				}
+				else
+				{
+					result.loopEnd = 0x00;
+				}
+				result.soundInfo = targetWaveInfo->adpcmInfoEntries.back();
+				//result.padding3.fill(0x00);
+				result.body = targetWaveInfo->packetContents.body;
+			}
+
+			return result;
+		}
 		bool rwsd::exportFileSection(std::ostream& destinationStream)
 		{
 			bool result = 0;

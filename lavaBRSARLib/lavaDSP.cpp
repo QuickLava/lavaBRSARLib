@@ -89,7 +89,7 @@ namespace lava
 			return result;
 		}
 
-		bool dspHeader::populate(const byteArray& bodyIn, unsigned long addressIn)
+		bool dsp::populate(const byteArray& bodyIn, unsigned long addressIn)
 		{
 			bool result = 0;
 
@@ -106,16 +106,18 @@ namespace lava
 				padding2 = bodyIn.getLong(cursor, &cursor);
 				soundInfo.populate(bodyIn, cursor);
 				cursor += 0x30;
-				for (unsigned long i; i < padding3.size(); i++)
+				for (unsigned long i = 0; i < padding3.size(); i++)
 				{
 					padding3[i] = bodyIn.getShort(cursor, &cursor);
 				}
-				result = cursor != SIZE_MAX;
+				std::size_t numGotten = SIZE_MAX;
+				body = bodyIn.getBytes(SIZE_MAX, cursor, numGotten);
+				result = cursor != SIZE_MAX && numGotten != SIZE_MAX;
 			}
 
 			return result;
 		}
-		bool dspHeader::populate(std::string pathIn, unsigned long addressIn)
+		bool dsp::populate(std::string pathIn, unsigned long addressIn)
 		{
 			bool result = 0;
 
@@ -128,7 +130,7 @@ namespace lava
 
 			return result;
 		}
-		bool dspHeader::exportContents(std::ostream& destinationStream) const
+		bool dsp::exportContents(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 
@@ -147,6 +149,7 @@ namespace lava
 				{
 					writeRawDataToStream(destinationStream, padding3[i]);
 				}
+				destinationStream.write((char*)body.data(), body.size());
 				result = destinationStream.good();
 			}
 
@@ -188,9 +191,9 @@ namespace lava
 			return result;
 		}
 
-		dspHeader sptToDSPHeader(const spt& sptIn)
+		dsp sptToDSPHeader(const spt& sptIn)
 		{
-			dspHeader result;
+			dsp result;
 
 			unsigned long dataStart = (sptIn.streamStart / 2) - 1;
 			unsigned long dataEnd = (sptIn.streamEnd / 2) + 1;

@@ -47,18 +47,20 @@ namespace lava
 		- VGMStream SPD+SPT Source: https://github.com/vgmstream/vgmstream/blob/37cc12295c92ec6aa874118fb237bd3821970836/src/meta/spt_spd.c
 		- SPTex Source: https://hcs64.com/vgm_ripping.html
 		*/
-		struct dspHeader
+		struct dsp
 		{
-			unsigned long sampleCount = ULONG_MAX; 
-			unsigned long nibbleCount = ULONG_MAX; 
+			unsigned long sampleCount = ULONG_MAX;
+			unsigned long nibbleCount = ULONG_MAX;
 			unsigned long sampleRate = ULONG_MAX;
 			unsigned short loops = USHRT_MAX;
-			unsigned short padding1 = USHRT_MAX;
+			unsigned short padding1 = 0x00;
 			unsigned long loopStart = ULONG_MAX;
 			unsigned long loopEnd = ULONG_MAX;
 			unsigned long padding2 = 0x02;
 			adpcmInfo soundInfo{};
-			std::array<unsigned short, 0xA> padding3;
+			std::array<unsigned short, 0xA> padding3{};
+
+			std::vector<unsigned char> body{};
 
 			bool populate(const byteArray& bodyIn, unsigned long addressIn);
 			bool populate(std::string pathIn, unsigned long addressIn);
@@ -72,13 +74,13 @@ namespace lava
 			unsigned long loopEndOffset = ULONG_MAX;
 			unsigned long streamEnd = ULONG_MAX;
 			unsigned long streamStart = ULONG_MAX;
-			unsigned long padding = ULONG_MAX;
+			unsigned long padding = 0x00;
 			adpcmInfo soundInfo{};
 			bool populate(const byteArray& bodyIn, unsigned long addressIn);
 			bool populate(std::string pathIn, unsigned long addressIn);
 		};
 
-		dspHeader sptToDSPHeader(const spt& sptIn);
+		dsp sptToDSPHeader(const spt& sptIn);
 	}
 }
 

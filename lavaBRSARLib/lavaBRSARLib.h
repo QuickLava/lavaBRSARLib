@@ -13,7 +13,7 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.9.0";
+		const std::string version = "v1.0.0";
 
 		enum brsarHexTags
 		{
@@ -583,6 +583,7 @@ namespace lava
 			bool overwriteDataNoteInfo(unsigned long dataSectionIndex, const dataInfo& dataInfoIn);
 			bool overwriteWave(unsigned long waveSectionIndex, const waveInfo& waveInfoIn);
 			bool overwriteWaveRawData(unsigned long waveSectionIndex, const std::vector<unsigned char>& rawDataIn);
+			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, const dsp& dspIn);
 
 
 			// Populate Funcs
@@ -595,6 +596,7 @@ namespace lava
 
 			// Export Funcs
 
+			dsp exportWaveRawDataToDSP(unsigned long waveSectionIndex);
 			bool exportFileSection(std::ostream& destinationStream);
 			std::vector<unsigned char> fileSectionToVec();
 			bool exportRawDataSection(std::ostream& destinationStream);

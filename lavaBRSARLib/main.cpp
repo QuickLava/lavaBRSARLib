@@ -4,6 +4,9 @@
 const std::string targetBrsarName = "smashbros_sound";
 const std::string tempFileDumpBaseFolder = targetBrsarName + "/";
 const unsigned long fileOverwriteTestTargetFile = 0x50;
+const std::string dspTestFileName = "sawnd000";
+const unsigned long dspTestTargetFileID = 0x32D;
+const unsigned long dspTestTargetWaveIndex = 0x01;
 
 // Test which overwrites File 0x06 with itself, shouldn't actually change anything.
 #define ENABLE_FILE_OVERWRITE_TEST_1 false
@@ -24,7 +27,11 @@ const unsigned long fileOverwriteTestTargetFile = 0x50;
 // Test which summarizes data for every brsarInfoFileHeader in the .brsar.
 #define ENABLE_FILE_INFO_SUMMARY_TEST false
 // Tests the .spt to .dsp header conversion system (see "lavaDSP.h").
-#define ENABLE_SPT_TO_DSP_HEADER_TEST true
+#define ENABLE_SPT_TO_DSP_HEADER_TEST false
+// Tests the DSP import function.
+#define ENABLE_DSP_TO_WAVE_INFO_TEST true
+// Tests the DSP export function.
+#define ENABLE_WAVE_INFO_TO_DSP_TEST true
 
 int main()
 {
@@ -99,6 +106,28 @@ int main()
 			dspFileOut << testSPD.rdbuf();
 		}
 		dspFileOut.close();
+	}
+#endif
+#if ENABLE_WAVE_INFO_TO_DSP_TEST
+	lava::brawl::rwsd testExportRWSD;
+	if (testExportRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(dspTestTargetFileID)))
+	{
+		lava::brawl::dsp tempDSP = testExportRWSD.exportWaveRawDataToDSP(dspTestTargetWaveIndex);
+		std::ofstream dspOut(dspTestFileName + ".dsp", std::ios_base::out | std::ios_base::binary);
+		tempDSP.exportContents(dspOut);
+	}
+#endif
+#if ENABLE_DSP_TO_WAVE_INFO_TEST
+	lava::brawl::dsp testImportDSP;
+	if (testImportDSP.populate(dspTestFileName + ".dsp", 0x00))
+	{
+		lava::brawl::rwsd tempRWSD;
+		tempRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(dspTestTargetFileID));
+		tempRWSD.overwriteWaveRawDataWithDSP(dspTestTargetWaveIndex, testImportDSP);
+		if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+		{
+			testBrsar.exportContents(targetBrsarName + "_dsp.brsar");
+		}
 	}
 #endif
 	return 0;

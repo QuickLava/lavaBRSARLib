@@ -229,7 +229,7 @@ namespace lava
 			numGotten = SIZE_MAX;
 			if (startIndex < body.size())
 			{
-				if (startIndex + numToGet >= body.size())
+				if (numToGet >= body.size() || startIndex + numToGet >= body.size())
 				{
 					numToGet = body.size() - startIndex;
 				}
