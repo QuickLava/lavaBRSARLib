@@ -9,6 +9,13 @@ namespace lava
 {
 	namespace brawl
 	{
+		// Ported Directly from the VGAudio Source Code to ensure compatibility
+		// See here: https://github.com/Thealexbarney/VGAudio/blob/9d8f6ea04c83cccccb3dd7851a631bbd53a8dbbe/src/VGAudio/Codecs/GcAdpcm/GcAdpcmMath.cs
+		unsigned long nibblesToSamples(unsigned long nibblesIn);
+		unsigned long nibblesToBytes(unsigned long nibblesIn);
+		unsigned long samplesToNibbles(unsigned long samplesIn);
+		unsigned long samplesToBytes(unsigned long samplesIn);
+
 		struct channelInfo
 		{
 			unsigned long address = ULONG_MAX;

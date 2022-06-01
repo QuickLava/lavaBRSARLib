@@ -4,6 +4,15 @@ namespace lava
 {
 	namespace brawl
 	{
+		std::string generateVGAudioWavToDSPCommand(std::string wavFilePath, std::string outputFilePath)
+		{
+			return "\"\"" + VGAudioMainExePath + "\" -c -i:0 \"" + wavFilePath + "\" -o \"" + outputFilePath + "\"\"";
+		}
+		std::string generateVGAudioDSPToWavCommand(std::string dspFilePath, std::string outputFilePath)
+		{
+			return "\"\"" + VGAudioMainExePath + "\" -c -i \"" + dspFilePath + "\" -o \"" + outputFilePath + "\"\"";
+		}
+
 		/* Misc. */
 
 		unsigned long validateHexTag(unsigned long tagIn)
@@ -1842,7 +1851,26 @@ namespace lava
 
 			return result;
 		}
+		bool rwsd::overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::string wavPathIn)
+		{
+			bool result = 0;
 
+			if (std::filesystem::is_regular_file(wavPathIn))
+			{
+				system(lava::brawl::generateVGAudioWavToDSPCommand(wavPathIn, VGAudioTempConvFilename).c_str());
+				if (std::filesystem::is_regular_file(VGAudioTempConvFilename))
+				{
+					lava::brawl::dsp conversionDSP;
+					if (conversionDSP.populate(VGAudioTempConvFilename, 0x00))
+					{
+						result = overwriteWaveRawDataWithDSP(waveSectionIndex, conversionDSP);
+					}
+					std::filesystem::remove(VGAudioTempConvFilename);
+				}
+			}
+
+			return result;
+		}
 
 		bool rwsd::populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long rawDataAddressIn, unsigned long specificDataEndAddressIn)
 		{
@@ -1929,8 +1957,8 @@ namespace lava
 			if (waveSectionIndex < waveSection.entries.size())
 			{
 				const waveInfo* targetWaveInfo = &waveSection.entries[waveSectionIndex];
-				result.sampleCount = (targetWaveInfo->nibbles * 7) / 8;
 				result.nibbleCount = targetWaveInfo->nibbles;
+				result.sampleCount = nibblesToSamples(result.nibbleCount);
 				result.sampleRate = unsigned long(targetWaveInfo->sampleRate24) << 16;
 				result.sampleRate |= targetWaveInfo->sampleRate;
 				result.loops = targetWaveInfo->looped;
@@ -1945,6 +1973,32 @@ namespace lava
 				}
 				result.soundInfo = targetWaveInfo->adpcmInfoEntries.back();
 				result.body = targetWaveInfo->packetContents.body;
+				unsigned long desiredLength = nibblesToBytes(result.nibbleCount);
+				if (result.body.size() < desiredLength)
+				{
+					result.body.resize(desiredLength);
+				}
+			}
+
+			return result;
+		}
+		bool rwsd::exportWaveRawDataToWAV(unsigned long waveSectionIndex, std::string wavOutputPath)
+		{
+			bool result = 0;
+
+			dsp conversionDSP = exportWaveRawDataToDSP(waveSectionIndex);
+			if (!conversionDSP.body.empty())
+			{
+				std::ofstream convDSPOut(VGAudioTempConvFilename, std::ios_base::out | std::ios_base::binary);
+				if (convDSPOut.is_open())
+				{
+					if (conversionDSP.exportContents(convDSPOut))
+					{
+						convDSPOut.close();
+						system(lava::brawl::generateVGAudioDSPToWavCommand(VGAudioTempConvFilename, wavOutputPath).c_str());
+					}
+					std::filesystem::remove(VGAudioTempConvFilename);
+				}
 			}
 
 			return result;

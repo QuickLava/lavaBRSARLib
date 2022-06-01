@@ -9,11 +9,29 @@
 #include "lavaByteArray.h"
 #include "md5.h"
 
+/* -- About & Credits --
+lavaBRSARLib is a work-in-progress library to facilitate the manipulation of BRSAR files.
+This library is based heavily off of the work of other people. Special thanks to:
+- Jaklub and Agoaj, as well as mstaklo, ssbbtailsfan, stickman and VILE (Sawndz, Super Sawndz)
+- Soopercool101, as well as Kryal, BlackJax96, and libertyernie (BrawlLib, BrawlBox, BrawlCrate)
+- Gota7 and kitlith (RhythmRevolution Documentation)
+- Halley's Comet Software (VGMStream Source & Documentation, along with a varietey of other resources)
+Additionally, this library directly makes use of the following code written by other people:
+- VGAudioCli by Alex Barney (used for conversions between GC-ADPCM .dsp files and standard .wav files)
+- Portable C++ Hashing Library by Stephan Brumme (used to provide md5 hashes in file export summaries)
+*/
+
 namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v1.0.0";
+		const std::string version = "v0.9.3";
+		const std::string VGAudioPath = "./VGAudio/";
+		const std::string VGAudioMainExeName = "VGAudioCli.exe";
+		const std::string VGAudioMainExePath = VGAudioPath + VGAudioMainExeName;
+		const std::string VGAudioTempConvFilename = "__tempfile.dsp";
+		std::string generateVGAudioWavToDSPCommand(std::string wavFilePath, std::string outputFilePath);
+		std::string generateVGAudioDSPToWavCommand(std::string dspFilePath, std::string outputFilePath);
 
 		enum brsarHexTags
 		{
@@ -584,7 +602,8 @@ namespace lava
 			bool overwriteWave(unsigned long waveSectionIndex, const waveInfo& waveInfoIn);
 			bool overwriteWaveRawData(unsigned long waveSectionIndex, const std::vector<unsigned char>& rawDataIn);
 			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, const dsp& dspIn);
-
+			bool overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::istream& wavIn);
+			bool overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::string wavPathIn);
 
 			// Populate Funcs
 
@@ -597,6 +616,7 @@ namespace lava
 			// Export Funcs
 
 			dsp exportWaveRawDataToDSP(unsigned long waveSectionIndex);
+			bool exportWaveRawDataToWAV(unsigned long waveSectionIndex, std::string wavOutputPath);
 			bool exportFileSection(std::ostream& destinationStream);
 			std::vector<unsigned char> fileSectionToVec();
 			bool exportRawDataSection(std::ostream& destinationStream);

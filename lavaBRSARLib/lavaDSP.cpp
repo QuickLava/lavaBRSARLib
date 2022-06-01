@@ -4,6 +4,30 @@ namespace lava
 {
 	namespace brawl
 	{
+		unsigned long nibblesToSamples(unsigned long nibblesIn)
+		{
+			int frames = nibblesIn / 0x10;
+			int extraNibbles = nibblesIn % 0x10;
+			int extraSamples = extraNibbles < 2 ? 0 : extraNibbles - 2;
+			return (0xE * frames) + extraSamples;
+		}
+		unsigned long nibblesToBytes(unsigned long nibblesIn)
+		{
+			ldiv_t temp = ldiv(nibblesIn, 2);
+			return temp.quot + temp.rem;
+		}
+		unsigned long samplesToNibbles(unsigned long samplesIn)
+		{
+			int frames = samplesIn / 0x0E;
+			int extraSamples = samplesIn % 0x0E;
+			int extraNibbles = extraSamples == 0 ? 0 : extraSamples + 2;
+			return 0x10 * frames + extraNibbles;
+		}
+		unsigned long samplesToBytes(unsigned long samplesIn)
+		{
+			return nibblesToBytes(samplesToNibbles(samplesIn));
+		}
+
 		bool channelInfo::populate(const lava::byteArray& bodyIn, unsigned long addressIn)
 		{
 			bool result = 0;
@@ -198,8 +222,8 @@ namespace lava
 			unsigned long dataStart = (sptIn.streamStart / 2) - 1;
 			unsigned long dataEnd = (sptIn.streamEnd / 2) + 1;
 
-			result.sampleCount = ((dataEnd - dataStart) * 7) / 4;
 			result.nibbleCount = (dataEnd - dataStart) * 2;
+			result.sampleCount = nibblesToSamples(result.nibbleCount);
 			result.sampleRate = sptIn.sampleRate;
 			result.loops = sptIn.format & 1;
 			result.padding1 = 0;
