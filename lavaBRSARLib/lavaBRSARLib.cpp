@@ -1851,6 +1851,21 @@ namespace lava
 
 			return result;
 		}
+		bool rwsd::overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, std::string dspPathIn)
+		{
+			bool result = 0;
+
+			if (std::filesystem::is_regular_file(dspPathIn))
+			{
+				dsp tempDSP;
+				if (tempDSP.populate(dspPathIn, 0x00))
+				{
+					result = overwriteWaveRawDataWithDSP(waveSectionIndex, tempDSP);
+				}
+			}
+
+			return result;
+		}
 		bool rwsd::overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::string wavPathIn)
 		{
 			bool result = 0;
@@ -1860,11 +1875,7 @@ namespace lava
 				system(lava::brawl::generateVGAudioWavToDSPCommand(wavPathIn, VGAudioTempConvFilename).c_str());
 				if (std::filesystem::is_regular_file(VGAudioTempConvFilename))
 				{
-					lava::brawl::dsp conversionDSP;
-					if (conversionDSP.populate(VGAudioTempConvFilename, 0x00))
-					{
-						result = overwriteWaveRawDataWithDSP(waveSectionIndex, conversionDSP);
-					}
+					result = overwriteWaveRawDataWithDSP(waveSectionIndex, VGAudioTempConvFilename);
 					std::filesystem::remove(VGAudioTempConvFilename);
 				}
 			}

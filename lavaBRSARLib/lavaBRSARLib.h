@@ -602,7 +602,7 @@ namespace lava
 			bool overwriteWave(unsigned long waveSectionIndex, const waveInfo& waveInfoIn);
 			bool overwriteWaveRawData(unsigned long waveSectionIndex, const std::vector<unsigned char>& rawDataIn);
 			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, const dsp& dspIn);
-			bool overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::istream& wavIn);
+			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, std::string dspPathIn);
 			bool overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::string wavPathIn);
 
 			// Populate Funcs
