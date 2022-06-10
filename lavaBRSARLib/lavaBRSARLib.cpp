@@ -174,11 +174,19 @@ namespace lava
 			{
 				address = addressIn;
 
+				result = 1;
 				std::size_t numGotten = SIZE_MAX;
-				body = bodyIn.getBytes(dataLengthIn, addressIn, numGotten);
-				result = numGotten == dataLengthIn;
-				padding = bodyIn.getBytes(paddingLengthIn, addressIn + dataLengthIn, numGotten);
-				result &= numGotten == paddingLengthIn;
+				if (dataLengthIn != 0)
+				{
+					body = bodyIn.getBytes(dataLengthIn, addressIn, numGotten);
+					result &= numGotten == dataLengthIn;
+				}
+				if (paddingLengthIn != 0 && result)
+				{
+					padding = bodyIn.getBytes(paddingLengthIn, addressIn + dataLengthIn, numGotten);
+					result &= numGotten == paddingLengthIn;
+				}
+
 				populated = result;
 				if (!result)
 				{
