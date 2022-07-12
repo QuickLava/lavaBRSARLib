@@ -8,6 +8,9 @@ const unsigned long dspTestTargetFileID = 0x32D;
 const std::string dspTestFileName = "sawnd000";
 const unsigned long dspTestExportWaveIndex = 0x01;
 const unsigned long dspTestImportWaveIndex = 0x00;
+const unsigned long multiWaveExportTestInitialGroupID = 7;
+const unsigned long multiWaveExportTestGroupsCound = 40;
+const std::string multiWaveExportOutputDIrectory = "./WAVE_TEST/";
 
 // Test which overwrites File 0x06 with itself, shouldn't actually change anything.
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = false;
@@ -32,11 +35,13 @@ constexpr bool ENABLE_SPT_TO_DSP_HEADER_TEST = false;
 // Tests exporting an RWSD Wave Info entry into a DSP.
 constexpr bool ENABLE_WAVE_INFO_TO_DSP_TEST = false;
 // Tests importing a DSP into an RWSD Wave Info entry.
-constexpr bool ENABLE_DSP_TO_WAVE_INFO_TEST = true;
+constexpr bool ENABLE_DSP_TO_WAVE_INFO_TEST = false;
 // Tests exporting an RWSD Wave Info entry into a WAV.
 constexpr bool ENABLE_WAVE_INFO_TO_WAV_TEST = false;
+// Tests exporting all of the Wave Info entries in the specified groups to WAVs.
+constexpr bool ENABLE_MULTI_WAVE_INFO_TO_WAV_TEST = true;
 // Tests importing a WAV into an RWSD Wave Info entry.
-constexpr bool ENABLE_WAV_TO_WAVE_INFO_TEST = true;
+constexpr bool ENABLE_WAV_TO_WAVE_INFO_TEST = false;
 
 int main()
 {
@@ -153,6 +158,52 @@ int main()
 		if (testExportRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(dspTestTargetFileID)))
 		{
 			testExportRWSD.exportWaveRawDataToWAV(dspTestExportWaveIndex, dspTestFileName + ".wav");
+		}
+	}
+	if (ENABLE_MULTI_WAVE_INFO_TO_WAV_TEST)
+	{
+		for (unsigned long u = multiWaveExportTestInitialGroupID; u < multiWaveExportTestInitialGroupID + multiWaveExportTestGroupsCound; u++)
+		{
+			lava::brawl::rwsd testExportRWSD;
+			lava::brawl::brsarInfoGroupHeader* currGroupHead = testBrsar.infoSection.getGroupWithID(u);
+			if (currGroupHead != nullptr)
+			{
+				std::string targetDirectory = multiWaveExportOutputDIrectory + "Group_" + lava::numToDecStringWithPadding(u, 3) + "/";
+				for (unsigned long y = 0; y < currGroupHead->entries.size(); y++)
+				{
+					lava::brawl::brsarInfoGroupEntry* currFile = &currGroupHead->entries[y];
+					lava::brawl::brsarFileFileContents* currFileContents = testBrsar.fileSection.getFileContentsPointer(currFile->fileID, u);
+					if (currFileContents->header.size() >= 4)
+					{
+						if (lava::bytesToFundamental<unsigned int>(currFileContents->header.data()) == lava::brawl::brsarHexTags::bht_RWSD)
+						{
+							if (testExportRWSD.populate(*currFileContents))
+							{
+								if (std::filesystem::create_directories(targetDirectory) || std::filesystem::is_directory(targetDirectory))
+								{
+									for (unsigned long i = 0; i < testExportRWSD.waveSection.entries.size(); i++)
+									{
+										std::string targetFile = "file_" + lava::numToDecStringWithPadding(currFile->fileID, 3) + "_wav_" + lava::numToDecStringWithPadding(i, 3) + ".wav";
+										std::cout << "Exporting " << targetDirectory + targetFile << "... ";
+										if (testExportRWSD.exportWaveRawDataToWAV(i, targetDirectory + targetFile))
+										{
+											std::cout << "Success!\n";
+										}
+										else
+										{
+											std::cerr << "Failure!\n";
+										}
+									}
+								}
+								else
+								{
+									std::cerr << "Unable to create output folder (\"" << targetDirectory << "\"), make sure it's a valid location.\n";
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 	if (ENABLE_WAV_TO_WAVE_INFO_TEST)
