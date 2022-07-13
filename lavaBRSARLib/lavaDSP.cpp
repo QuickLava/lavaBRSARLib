@@ -134,9 +134,8 @@ namespace lava
 				{
 					padding3[i] = bodyIn.getShort(cursor, &cursor);
 				}
-				std::size_t numGotten = SIZE_MAX;
-				body = bodyIn.getBytes(SIZE_MAX, cursor, numGotten);
-				result = cursor != SIZE_MAX && numGotten != SIZE_MAX;
+				body = bodyIn.getBytes(SIZE_MAX, cursor);
+				result = cursor != SIZE_MAX && body.size() != SIZE_MAX;
 			}
 
 			return result;

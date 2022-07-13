@@ -9,15 +9,15 @@ const std::string dspTestFileName = "sawnd000";
 const unsigned long dspTestExportWaveIndex = 0x01;
 const unsigned long dspTestImportWaveIndex = 0x00;
 const unsigned long multiWaveExportTestInitialGroupID = 7;
-const unsigned long multiWaveExportTestGroupsCound = 40;
+const unsigned long multiWaveExportTestGroupsCound = 3;
 const std::string multiWaveExportOutputDIrectory = "./WAVE_TEST/";
 
 // Test which overwrites File 0x06 with itself, shouldn't actually change anything.
-constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = false;
+constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = true;
 // Test which overwrites File 0x06's header and data with zeroed-out 0x20 byte vectors.
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_2 = false;
 // Test which exports the entire .brsar.
-constexpr bool ENABLE_BRSAR_EXPORT_TEST = false;
+constexpr bool ENABLE_BRSAR_EXPORT_TEST = true;
 // Test which exports the full SYMB section.
 constexpr bool ENABLE_SYMB_SECTION_EXPORT_TEST = false;
 // Test which exports the full INFO section.

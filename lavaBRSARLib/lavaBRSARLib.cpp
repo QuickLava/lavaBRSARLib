@@ -175,16 +175,15 @@ namespace lava
 				address = addressIn;
 
 				result = 1;
-				std::size_t numGotten = SIZE_MAX;
 				if (dataLengthIn != 0)
 				{
-					body = bodyIn.getBytes(dataLengthIn, addressIn, numGotten);
-					result &= numGotten == dataLengthIn;
+					body = bodyIn.getBytes(dataLengthIn, addressIn);
+					result &= body.size() == dataLengthIn;
 				}
 				if (paddingLengthIn != 0 && result)
 				{
-					padding = bodyIn.getBytes(paddingLengthIn, addressIn + dataLengthIn, numGotten);
-					result &= numGotten == paddingLengthIn;
+					padding = bodyIn.getBytes(paddingLengthIn, addressIn + dataLengthIn);
+					result &= padding.size() == paddingLengthIn;
 				}
 
 				populated = result;
@@ -612,8 +611,7 @@ namespace lava
 					unsigned long stringBlockEndAddr = address + 0x08 + soundTrieOffset;
 					if (stringBlockStartAddr < stringBlockEndAddr)
 					{
-						std::size_t numGotten = SIZE_MAX;
-						stringBlock = bodyIn.getBytes(stringBlockEndAddr - stringBlockStartAddr, stringBlockStartAddr, numGotten);
+						stringBlock = bodyIn.getBytes(stringBlockEndAddr - stringBlockStartAddr, stringBlockStartAddr);
 					}
 				}
 			}
@@ -1356,11 +1354,10 @@ namespace lava
 					currFileHeader->populate(bodyIn, filesSection.refs[i].getAddress(address + 0x08));
 					if (currFileHeader->stringOffset.getAddress() != 0x00)
 					{
-						std::size_t numGotten = SIZE_MAX;
 						std::string measurementString = bodyIn.data() + (currFileHeader->stringOffset.getAddress(address + 0x08));
 						std::size_t sizePrescription = measurementString.size() + (0x04 - (measurementString.size() % 0x04));
-						currFileHeader->stringContent = bodyIn.getBytes(sizePrescription, currFileHeader->stringOffset.getAddress(address + 0x08), numGotten);
-						result &= numGotten == sizePrescription;
+						currFileHeader->stringContent = bodyIn.getBytes(sizePrescription, currFileHeader->stringOffset.getAddress(address + 0x08));
+						result &= currFileHeader->stringContent.size() == sizePrescription;
 					}
 					if (currFileHeader->listOffset.getAddress() != 0x00)
 					{
@@ -1538,15 +1535,14 @@ namespace lava
 					for (std::size_t u = 0; u < currHeader->entries.size(); u++)
 					{
 						currEntry = &currHeader->entries[u];
-						std::size_t numGotten = ULONG_MAX;
 						fileContents.push_back(brsarFileFileContents());
 						fileContents.back().fileID = currEntry->fileID;
 						fileContents.back().groupInfoIndex = i;
 						fileContents.back().groupID = currHeader->groupID;
 						fileContents.back().headerAddress = currHeader->headerAddress + currEntry->headerOffset;
-						fileContents.back().header = bodyIn.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset, numGotten);
+						fileContents.back().header = bodyIn.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset);
 						fileContents.back().dataAddress = currHeader->dataAddress + currEntry->dataOffset;
-						fileContents.back().data = bodyIn.getBytes(currEntry->dataLength, currHeader->dataAddress + currEntry->dataOffset, numGotten);
+						fileContents.back().data = bodyIn.getBytes(currEntry->dataLength, currHeader->dataAddress + currEntry->dataOffset);
 						fileIDToIndex[currEntry->fileID].push_back(fileContents.size() - 1);
 					}
 				}

@@ -145,15 +145,19 @@ namespace lava
 		{
 			populate(lengthIn, defaultChar);
 		};
-		_byteArray(const unsigned char* dataIn, std::size_t lengthIn)
-		{
-			populate((const char*)dataIn, lengthIn);
-		}
 		_byteArray(const char* dataIn, std::size_t lengthIn)
 		{
 			populate(dataIn, lengthIn);
 		}
+		_byteArray(const unsigned char* dataIn, std::size_t lengthIn)
+		{
+			populate(dataIn, lengthIn);
+		}
 		_byteArray(std::vector<char>& sourceVec)
+		{
+			populate(sourceVec);
+		}
+		_byteArray(std::vector<unsigned char>& sourceVec)
 		{
 			populate(sourceVec);
 		}
@@ -173,13 +177,24 @@ namespace lava
 		}
 		void populate(const char* sourceData, std::size_t lengthIn)
 		{
-			_populated = 1;
-			body = std::vector<char>(sourceData, sourceData + lengthIn);
+			if (sourceData != nullptr)
+			{
+				_populated = 1;
+				body = std::vector<char>(sourceData, sourceData + lengthIn);
+			}
+		}
+		void populate(const unsigned char* sourceData, std::size_t lengthIn)
+		{
+			populate((const char*)sourceData, lengthIn);
 		}
 		void populate(std::vector<char>& sourceVec)
 		{
 			_populated = 1;
 			body = sourceVec;
+		}
+		void populate(std::vector<unsigned char>& sourceVec)
+		{
+			populate(sourceVec.data(), sourceVec.size());
 		}
 		void populate(std::istream& sourceStream)
 		{
@@ -224,28 +239,26 @@ namespace lava
 			return body.back();
 		}
 
-		std::vector<unsigned char> getBytes(std::size_t numToGet, std::size_t startIndex, std::size_t& numGotten = nullptr) const
+		std::vector<unsigned char> getBytes(std::size_t numToGet, std::size_t startIndex, std::size_t* nextIndexOut = nullptr) const
 		{
-			numGotten = SIZE_MAX;
 			if (startIndex < body.size())
 			{
-				if (numToGet >= body.size() || startIndex + numToGet >= body.size())
+				if (numToGet >= body.size() || (startIndex + numToGet) >= body.size())
 				{
 					numToGet = body.size() - startIndex;
 				}
-				numGotten = numToGet;
-				/*if (nextIndexOut != nullptr)
+				if (nextIndexOut != nullptr)
 				{
 					*nextIndexOut = startIndex + numToGet;
-				}*/
+				}
 				return std::vector<unsigned char>(body.begin() + startIndex, body.begin() + startIndex + numToGet);
 			}
 			else
 			{
-				/*if (nextIndexOut != nullptr)
+				if (nextIndexOut != nullptr)
 				{
 					*nextIndexOut = SIZE_MAX;
-				}*/
+				}
 				std::cerr << "[ERROR] Requested region startpoint was invalid. Specified index was [" << startIndex << "], max valid index is [" << body.size() - 1 << "].\n";
 			}
 			return std::vector<unsigned char>();
