@@ -1,5 +1,5 @@
-#ifndef LAVA_BYTE_ARRAY_H_V2
-#define LAVA_BYTE_ARRAY_H_V2
+#ifndef LAVA_BYTE_ARRAY_H_V3
+#define LAVA_BYTE_ARRAY_H_V3
 
 #include <vector>
 #include <algorithm>
