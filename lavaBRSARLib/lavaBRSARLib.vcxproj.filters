@@ -30,6 +30,12 @@
     <ClCompile Include="lavaDSP.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="lavaBytes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lavaByteArray.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lavaByteArray.h">
@@ -45,6 +51,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lavaDSP.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lavaBytes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
