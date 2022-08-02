@@ -5,21 +5,26 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
-#include "lavaUtility.h"
+#include "lavaBytes.h"
 
 namespace lava
 {
-	template<endType defaultEndian = endType::et_BIG_ENDIAN>
-	struct _byteArray
+	struct byteArray
 	{
 	private:
 		bool _populated = 0;
 		std::vector<char> body = {};
+		endType defaultEndian = endType::et_BIG_ENDIAN;
 	private:
 
 		template<typename objectType>
-		objectType getFundamental(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian) const
+		objectType getFundamental(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL) const
 		{
+			if (endianIn == endType::et_NULL)
+			{
+				endianIn = defaultEndian;
+			}
+
 			objectType result = ULLONG_MAX;
 			if ((startIndex + sizeof(objectType)) <= body.size())
 			{
@@ -41,6 +46,11 @@ namespace lava
 		template<>
 		unsigned char getFundamental<unsigned char>(std::size_t startIndex, std::size_t* nextIndexOut, endType endianIn) const
 		{
+			if (endianIn == endType::et_NULL)
+			{
+				endianIn = defaultEndian;
+			}
+
 			unsigned char result = UCHAR_MAX;
 			if (startIndex < body.size())
 			{
@@ -61,8 +71,13 @@ namespace lava
 		}
 
 		template<typename objectType>
-		bool setFundamental(const objectType& objectIn, std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian)
+		bool setFundamental(const objectType& objectIn, std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL)
 		{
+			if (endianIn == endType::et_NULL)
+			{
+				endianIn = defaultEndian;
+			}
+
 			bool result = 0;
 			if (startIndex + sizeof(objectType) <= body.size())
 			{
@@ -86,6 +101,11 @@ namespace lava
 		template<>
 		bool setFundamental<unsigned char>(const unsigned char& objectIn, std::size_t startIndex, std::size_t* nextIndexOut, endType endianIn)
 		{
+			if (endianIn == endType::et_NULL)
+			{
+				endianIn = defaultEndian;
+			}
+
 			bool result = 0;
 			if (startIndex < body.size())
 			{
@@ -107,8 +127,13 @@ namespace lava
 		}
 
 		template<typename objectType>
-		bool insertFundamental(const objectType& objectIn, std::size_t startIndex, endType endianIn = defaultEndian)
+		bool insertFundamental(const objectType& objectIn, std::size_t startIndex, endType endianIn = endType::et_NULL)
 		{
+			if (endianIn == endType::et_NULL)
+			{
+				endianIn = defaultEndian;
+			}
+
 			bool result = 0;
 			if (startIndex < body.size())
 			{
@@ -119,8 +144,13 @@ namespace lava
 		}
 
 		template<typename objectType>
-		std::size_t findFundamental(const objectType& objectIn, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::size_t findFundamental(const objectType& objectIn, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
+			if (endianIn == endType::et_NULL)
+			{
+				endianIn = defaultEndian;
+			}
+
 			std::size_t result = SIZE_MAX;
 			if (startItr < body.size())
 			{
@@ -128,10 +158,15 @@ namespace lava
 			}
 			return result;
 		}
-		template<typename objectType>
 
-		std::vector<std::size_t> findFundamentalMultiple(const objectType& objectIn, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		template<typename objectType>
+		std::vector<std::size_t> findFundamentalMultiple(const objectType& objectIn, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
+			if (endianIn == endType::et_NULL)
+			{
+				endianIn = defaultEndian;
+			}
+
 			std::vector<std::size_t> result{};
 			if (startItr < body.size())
 			{
@@ -141,27 +176,27 @@ namespace lava
 		}
 
 	public:
-		_byteArray(std::size_t lengthIn = 0x00, char defaultChar = 0x00) 
+		byteArray(std::size_t lengthIn = 0x00, char defaultChar = 0x00) 
 		{
 			populate(lengthIn, defaultChar);
 		};
-		_byteArray(const char* dataIn, std::size_t lengthIn)
+		byteArray(const char* dataIn, std::size_t lengthIn)
 		{
 			populate(dataIn, lengthIn);
 		}
-		_byteArray(const unsigned char* dataIn, std::size_t lengthIn)
+		byteArray(const unsigned char* dataIn, std::size_t lengthIn)
 		{
 			populate(dataIn, lengthIn);
 		}
-		_byteArray(std::vector<char>& sourceVec)
+		byteArray(std::vector<char>& sourceVec)
 		{
 			populate(sourceVec);
 		}
-		_byteArray(std::vector<unsigned char>& sourceVec)
+		byteArray(std::vector<unsigned char>& sourceVec)
 		{
 			populate(sourceVec);
 		}
-		_byteArray(std::istream& sourceStream)
+		byteArray(std::istream& sourceStream)
 		{
 			populate(sourceStream);
 		}
@@ -263,28 +298,28 @@ namespace lava
 			}
 			return std::vector<unsigned char>();
 		}
-		unsigned long long int getLLong(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian) const
+		unsigned long long int getLLong(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL) const
 		{
 			return getFundamental<unsigned long long int>(startIndex, nextIndexOut, endianIn);
 		}
-		unsigned long int getLong(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian) const
+		unsigned long int getLong(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL) const
 		{
 			return getFundamental<unsigned long int>(startIndex, nextIndexOut, endianIn);
 		}
-		unsigned short int getShort(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian) const
+		unsigned short int getShort(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL) const
 		{
 			return getFundamental<unsigned short int>(startIndex, nextIndexOut, endianIn);
 		}
-		unsigned char getChar(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian) const
+		unsigned char getChar(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL) const
 		{
 			return getFundamental<unsigned char>(startIndex, nextIndexOut, endianIn);
 		}
-		double getDouble(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian) const
+		double getDouble(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL) const
 		{
 			unsigned long long tempRes = getLLong(startIndex, nextIndexOut, endianIn);
 			return *(double*)(&tempRes);
 		}
-		float getFloat(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian, float* floatOut = nullptr) const
+		float getFloat(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL, float* floatOut = nullptr) const
 		{
 			unsigned long tempRes = getLong(startIndex, nextIndexOut, endianIn);
 			return *(float*)(&tempRes);
@@ -332,28 +367,28 @@ namespace lava
 
 			return result;
 		}
-		bool setLLong(unsigned long long int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian)
+		bool setLLong(unsigned long long int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL)
 		{
 			return setFundamental<unsigned long long int>(valueIn, atIndex, nextIndexOut, endianIn);
 		}
-		bool setLong(unsigned long int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian)
+		bool setLong(unsigned long int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL)
 		{
 			return setFundamental<unsigned long int>(valueIn, atIndex, nextIndexOut, endianIn);
 		}
-		bool setShort(unsigned short int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian)
+		bool setShort(unsigned short int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL)
 		{
 			return setFundamental<unsigned short int>(valueIn, atIndex, nextIndexOut, endianIn);
 		}
-		bool setChar(unsigned char valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian)
+		bool setChar(unsigned char valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL)
 		{
 			return setFundamental<unsigned char>(valueIn, atIndex, nextIndexOut, endianIn);
 		}
-		bool setDouble(double valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian)
+		bool setDouble(double valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL)
 		{
 			unsigned long long tempVal = *(unsigned long long*)(&valueIn);
 			return setFundamental<unsigned long long>(tempVal, atIndex, nextIndexOut, endianIn);
 		}
-		bool setFloat(float valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = defaultEndian)
+		bool setFloat(float valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL)
 		{
 			unsigned long tempVal = *((unsigned long*)(&valueIn));
 			return setFundamental<unsigned long>(tempVal, atIndex, nextIndexOut, endianIn);
@@ -369,28 +404,28 @@ namespace lava
 			}
 			return result;
 		}
-		bool insertLLong(unsigned long long int valueIn, std::size_t atIndex, endType endianIn = defaultEndian)
+		bool insertLLong(unsigned long long int valueIn, std::size_t atIndex, endType endianIn = endType::et_NULL)
 		{
 			return insertFundamental<unsigned long long int>(valueIn, atIndex, endianIn);
 		}
-		bool insertLong(unsigned long int valueIn, std::size_t atIndex, endType endianIn = defaultEndian)
+		bool insertLong(unsigned long int valueIn, std::size_t atIndex, endType endianIn = endType::et_NULL)
 		{
 			return insertFundamental<unsigned long int>(valueIn, atIndex, endianIn);
 		}
-		bool insertShort(unsigned short int valueIn, std::size_t atIndex, endType endianIn = defaultEndian)
+		bool insertShort(unsigned short int valueIn, std::size_t atIndex, endType endianIn = endType::et_NULL)
 		{
 			return insertFundamental<unsigned short int>(valueIn, atIndex, endianIn);
 		}
-		bool insertChar(unsigned char valueIn, std::size_t atIndex, endType endianIn = defaultEndian)
+		bool insertChar(unsigned char valueIn, std::size_t atIndex, endType endianIn = endType::et_NULL)
 		{
 			return insertFundamental<unsigned char>(valueIn, atIndex, endianIn);
 		}
-		bool insertDouble(double valueIn, std::size_t atIndex, endType endianIn = defaultEndian)
+		bool insertDouble(double valueIn, std::size_t atIndex, endType endianIn = endType::et_NULL)
 		{
 			unsigned long long tempVal = *(unsigned long long*)(&valueIn);
 			return insertFundamental<unsigned long long>(tempVal, atIndex, endianIn);
 		}
-		bool insertFloat(float valueIn, std::size_t atIndex, endType endianIn = defaultEndian)
+		bool insertFloat(float valueIn, std::size_t atIndex, endType endianIn = endType::et_NULL)
 		{
 			unsigned long tempVal = *(unsigned long*)(&valueIn);
 			return insertFundamental<unsigned long>(tempVal, atIndex, endianIn);
@@ -414,27 +449,27 @@ namespace lava
 			}
 			return (itr != body.end()) ? itr - body.begin() : SIZE_MAX;
 		}
-		std::size_t searchLLong(unsigned long long int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::size_t searchLLong(unsigned long long int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamental<unsigned long long int>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::size_t searchLong(unsigned long int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::size_t searchLong(unsigned long int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamental<unsigned long int>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::size_t searchShort(unsigned short int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::size_t searchShort(unsigned short int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamental<unsigned short>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::size_t searchChar(unsigned char searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::size_t searchChar(unsigned char searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamental<unsigned char>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::size_t searchDouble(double searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::size_t searchDouble(double searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamental<double>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::size_t searchFloat(float searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::size_t searchFloat(float searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamental<float>(searchCriteria, startItr, endItr, endianIn);
 		}
@@ -463,27 +498,27 @@ namespace lava
 			}
 			return result;
 		}
-		std::vector<std::size_t> searchMultipleLLong(unsigned long long int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::vector<std::size_t> searchMultipleLLong(unsigned long long int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamentalMultiple<unsigned long long int>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::vector<std::size_t> searchMultipleLong(unsigned long int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::vector<std::size_t> searchMultipleLong(unsigned long int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamentalMultiple<unsigned long int>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::vector<std::size_t> searchMultipleShort(unsigned short int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::vector<std::size_t> searchMultipleShort(unsigned short int searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamentalMultiple<unsigned short>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::vector<std::size_t> searchMultipleChar(unsigned char searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::vector<std::size_t> searchMultipleChar(unsigned char searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamentalMultiple<unsigned char>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::vector<std::size_t> searchMultipleDouble(double searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::vector<std::size_t> searchMultipleDouble(double searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamentalMultiple<double>(searchCriteria, startItr, endItr, endianIn);
 		}
-		std::vector<std::size_t> searchMultipleFloat(float searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = defaultEndian) const
+		std::vector<std::size_t> searchMultipleFloat(float searchCriteria, std::size_t startItr = 0, std::size_t endItr = SIZE_MAX, endType endianIn = endType::et_NULL) const
 		{
 			return findFundamentalMultiple<float>(searchCriteria, startItr, endItr, endianIn);
 		}
@@ -521,10 +556,6 @@ namespace lava
 			return result;
 		}
 	};
-	// Byte Array (Big Endian Default)
-	typedef _byteArray<endType::et_BIG_ENDIAN> byteArray;
-	// Byte Array (Little Endian Default)
-	typedef _byteArray<endType::et_LITTLE_ENDIAN> byteArray_LE;
 
 	// Old Testing Stuff
 	/*const std::string testFileName = "testFile";
