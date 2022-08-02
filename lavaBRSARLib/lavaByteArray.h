@@ -209,7 +209,7 @@ namespace lava
 		double getDouble(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL) const;
 		float getFloat(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL) const;
 
-		bool setBytes(std::vector<unsigned char> bytesIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr);
+		bool setBytes(const std::vector<unsigned char>& bytesIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr);
 		bool setLLong(unsigned long long int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL);
 		bool setLong(unsigned long int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL);
 		bool setShort(unsigned short int valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL);
@@ -217,7 +217,7 @@ namespace lava
 		bool setDouble(double valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL);
 		bool setFloat(float valueIn, std::size_t atIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL);
 
-		bool insertBytes(std::vector<unsigned char> bytesIn, std::size_t atIndex);
+		bool insertBytes(const std::vector<unsigned char>& bytesIn, std::size_t atIndex);
 		bool insertLLong(unsigned long long int valueIn, std::size_t atIndex, endType endianIn = endType::et_NULL);
 		bool insertLong(unsigned long int valueIn, std::size_t atIndex, endType endianIn = endType::et_NULL);
 		bool insertShort(unsigned short int valueIn, std::size_t atIndex, endType endianIn = endType::et_NULL);

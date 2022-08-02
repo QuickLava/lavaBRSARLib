@@ -163,7 +163,7 @@ namespace lava
 		return *(float*)(&tempRes);
 	}
 
-	bool byteArray::setBytes(std::vector<unsigned char> bytesIn, std::size_t atIndex, std::size_t* nextIndexOut)
+	bool byteArray::setBytes(const std::vector<unsigned char>& bytesIn, std::size_t atIndex, std::size_t* nextIndexOut)
 	{
 		bool result = 0;
 		if ((atIndex + bytesIn.size()) >= atIndex && atIndex + bytesIn.size() <= body.size())
@@ -232,7 +232,7 @@ namespace lava
 		return setFundamental<unsigned long>(tempVal, atIndex, nextIndexOut, endianIn);
 	}
 
-	bool byteArray::insertBytes(std::vector<unsigned char> bytesIn, std::size_t atIndex)
+	bool byteArray::insertBytes(const std::vector<unsigned char>& bytesIn, std::size_t atIndex)
 	{
 		bool result = 0;
 		if (atIndex < body.size())
