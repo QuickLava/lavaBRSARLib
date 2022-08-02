@@ -7,6 +7,7 @@
 #include <array>
 #include "lavaDSP.h"
 #include "lavaByteArray.h"
+#include "lavaUtility.h"
 #include "md5.h"
 
 /* -- About & Credits --
