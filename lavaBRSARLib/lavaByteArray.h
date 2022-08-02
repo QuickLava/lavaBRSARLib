@@ -197,6 +197,7 @@ namespace lava
 		const std::vector<char>::const_iterator end() const;
 		const char& front() const;
 		const char& back() const;
+		void setDefaultEndian(endType endianIn);
 
 		std::vector<unsigned char> getBytes(std::size_t numToGet, std::size_t startIndex, std::size_t* nextIndexOut = nullptr) const;
 		unsigned long long int getLLong(std::size_t startIndex, std::size_t* nextIndexOut = nullptr, endType endianIn = endType::et_NULL) const;

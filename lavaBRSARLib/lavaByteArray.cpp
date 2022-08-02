@@ -99,6 +99,13 @@ namespace lava
 	{
 		return body.back();
 	}
+	void byteArray::setDefaultEndian(endType endianIn)
+	{
+		if (endianIn != endType::et_NULL)
+		{
+			defaultEndian = endianIn;
+		}
+	}
 
 	std::vector<unsigned char> byteArray::getBytes(std::size_t numToGet, std::size_t startIndex, std::size_t* nextIndexOut) const
 	{
