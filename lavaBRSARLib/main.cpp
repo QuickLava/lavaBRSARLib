@@ -11,9 +11,13 @@ const unsigned long dspTestImportWaveIndex = 0x00;
 const unsigned long multiWaveExportTestInitialGroupID = 7;
 const unsigned long multiWaveExportTestGroupsCound = 3;
 const std::string multiWaveExportOutputDIrectory = "./WAVE_TEST/";
+const std::string testFileName = "testFile";
+const std::string testFileSuffix = ".dat";
+const std::string testFilePath = testFileName + testFileSuffix;
+const std::string testFileOutputPath = testFileName + "_edit" + testFileSuffix;
 
 // Test which overwrites File 0x06 with itself, shouldn't actually change anything.
-constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = true;
+constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = false;
 // Test which overwrites File 0x06's header and data with zeroed-out 0x20 byte vectors.
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_2 = false;
 // Test which exports the entire .brsar.
@@ -39,9 +43,13 @@ constexpr bool ENABLE_DSP_TO_WAVE_INFO_TEST = false;
 // Tests exporting an RWSD Wave Info entry into a WAV.
 constexpr bool ENABLE_WAVE_INFO_TO_WAV_TEST = false;
 // Tests exporting all of the Wave Info entries in the specified groups to WAVs.
-constexpr bool ENABLE_MULTI_WAVE_INFO_TO_WAV_TEST = true;
+constexpr bool ENABLE_MULTI_WAVE_INFO_TO_WAV_TEST = false;
 // Tests importing a WAV into an RWSD Wave Info entry.
 constexpr bool ENABLE_WAV_TO_WAVE_INFO_TEST = false;
+// Tests lossiness of the dsp-to-wav conversion process
+constexpr bool ENABLE_CONV_LOSS_TEST = false;
+// Tests lavaByteArray's Operations for errors.
+constexpr bool ENABLE_BYTE_ARRAY_TEST = false;
 
 int main()
 {
@@ -218,6 +226,48 @@ int main()
 					testBrsar.exportContents(targetBrsarName + "_wav.brsar");
 				}
 			}
+		}
+	}
+	if (ENABLE_CONV_LOSS_TEST)
+	{
+		lava::brawl::rwsd testExportRWSD;
+		if (testExportRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(dspTestTargetFileID)))
+		{
+			lava::brawl::dsp tempDSP = testExportRWSD.exportWaveRawDataToDSP(dspTestExportWaveIndex);
+			std::ofstream dspOut(dspTestFileName + ".dsp", std::ios_base::out | std::ios_base::binary);
+			tempDSP.exportContents(dspOut);
+			dspOut.close();
+			testExportRWSD.overwriteWaveRawDataWithDSP(dspTestExportWaveIndex, dspTestFileName + ".dsp");
+			for (unsigned long i = 0; i < 30; i++)
+			{
+				lava::brawl::dsp testDSP = testExportRWSD.exportWaveRawDataToDSP(dspTestExportWaveIndex);
+				std::ofstream testDSPOut(dspTestFileName + "_edit.dsp", std::ios_base::out | std::ios_base::binary);
+				testDSP.exportContents(testDSPOut);
+				testDSPOut.close();
+				testExportRWSD.overwriteWaveRawDataWithDSP(dspTestExportWaveIndex, dspTestFileName + "_edit.dsp");
+			}
+		}
+	}
+	if (ENABLE_BYTE_ARRAY_TEST)
+	{
+		std::ofstream testFileOut(testFilePath, std::ios_base::out | std::ios_base::binary);
+		if (testFileOut.is_open())
+		{
+			for (std::size_t i = 0; i < USHRT_MAX; i++)
+			{
+				lava::writeRawDataToStream(testFileOut, i | (i << 0x10));
+			}
+			lava::byteArray testArr;
+			std::ifstream testFileIn(testFilePath, std::ios_base::in | std::ios_base::binary);
+			testArr.populate(testFileIn);
+			testFileIn.close();
+			std::size_t cursor = 0x00;
+			while (cursor < testArr.size())
+			{
+				long temp = testArr.getLong(cursor, nullptr);
+				testArr.setLong(temp, cursor, &cursor);
+			}
+			testArr.dumpToFile(testFileOutputPath);
 		}
 	}
 	return 0;
