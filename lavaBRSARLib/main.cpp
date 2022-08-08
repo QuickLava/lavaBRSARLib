@@ -46,8 +46,10 @@ constexpr bool ENABLE_WAVE_INFO_TO_WAV_TEST = false;
 constexpr bool ENABLE_MULTI_WAVE_INFO_TO_WAV_TEST = false;
 // Tests importing a WAV into an RWSD Wave Info entry.
 constexpr bool ENABLE_WAV_TO_WAVE_INFO_TEST = false;
+// Tests addign new WAV entries to an RWSD
+constexpr bool ENABLE_PUSH_RWSD_WAV_ENTRY_TEST = true;
 // Tests lossiness of the dsp-to-wav conversion process
-constexpr bool ENABLE_CONV_LOSS_TEST = false;
+constexpr bool ENABLE_CONV_LOSS_TEST = true;
 // Tests lavaByteArray's Operations for errors.
 constexpr bool ENABLE_BYTE_ARRAY_TEST = false;
 
@@ -224,6 +226,20 @@ int main()
 				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
 				{
 					testBrsar.exportContents(targetBrsarName + "_wav.brsar");
+				}
+			}
+		}
+	}
+	if (ENABLE_PUSH_RWSD_WAV_ENTRY_TEST)
+	{
+		lava::brawl::rwsd tempRWSD;
+		if (tempRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(799)))
+		{
+			if (tempRWSD.grantDataEntryUniqueWave(1, tempRWSD.waveSection.entries[1]))
+			{
+				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), 799))
+				{
+					testBrsar.exportContents(targetBrsarName + "_newwav.brsar");
 				}
 			}
 		}

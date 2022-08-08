@@ -1589,6 +1589,42 @@ namespace lava
 
 		/* RWSD */
 
+		void rwsdWaveSection::grantUniqueWaveEntry(const waveInfo& sourceWave)
+		{
+			if (!entryOffsets.empty())
+			{
+				for (unsigned long i = 0; i < entryOffsets.size(); i++)
+				{
+					entryOffsets[i] += 0x04;
+				}
+
+				entryOffsets.push_back(entryOffsets.back() + 0x6C);
+			}
+			else
+			{
+				entryOffsets.push_back(0x10);
+			}
+
+			entries.push_back(sourceWave);
+			waveInfo* newFinalEntry = &entries.back();
+			newFinalEntry->address = brsarAddressConsts::bac_NOT_IN_FILE;
+			if (entries.size() > 1)
+			{
+				waveInfo* formerFinalEntry = &entries[entries.size() - 2];
+				unsigned long newDataLocation = formerFinalEntry->dataLocation + formerFinalEntry->packetContents.body.size();
+				if (formerFinalEntry->packetContents.populated)
+				{
+					newDataLocation += formerFinalEntry->packetContents.padding.size();
+				}
+				newFinalEntry->dataLocation = newDataLocation;
+			}
+			else
+			{
+				newFinalEntry->dataLocation = 0x00;
+			}
+
+			length += 0x04 + 0x6C;
+		}
 		bool rwsdWaveSection::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -1651,6 +1687,7 @@ namespace lava
 			}
 			return result;
 		}
+
 		bool rwsdDataSection::hasExclusiveWave(unsigned long dataSectionIndex)
 		{
 			bool result = 1;
@@ -1890,6 +1927,18 @@ namespace lava
 			return result;
 		}
 
+		bool rwsd::grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave)
+		{
+			bool result = 1;
+
+			waveSection.grantUniqueWaveEntry(sourceWave);
+			dataSection.entries[dataSectionIndex].ntWaveIndex = waveSection.entries.size() - 1;
+			header.headerLength += 0x70;
+			header.waveLength += 0x70;
+
+			return result;
+		}
+
 		bool rwsd::populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long rawDataAddressIn, unsigned long specificDataEndAddressIn)
 		{
 			bool result = 0;
@@ -1992,6 +2041,7 @@ namespace lava
 				}
 				result.soundInfo = targetWaveInfo->adpcmInfoEntries.back();
 				result.body = targetWaveInfo->packetContents.body;
+				//result.body.insert(result.body.end(), targetWaveInfo->packetContents.padding.begin(), targetWaveInfo->packetContents.padding.end());
 				unsigned long desiredLength = nibblesToBytes(result.nibbleCount);
 				if (result.body.size() < desiredLength)
 				{

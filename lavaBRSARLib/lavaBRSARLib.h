@@ -560,7 +560,7 @@ namespace lava
 			std::vector<unsigned long> entryOffsets{};
 			std::vector<waveInfo> entries{};
 
-			void pushEntry(const waveInfo& entryIn);
+			void grantUniqueWaveEntry(const waveInfo& sourceWave);
 			unsigned long sumWavePacketLengths();
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
@@ -605,6 +605,8 @@ namespace lava
 			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, const dsp& dspIn);
 			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, std::string dspPathIn);
 			bool overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::string wavPathIn);
+
+			bool grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave);
 
 			// Populate Funcs
 
