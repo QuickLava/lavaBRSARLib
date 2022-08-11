@@ -1471,6 +1471,79 @@ namespace lava
 
 		/* BRSAR File Section */
 
+		bool brsarFileFileContents::dumpToStream(std::ostream& output)
+		{
+			bool result = 0;
+
+			if (output.good())
+			{
+				result = dumpHeaderToStream(output);
+				result &= dumpDataToStream(output);
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpHeaderToStream(std::ostream& output)
+		{
+			bool result = 0;
+
+			if (output.good())
+			{
+				output.write((char*)header.data(), header.size());
+				result = output.good();
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpDataToStream(std::ostream& output)
+		{
+			bool result = 0;
+
+			if (output.good())
+			{
+				output.write((char*)data.data(), data.size());
+				result = output.good();
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpToFile(std::string filePath)
+		{
+			bool result = 0;
+
+			std::ofstream output(filePath, std::ios_base::binary | std::ios_base::out);
+			if (output.is_open())
+			{
+				result = dumpToStream(output);
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpHeaderToFile(std::string filePath)
+		{
+			bool result = 0;
+
+			std::ofstream output(filePath, std::ios_base::binary | std::ios_base::out);
+			if (output.is_open())
+			{
+				result = dumpHeaderToStream(output);
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpDataToFile(std::string filePath)
+		{
+			bool result = 0;
+
+			std::ofstream output(filePath, std::ios_base::binary | std::ios_base::out);
+			if (output.is_open())
+			{
+				result = dumpDataToStream(output);
+			}
+
+			return result;
+		}
+
 		std::vector<brsarFileFileContents*> brsarFileSection::getFileContentsPointerVector(unsigned long fileID)
 		{
 			std::vector<brsarFileFileContents*> result{};
@@ -2503,30 +2576,14 @@ namespace lava
 							if (joinHeaderAndData)
 							{
 								headerFilename += "_joined.dat";
-								std::ofstream headerOutput(groupFolder + fileBaseName + headerFilename, std::ios_base::out | std::ios_base::binary);
-								if (headerOutput.is_open())
-								{
-									headerOutput.write((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size());
-									headerOutput.write((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size());
-									headerOutput.close();
-								}
+								fileContentsPtr->dumpToFile(headerFilename);
 							}
 							else
 							{
 								headerFilename += "_header.dat";
 								dataFilename += "_data.dat";
-								std::ofstream headerOutput(groupFolder + fileBaseName + headerFilename, std::ios_base::out | std::ios_base::binary);
-								if (headerOutput.is_open())
-								{
-									headerOutput.write((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size());
-									headerOutput.close();
-								}
-								std::ofstream dataOutput(groupFolder + fileBaseName + dataFilename, std::ios_base::out | std::ios_base::binary);
-								if (dataOutput.is_open())
-								{
-									dataOutput.write((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size());
-									dataOutput.close();
-								}
+								fileContentsPtr->dumpHeaderToFile(headerFilename);
+								fileContentsPtr->dumpDataToFile(dataFilename);
 							}
 							entryExported = 1;
 						}

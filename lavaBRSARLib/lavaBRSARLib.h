@@ -518,6 +518,12 @@ namespace lava
 			std::vector<unsigned char> header{};
 			unsigned long dataAddress = SIZE_MAX;
 			std::vector<unsigned char> data{};
+			bool dumpToStream(std::ostream& output);
+			bool dumpHeaderToStream(std::ostream& output);
+			bool dumpDataToStream(std::ostream& output);
+			bool dumpToFile(std::string filePath);
+			bool dumpHeaderToFile(std::string filePath);
+			bool dumpDataToFile(std::string filePath);
 		};
 		struct brsarFileSection
 		{

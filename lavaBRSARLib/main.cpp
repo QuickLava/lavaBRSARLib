@@ -236,11 +236,13 @@ int main()
 		if (tempRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(799)))
 		{
 			tempRWSD.summarize("tempRWSDSummary.txt");
+			testBrsar.fileSection.getFileContentsPointer(799)->dumpToFile("tempRWSDDump.dat");
 			if (tempRWSD.grantDataEntryUniqueWave(1, tempRWSD.waveSection.entries[1]))
 			{
 				tempRWSD.summarize("tempRWSDSummary_edit.txt");
 				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), 799))
 				{
+					testBrsar.fileSection.getFileContentsPointer(799)->dumpToFile("tempRWSDDump_edit.dat");
 					testBrsar.exportContents(targetBrsarName + "_newwav.brsar");
 				}
 			}
