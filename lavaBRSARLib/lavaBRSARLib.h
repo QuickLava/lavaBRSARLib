@@ -593,6 +593,8 @@ namespace lava
 
 			bool updateWaveEntryDataLocations();
 			waveInfo* getWaveInfoAssociatedWithDataInfo(unsigned long dataSectionIndex);
+			bool summarize(std::ostream& output);
+			bool summarize(std::string filepath);
 
 
 			// Edit Funcs

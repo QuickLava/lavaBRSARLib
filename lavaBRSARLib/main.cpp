@@ -235,8 +235,10 @@ int main()
 		lava::brawl::rwsd tempRWSD;
 		if (tempRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(799)))
 		{
+			tempRWSD.summarize("tempRWSDSummary.txt");
 			if (tempRWSD.grantDataEntryUniqueWave(1, tempRWSD.waveSection.entries[1]))
 			{
+				tempRWSD.summarize("tempRWSDSummary_edit.txt");
 				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), 799))
 				{
 					testBrsar.exportContents(targetBrsarName + "_newwav.brsar");

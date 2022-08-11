@@ -1857,6 +1857,72 @@ namespace lava
 
 			return result;
 		}
+		bool rwsd::summarize(std::ostream& output)
+		{
+			bool result = 0;
+
+			if (output.good() && header.address != UINT_MAX)
+			{
+				output << "\tAddress:\t0x" << lava::numToHexStringWithPadding(header.address, 0x08) << "\n";
+				output << "\tTotal Length/End:\t0x" << lava::numToHexStringWithPadding(header.headerLength, 0x08) << " / 0x" << lava::numToHexStringWithPadding(header.headerLength + header.address, 0x08) << "\n";
+				output << "\tData Section Offset/Address:\t0x" << lava::numToHexStringWithPadding(header.dataOffset, 0x08) << " / 0x" << lava::numToHexStringWithPadding(dataSection.address, 0x08) << "\n";
+				output << "\tData Section Length/End:\t0x" << lava::numToHexStringWithPadding(header.dataLength, 0x08) << " / 0x" << lava::numToHexStringWithPadding(dataSection.address + header.dataLength, 0x08) << "\n";
+				output << "\tData Entry Count:\t\t0x" << lava::numToHexStringWithPadding(dataSection.entries.size(), 0x04) << "\n";
+				output << "\tWave Section Offset/Address:\t0x" << lava::numToHexStringWithPadding(header.waveOffset, 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveSection.address, 0x08) << "\n";
+				output << "\tWave Section Length/End:\t0x" << lava::numToHexStringWithPadding(header.waveLength, 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveSection.address + header.waveLength, 0x08) << "\n";
+				output << "\tWave Entry Count:\t\t0x" << lava::numToHexStringWithPadding(waveSection.entries.size(), 0x04) << "\n";
+
+				std::unordered_map<unsigned long, std::vector<unsigned long>> waveIndecesToReferrerDataIndeces{};
+
+				std::vector<dataInfo>* dataVecPtr = &dataSection.entries;
+				std::vector<waveInfo>* waveVecPtr = &waveSection.entries;
+				brawlReferenceVector* dataRefVecPtr = &dataSection.entryReferences;
+				std::vector<unsigned long>* waveOffVecPtr = &waveSection.entryOffsets;
+
+				unsigned long waveDataBaseAddress = header.waveOffset + header.waveLength;
+
+				for (unsigned long u = 0; u < dataVecPtr->size(); u++)
+				{
+					dataInfo* currDataEntry = &(*dataVecPtr)[u];
+					output << "\tData Entry 0x" << lava::numToHexStringWithPadding(u, 0x04) << "\n";
+					output << "\t\tOffset / Address:\t0x" << lava::numToHexStringWithPadding(dataRefVecPtr->refs[u].address, 0x08) << " / 0x" << lava::numToHexStringWithPadding(currDataEntry->address, 0x08) << "\n";
+					output << "\t\tAssociated Wave ID:\t0x" << lava::numToHexStringWithPadding(currDataEntry->ntWaveIndex, 0x04) << "\n";
+					if (currDataEntry->ntWaveIndex != ULONG_MAX)
+					{
+						auto emplaceResult = waveIndecesToReferrerDataIndeces.emplace(std::make_pair(currDataEntry->ntWaveIndex, std::vector<unsigned long>()));
+						if (emplaceResult.second)
+						{
+							waveInfo* currWaveEntry = &(*waveVecPtr)[currDataEntry->ntWaveIndex];
+							output << "\t\tWave Entry Offset / Address:\t0x" << lava::numToHexStringWithPadding((*waveOffVecPtr)[currDataEntry->ntWaveIndex], 0x08) << " / 0x" << lava::numToHexStringWithPadding(currWaveEntry->address, 0x08) << "\n";
+							output << "\t\tWave Contents Offset / Address:\t0x" << lava::numToHexStringWithPadding(currWaveEntry->dataLocation, 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveDataBaseAddress + currWaveEntry->dataLocation, 0x08) << "\n";
+							output << "\t\tWave Contents Length / End:\t0x" << lava::numToHexStringWithPadding(currWaveEntry->getLengthInBytes(), 0x04) << " / 0x" << lava::numToHexStringWithPadding(waveDataBaseAddress + currWaveEntry->dataLocation + currWaveEntry->getLengthInBytes(), 0x08) << "\n";
+							emplaceResult.first->second.push_back(u);
+						}
+						else
+						{
+							output << "\t\tSkipping Wave Summary, see Data Entry 0x" << lava::numToHexStringWithPadding(emplaceResult.first->second.front(), 0x04) << "\n";
+							emplaceResult.first->second.push_back(u);
+						}
+					}
+				}
+				result = output.good();
+			}
+
+			return result;
+		}
+		bool rwsd::summarize(std::string filepath)
+		{
+			bool result = 0;
+
+			std::ofstream output(filepath, std::ios_base::out);
+			if (output.is_open())
+			{
+				result = summarize(output);
+			}
+
+			return result;
+		}
+
 		bool rwsd::overwriteWaveRawData(unsigned long waveSectionIndex, const std::vector<unsigned char>& rawDataIn)
 		{
 			bool result = 0;
