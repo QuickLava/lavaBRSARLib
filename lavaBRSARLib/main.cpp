@@ -233,12 +233,14 @@ int main()
 	if (ENABLE_PUSH_RWSD_WAV_ENTRY_TEST)
 	{
 		lava::brawl::rwsd tempRWSD;
-		if (tempRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(799)))
+		lava::brawl::brsarFileFileContents* fileContentsPtr = testBrsar.fileSection.getFileContentsPointer(799);
+		if (fileContentsPtr != nullptr && tempRWSD.populate(*fileContentsPtr))
 		{
 			tempRWSD.summarize("tempRWSDSummary.txt");
-			testBrsar.fileSection.getFileContentsPointer(799)->dumpToFile("tempRWSDDump.dat");
+			fileContentsPtr->dumpToFile("tempRWSDDump.dat");
 			if (tempRWSD.grantDataEntryUniqueWave(1, tempRWSD.waveSection.entries[1]))
 			{
+				//tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
 				tempRWSD.summarize("tempRWSDSummary_edit.txt");
 				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), 799))
 				{

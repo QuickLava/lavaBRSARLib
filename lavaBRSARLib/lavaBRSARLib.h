@@ -139,7 +139,9 @@ namespace lava
 
 			wavePacket packetContents;
 
-			unsigned long getLengthInBytes() const;
+			unsigned long getWaveEntryLengthInBytes() const;
+
+			unsigned long getAudioLengthInBytes() const;
 			void copyOverWaveInfoProperties(const waveInfo& sourceInfo);
 
 			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
@@ -616,7 +618,7 @@ namespace lava
 			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, std::string dspPathIn);
 			bool overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::string wavPathIn);
 
-			bool grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave);
+			bool grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront = 0);
 
 			// Populate Funcs
 

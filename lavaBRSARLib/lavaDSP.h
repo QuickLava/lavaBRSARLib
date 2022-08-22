@@ -18,6 +18,8 @@ namespace lava
 
 		struct channelInfo
 		{
+			static constexpr unsigned long size = 0x1C;
+
 			unsigned long address = ULONG_MAX;
 
 			unsigned long channelDataOffset = ULONG_MAX;
@@ -33,6 +35,8 @@ namespace lava
 		};
 		struct adpcmInfo
 		{
+			static constexpr unsigned long size = 0x30;
+
 			unsigned long address = ULONG_MAX;
 
 			std::array<unsigned short, 0x10> coefficients;

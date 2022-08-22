@@ -197,7 +197,12 @@ namespace lava
 			return result;
 		}
 
-		unsigned long waveInfo::getLengthInBytes() const
+		unsigned long waveInfo::getWaveEntryLengthInBytes() const
+		{
+			return 0x1C + (channelInfoTable.size() * 4) + (channelInfoEntries.size() * channelInfo::size) + (adpcmInfoEntries.size() * adpcmInfo::size);
+		}
+
+		unsigned long waveInfo::getAudioLengthInBytes() const
 		{
 			unsigned long result = ULONG_MAX;
 
@@ -1671,7 +1676,7 @@ namespace lava
 					entryOffsets[i] += 0x04;
 				}
 
-				entryOffsets.push_back(entryOffsets.back() + 0x6C);
+				entryOffsets.push_back(entryOffsets.back() + entries.back().getWaveEntryLengthInBytes());
 			}
 			else
 			{
@@ -1680,18 +1685,18 @@ namespace lava
 
 			entries.push_back(sourceWave);
 
-			length += 0x04 + 0x6C;
+			length += 0x04 + sourceWave.getWaveEntryLengthInBytes();
 		}
 		void rwsdWaveSection::waveEntryPushFront(const waveInfo& sourceWave)
 		{
 			if (!entryOffsets.empty())
 			{
-				unsigned long initial = entryOffsets.front();
+				unsigned long initialEntryAddress = entryOffsets.front();
 				for (unsigned long i = 0; i < entryOffsets.size(); i++)
 				{
-					entryOffsets[i] += 0x04 + 0x6C;
+					entryOffsets[i] += 0x04 + sourceWave.getWaveEntryLengthInBytes();
 				}
-				entryOffsets.push_back(initial + 0x4);
+				entryOffsets.push_back(initialEntryAddress + 0x04);
 			}
 			else
 			{
@@ -1700,7 +1705,7 @@ namespace lava
 
 			entries.insert(entries.begin(), sourceWave);
 
-			length += 0x04 + 0x6C;
+			length += 0x04 + sourceWave.getWaveEntryLengthInBytes();
 		}
 
 		bool rwsdWaveSection::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
@@ -1973,7 +1978,7 @@ namespace lava
 							waveInfo* currWaveEntry = &(*waveVecPtr)[currDataEntry->ntWaveIndex];
 							output << "\t\tWave Entry Offset / Address:\t0x" << lava::numToHexStringWithPadding((*waveOffVecPtr)[currDataEntry->ntWaveIndex], 0x08) << " / 0x" << lava::numToHexStringWithPadding(currWaveEntry->address, 0x08) << "\n";
 							output << "\t\tWave Contents Offset / Address:\t0x" << lava::numToHexStringWithPadding(currWaveEntry->dataLocation, 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveDataBaseAddress + currWaveEntry->dataLocation, 0x08) << "\n";
-							output << "\t\tWave Contents Length / End:\t0x" << lava::numToHexStringWithPadding(currWaveEntry->getLengthInBytes(), 0x04) << " / 0x" << lava::numToHexStringWithPadding(waveDataBaseAddress + currWaveEntry->dataLocation + currWaveEntry->getLengthInBytes(), 0x08) << "\n";
+							output << "\t\tWave Contents Length / End:\t0x" << lava::numToHexStringWithPadding(currWaveEntry->getAudioLengthInBytes(), 0x04) << " / 0x" << lava::numToHexStringWithPadding(waveDataBaseAddress + currWaveEntry->dataLocation + currWaveEntry->getAudioLengthInBytes(), 0x08) << "\n";
 							emplaceResult.first->second.push_back(u);
 						}
 						else
@@ -2071,16 +2076,23 @@ namespace lava
 			return result;
 		}
 
-		bool rwsd::grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave)
+		bool rwsd::grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront)
 		{
 			bool result = 1;
 
-			waveSection.waveEntryPushBack(sourceWave);
+			if (!pushFront)
+			{
+				waveSection.waveEntryPushFront(sourceWave);
+			}
+			else
+			{
+				waveSection.waveEntryPushBack(sourceWave);
+			}
 			if (updateWaveEntryDataLocations())
 			{
 				dataSection.entries[dataSectionIndex].ntWaveIndex = waveSection.entries.size() - 1;
-				header.headerLength += 0x70;
-				header.waveLength += 0x70;
+				header.headerLength += 0x04 + sourceWave.getWaveEntryLengthInBytes();
+				header.waveLength += 0x04 + sourceWave.getWaveEntryLengthInBytes();
 			}
 
 			return result;
@@ -2094,7 +2106,7 @@ namespace lava
 			{
 				result = 1;
 				waveInfo* currWave = &waveSection.entries[waveIndex];
-				unsigned long length = currWave->getLengthInBytes();
+				unsigned long length = currWave->getAudioLengthInBytes();
 				unsigned long paddingLength = 0x00;
 				unsigned long currWaveDataEndpoint = rawDataAddressIn + currWave->dataLocation + length;
 				if (currWaveDataEndpoint <= specificDataEndAddressIn)
