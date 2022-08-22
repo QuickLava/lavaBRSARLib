@@ -566,7 +566,9 @@ namespace lava
 			std::vector<unsigned long> entryOffsets{};
 			std::vector<waveInfo> entries{};
 
-			void grantUniqueWaveEntry(const waveInfo& sourceWave);
+			void waveEntryPushBack(const waveInfo& sourceWave);
+			void waveEntryPushFront(const waveInfo& sourceWave);
+
 			unsigned long sumWavePacketLengths();
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);

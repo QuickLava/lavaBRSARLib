@@ -1662,7 +1662,7 @@ namespace lava
 
 		/* RWSD */
 
-		void rwsdWaveSection::grantUniqueWaveEntry(const waveInfo& sourceWave)
+		void rwsdWaveSection::waveEntryPushBack(const waveInfo& sourceWave)
 		{
 			if (!entryOffsets.empty())
 			{
@@ -1679,25 +1679,30 @@ namespace lava
 			}
 
 			entries.push_back(sourceWave);
-			waveInfo* newFinalEntry = &entries.back();
-			newFinalEntry->address = brsarAddressConsts::bac_NOT_IN_FILE;
-			if (entries.size() > 1)
-			{
-				waveInfo* formerFinalEntry = &entries[entries.size() - 2];
-				unsigned long newDataLocation = formerFinalEntry->dataLocation + formerFinalEntry->packetContents.body.size();
-				if (formerFinalEntry->packetContents.populated)
-				{
-					newDataLocation += formerFinalEntry->packetContents.padding.size();
-				}
-				newFinalEntry->dataLocation = newDataLocation;
-			}
-			else
-			{
-				newFinalEntry->dataLocation = 0x00;
-			}
 
 			length += 0x04 + 0x6C;
 		}
+		void rwsdWaveSection::waveEntryPushFront(const waveInfo& sourceWave)
+		{
+			if (!entryOffsets.empty())
+			{
+				unsigned long initial = entryOffsets.front();
+				for (unsigned long i = 0; i < entryOffsets.size(); i++)
+				{
+					entryOffsets[i] += 0x04 + 0x6C;
+				}
+				entryOffsets.push_back(initial + 0x4);
+			}
+			else
+			{
+				entryOffsets.push_back(0x10);
+			}
+
+			entries.insert(entries.begin(), sourceWave);
+
+			length += 0x04 + 0x6C;
+		}
+
 		bool rwsdWaveSection::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -2070,10 +2075,13 @@ namespace lava
 		{
 			bool result = 1;
 
-			waveSection.grantUniqueWaveEntry(sourceWave);
-			dataSection.entries[dataSectionIndex].ntWaveIndex = waveSection.entries.size() - 1;
-			header.headerLength += 0x70;
-			header.waveLength += 0x70;
+			waveSection.waveEntryPushBack(sourceWave);
+			if (updateWaveEntryDataLocations())
+			{
+				dataSection.entries[dataSectionIndex].ntWaveIndex = waveSection.entries.size() - 1;
+				header.headerLength += 0x70;
+				header.waveLength += 0x70;
+			}
 
 			return result;
 		}
