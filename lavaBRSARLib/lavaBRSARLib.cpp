@@ -2687,11 +2687,11 @@ namespace lava
 			writeRawDataToStream(destinationStream, size());
 			writeRawDataToStream(destinationStream, headerLength);
 			writeRawDataToStream(destinationStream, sectionCount);
-			writeRawDataToStream(destinationStream, unsigned long (headerLength));
+			writeRawDataToStream(destinationStream, calculateSYMBSectionAddress());
 			writeRawDataToStream(destinationStream, symbSection.paddedSize());
-			writeRawDataToStream(destinationStream, headerLength + symbSection.paddedSize());
+			writeRawDataToStream(destinationStream, calculateINFOSectionAddress());
 			writeRawDataToStream(destinationStream, infoSection.paddedSize());
-			writeRawDataToStream(destinationStream, headerLength + symbSection.paddedSize() + infoSection.paddedSize());
+			writeRawDataToStream(destinationStream, calculateFILESectionAddress());
 			writeRawDataToStream(destinationStream, fileSection.size());
 			if (headerLength > destinationStream.tellp())
 			{
@@ -2715,6 +2715,19 @@ namespace lava
 			}
 
 			return result;
+		}
+
+		unsigned long brsar::calculateSYMBSectionAddress() const
+		{
+			return headerLength;
+		}
+		unsigned long brsar::calculateINFOSectionAddress() const
+		{
+			return calculateSYMBSectionAddress() + symbSection.paddedSize();
+		}
+		unsigned long brsar::calculateFILESectionAddress() const
+		{
+			return calculateINFOSectionAddress() + infoSection.paddedSize();
 		}
 
 		std::string brsar::getSymbString(unsigned long indexIn)

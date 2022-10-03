@@ -677,6 +677,9 @@ namespace lava
 			bool init(std::string filePathIn);
 			bool exportContents(std::ostream& destinationStream);
 			bool exportContents(std::string outputFilename);
+			unsigned long calculateSYMBSectionAddress() const;
+			unsigned long calculateINFOSectionAddress() const;
+			unsigned long calculateFILESectionAddress() const;
 
 			std::string getSymbString(unsigned long indexIn);
 			unsigned long getGroupOffset(unsigned long groupIDIn);
