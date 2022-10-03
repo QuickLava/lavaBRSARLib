@@ -88,11 +88,11 @@ namespace lava
 			addressType = valueIn >> 0x20;
 			address = valueIn & 0x00000000FFFFFFFF;
 		}
-		bool brawlReference::isOffset()
+		bool brawlReference::isOffset() const
 		{
 			return addressType & 0x01000000;
 		}
-		unsigned long brawlReference::getAddress(unsigned long relativeToIn)
+		unsigned long brawlReference::getAddress(unsigned long relativeToIn) const
 		{
 			unsigned long result = address;
 			if (isOffset())
@@ -104,11 +104,11 @@ namespace lava
 			}
 			return result;
 		}
-		std::string brawlReference::getAddressString(unsigned long relativeToIn)
+		std::string brawlReference::getAddressString(unsigned long relativeToIn) const
 		{
 			return numToHexStringWithPadding(getAddress(relativeToIn), 8);
 		}
-		unsigned long long brawlReference::getHex()
+		unsigned long long brawlReference::getHex() const
 		{
 			unsigned long long result = address | (unsigned long long(addressType) << 0x20);
 			return result;
@@ -137,7 +137,7 @@ namespace lava
 
 			return result;
 		}
-		std::vector<unsigned long> brawlReferenceVector::getHex()
+		std::vector<unsigned long> brawlReferenceVector::getHex() const
 		{
 			std::vector<unsigned long> result{};
 
@@ -151,7 +151,7 @@ namespace lava
 
 			return result;
 		}
-		bool brawlReferenceVector::exportContents(std::ostream& destinationStream)
+		bool brawlReferenceVector::exportContents(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 
@@ -331,37 +331,55 @@ namespace lava
 			adpcmInfoEntries = sourceInfo.adpcmInfoEntries;
 		}
 
-		void dataInfo::copyOverDataInfoProperties(const dataInfo& sourceInfo)
+		unsigned long dataInfo::size() const
 		{
-			address = brsarAddressConsts::bac_NOT_IN_FILE;
+			unsigned long result = 0;
 
-			wsdPitch = sourceInfo.wsdPitch;
-			wsdPan = sourceInfo.wsdPan;
-			wsdSurroundPan = sourceInfo.wsdSurroundPan;
-			wsdFxSendA = sourceInfo.wsdFxSendA;
-			wsdFxSendB = sourceInfo.wsdFxSendB;
-			wsdFxSendC = sourceInfo.wsdFxSendC;
-			wsdMainSend = sourceInfo.wsdMainSend;
-			wsdPad1 = sourceInfo.wsdPad1;
-			wsdPad2 = sourceInfo.wsdPad2;
+			result += wsdInfo.size();
+			result += trackTable.size();
+			result += noteTable.size();
+			result += sizeof(wsdPitch);
+			result += sizeof(wsdPan);
+			result += sizeof(wsdSurroundPan);
+			result += sizeof(wsdFxSendA);
+			result += sizeof(wsdFxSendB);
+			result += sizeof(wsdFxSendC);
+			result += sizeof(wsdMainSend);
+			result += sizeof(wsdPad1);
+			result += sizeof(wsdPad2);
+			result += wsdGraphEnvTableRef.size();
+			result += wsdRandomizerTableRef.size();
+			result += sizeof(wsdPadding);
 
-			ttPosition = sourceInfo.ttPosition;
-			ttLength = sourceInfo.ttLength;
-			ttNoteIndex = sourceInfo.ttNoteIndex;
+			result += ttReferenceList1.size();
+			result += ttIntermediateReference.size();
+			result += ttReferenceList2.size();
+			result += sizeof(ttPosition);
+			result += sizeof(ttLength);
+			result += sizeof(ttNoteIndex);
+			result += sizeof(ttReserved);
 
-			ntAttack = sourceInfo.ntAttack;
-			ntDecay = sourceInfo.ntDecay;
-			ntSustain = sourceInfo.ntSustain;
-			ntRelease = sourceInfo.ntRelease;
-			ntHold = sourceInfo.ntHold;
-			ntPad1 = sourceInfo.ntPad1;
-			ntPad2 = sourceInfo.ntPad2;
-			ntPad3 = sourceInfo.ntPad3;
-			ntOriginalKey = sourceInfo.ntOriginalKey;
-			ntVolume = sourceInfo.ntVolume;
-			ntPan = sourceInfo.ntPan;
-			ntSurroundPan = sourceInfo.ntSurroundPan;
-			ntPitch = sourceInfo.ntPitch;
+			result += ntReferenceList.size();
+			result += sizeof(ntWaveIndex);
+			result += sizeof(ntAttack);
+			result += sizeof(ntDecay);
+			result += sizeof(ntSustain);
+			result += sizeof(ntRelease);
+			result += sizeof(ntHold);
+			result += sizeof(ntPad1);
+			result += sizeof(ntPad2);
+			result += sizeof(ntPad3);
+			result += sizeof(ntOriginalKey);
+			result += sizeof(ntVolume);
+			result += sizeof(ntPan);
+			result += sizeof(ntSurroundPan);
+			result += sizeof(ntPitch);
+			result += ntIfoTableRef.size();
+			result += ntGraphEnvTableRef.size();
+			result += ntRandomizerTableRef.size();
+			result += sizeof(ntReserved);
+
+			return result;
 		}
 		bool dataInfo::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
@@ -420,7 +438,7 @@ namespace lava
 
 			return result;
 		}
-		bool dataInfo::exportContents(std::ostream& destinationStream)
+		bool dataInfo::exportContents(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 			if (destinationStream.good())
@@ -472,6 +490,38 @@ namespace lava
 				result = destinationStream.good();
 			}
 			return result;
+		}
+		void dataInfo::copyOverDataInfoProperties(const dataInfo& sourceInfo)
+		{
+			address = brsarAddressConsts::bac_NOT_IN_FILE;
+
+			wsdPitch = sourceInfo.wsdPitch;
+			wsdPan = sourceInfo.wsdPan;
+			wsdSurroundPan = sourceInfo.wsdSurroundPan;
+			wsdFxSendA = sourceInfo.wsdFxSendA;
+			wsdFxSendB = sourceInfo.wsdFxSendB;
+			wsdFxSendC = sourceInfo.wsdFxSendC;
+			wsdMainSend = sourceInfo.wsdMainSend;
+			wsdPad1 = sourceInfo.wsdPad1;
+			wsdPad2 = sourceInfo.wsdPad2;
+
+			ttPosition = sourceInfo.ttPosition;
+			ttLength = sourceInfo.ttLength;
+			ttNoteIndex = sourceInfo.ttNoteIndex;
+
+			ntAttack = sourceInfo.ntAttack;
+			ntDecay = sourceInfo.ntDecay;
+			ntSustain = sourceInfo.ntSustain;
+			ntRelease = sourceInfo.ntRelease;
+			ntHold = sourceInfo.ntHold;
+			ntPad1 = sourceInfo.ntPad1;
+			ntPad2 = sourceInfo.ntPad2;
+			ntPad3 = sourceInfo.ntPad3;
+			ntOriginalKey = sourceInfo.ntOriginalKey;
+			ntVolume = sourceInfo.ntVolume;
+			ntPan = sourceInfo.ntPan;
+			ntSurroundPan = sourceInfo.ntSurroundPan;
+			ntPitch = sourceInfo.ntPitch;
 		}
 
 		/*Sound Data Structs*/

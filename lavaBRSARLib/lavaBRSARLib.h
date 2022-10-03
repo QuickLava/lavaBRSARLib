@@ -88,10 +88,10 @@ namespace lava
 			static constexpr unsigned long size();
 			brawlReference(unsigned long long valueIn = ULONG_MAX);
 
-			bool isOffset();
-			unsigned long getAddress(unsigned long relativeToIn = ULONG_MAX);
-			std::string getAddressString(unsigned long relativeToIn = ULONG_MAX);
-			unsigned long long getHex();
+			bool isOffset() const;
+			unsigned long getAddress(unsigned long relativeToIn = ULONG_MAX) const;
+			std::string getAddressString(unsigned long relativeToIn = ULONG_MAX) const;
+			unsigned long long getHex() const;
 		};
 		struct brawlReferenceVector
 		{
@@ -99,9 +99,9 @@ namespace lava
 
 			unsigned long size() const;
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn = SIZE_MAX);
-			std::vector<unsigned long> getHex();
+			std::vector<unsigned long> getHex() const;
 
-			bool exportContents(std::ostream& destinationStream);
+			bool exportContents(std::ostream& destinationStream) const;
 		};
 
 		/* Brawl Reference */
@@ -204,10 +204,10 @@ namespace lava
 			brawlReference ntRandomizerTableRef = ULLONG_MAX;
 			unsigned long ntReserved = ULONG_MAX;
 
-			void copyOverDataInfoProperties(const dataInfo& sourceInfo);
-
+			unsigned long size() const;
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
-			bool exportContents(std::ostream& destinationStream);
+			bool exportContents(std::ostream& destinationStream) const;
+			void copyOverDataInfoProperties(const dataInfo& sourceInfo);
 		};
 
 		/*Sound Data Structs*/
