@@ -1728,7 +1728,6 @@ namespace lava
 							currFileHeader->entries.push_back(brsarInfoFileEntry());
 							result &= currFileHeader->entries.back().populate(*currFileHeader, bodyIn, currFileHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
 						}
-						currFileHeader->updateFileEntryOffsetValues();
 					}
 				}
 				updateFileHeaderOffsetValues();
@@ -1746,7 +1745,6 @@ namespace lava
 						currGroupHeader->entries.push_back(brsarInfoGroupEntry());
 						result &= currGroupHeader->entries.back().populate(*currGroupHeader, bodyIn, currGroupHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
 					}
-					currGroupHeader->updateGroupEntryOffsetValues();
 				}
 				updateGroupHeaderOffsetValues();
 				
@@ -1858,6 +1856,7 @@ namespace lava
 			for (std::size_t i = 0; i < fileHeaders.size(); i++)
 			{
 				fileHeaders[i].parentRelativeOffset = relativeOffset;
+				fileHeaders[i].updateFileEntryOffsetValues();
 				relativeOffset += fileHeaders[i].size();
 			}
 		}
@@ -1868,6 +1867,7 @@ namespace lava
 			for (std::size_t i = 0; i < groupHeaders.size(); i++)
 			{
 				groupHeaders[i].parentRelativeOffset = relativeOffset;
+				groupHeaders[i].updateGroupEntryOffsetValues();
 				relativeOffset += groupHeaders[i].size();
 			}
 		}
