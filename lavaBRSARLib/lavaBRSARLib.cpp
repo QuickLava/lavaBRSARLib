@@ -1272,17 +1272,23 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoFileEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoFileEntry::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoFileEntry::populate(const brsarInfoFileHeader& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
 				result = 1;
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				groupID = bodyIn.getLong(address);
-				index = bodyIn.getLong(address + 0x04);
+				std::size_t cursor = originalAddress;
+				groupID = bodyIn.getLong(cursor, &cursor);
+				index = bodyIn.getLong(cursor, &cursor);
 			}
 
 			return result;
@@ -1315,20 +1321,26 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoFileHeader::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoFileHeader::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoFileHeader::populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
 				result = 1;
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				headerLength = bodyIn.getLong(address);
-				dataLength = bodyIn.getLong(address + 0x04);
-				entryNumber = bodyIn.getLong(address + 0x08);
-				stringOffset = brawlReference(bodyIn.getLLong(address + 0x0C));
-				listOffset = brawlReference(bodyIn.getLLong(address + 0x14));
+				std::size_t cursor = originalAddress;
+				headerLength = bodyIn.getLong(cursor, &cursor);
+				dataLength = bodyIn.getLong(cursor, &cursor);
+				entryNumber = bodyIn.getLong(cursor, &cursor);
+				stringOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
+				listOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
 			}
 
 			return result;
@@ -1354,6 +1366,22 @@ namespace lava
 			}
 			return result;
 		}
+		void brsarInfoFileHeader::updateFileEntryOffsetValues()
+		{
+			unsigned long relativeOffset = 0;
+			relativeOffset += sizeof(headerLength);
+			relativeOffset += sizeof(dataLength);
+			relativeOffset += sizeof(entryNumber);
+			relativeOffset += stringOffset.size();
+			relativeOffset += listOffset.size();
+			relativeOffset += stringContent.size() * sizeof(unsigned char);
+			relativeOffset += entryReferenceList.size();
+			for (std::size_t i = 0; i < entries.size(); i++)
+			{
+				entries[i].parentRelativeOffset = relativeOffset;
+				relativeOffset += entries[i].size();
+			}
+		}
 
 		constexpr unsigned long brsarInfoGroupEntry::size()
 		{
@@ -1368,20 +1396,26 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoGroupEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoGroupEntry::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoGroupEntry::populate(const brsarInfoGroupHeader& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				fileID = bodyIn.getLong(address);
-				headerOffset = bodyIn.getLong(address + 0x04);
-				headerLength = bodyIn.getLong(address + 0x08);
-				dataOffset = bodyIn.getLong(address + 0x0C);
-				dataLength = bodyIn.getLong(address + 0x10);
-				reserved = bodyIn.getLong(address + 0x14);
+				std::size_t cursor = originalAddress;
+				fileID = bodyIn.getLong(cursor, &cursor);
+				headerOffset = bodyIn.getLong(cursor, &cursor);
+				headerLength = bodyIn.getLong(cursor, &cursor);
+				dataOffset = bodyIn.getLong(cursor, &cursor);
+				dataLength = bodyIn.getLong(cursor, &cursor);
+				reserved = bodyIn.getLong(cursor, &cursor);
 
 				result = 1;
 			}
@@ -1422,22 +1456,29 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoGroupHeader::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoGroupHeader::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoGroupHeader::populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				groupID = bodyIn.getLong(address);
-				entryNum = bodyIn.getLong(address + 0x04);
-				extFilePathRef = brawlReference(bodyIn.getLLong(address + 0x08));
-				headerAddress = bodyIn.getLong(address + 0x10);
-				headerLength = bodyIn.getLong(address + 0x14);
-				dataAddress = bodyIn.getLong(address + 0x18);
-				dataLength = bodyIn.getLong(address + 0x1C);
-				listOffset = brawlReference(bodyIn.getLLong(address + 0x20));
+				std::size_t cursor = originalAddress;
+
+				groupID = bodyIn.getLong(cursor, &cursor);
+				entryNum = bodyIn.getLong(cursor, &cursor);
+				extFilePathRef = brawlReference(bodyIn.getLLong(cursor, &cursor));
+				headerAddress = bodyIn.getLong(cursor, &cursor);
+				headerLength = bodyIn.getLong(cursor, &cursor);
+				dataAddress = bodyIn.getLong(cursor, &cursor);
+				dataLength = bodyIn.getLong(cursor, &cursor);
+				listOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
 
 				result = 1;
 			}
@@ -1466,6 +1507,24 @@ namespace lava
 				result &= destinationStream.good();
 			}
 			return result;
+		}
+		void brsarInfoGroupHeader::updateGroupEntryOffsetValues()
+		{
+			unsigned long relativeOffset = 0;
+			relativeOffset += sizeof(groupID);
+			relativeOffset += sizeof(entryNum);
+			relativeOffset += extFilePathRef.size();
+			relativeOffset += sizeof(headerAddress);
+			relativeOffset += sizeof(headerLength);
+			relativeOffset += sizeof(dataAddress);
+			relativeOffset += sizeof(dataLength);
+			relativeOffset += listOffset.size();
+			relativeOffset += entryReferenceList.size();
+			for (int i = 0; i < entries.size(); i++)
+			{
+				entries[i].parentRelativeOffset = relativeOffset;
+				relativeOffset += entries[i].size();
+			}
 		}
 		unsigned long brsarInfoGroupHeader::getSynonymFileID(std::size_t headerLengthIn) const
 		{
@@ -1653,7 +1712,7 @@ namespace lava
 				for (std::size_t i = 0; i < filesSection.refs.size(); i++)
 				{
 					currFileHeader = &fileHeaders[i];
-					currFileHeader->populate(bodyIn, filesSection.refs[i].getAddress(address + 0x08));
+					currFileHeader->populate(*this, bodyIn, filesSection.refs[i].getAddress(address + 0x08));
 					if (currFileHeader->stringOffset.getAddress() != 0x00)
 					{
 						std::string measurementString = bodyIn.data() + (currFileHeader->stringOffset.getAddress(address + 0x08));
@@ -1667,26 +1726,30 @@ namespace lava
 						for (std::size_t u = 0; u < currFileHeader->entryReferenceList.refs.size(); u++)
 						{
 							currFileHeader->entries.push_back(brsarInfoFileEntry());
-							result &= currFileHeader->entries.back().populate(bodyIn, currFileHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
+							result &= currFileHeader->entries.back().populate(*currFileHeader, bodyIn, currFileHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
 						}
+						currFileHeader->updateFileEntryOffsetValues();
 					}
 				}
+				updateFileHeaderOffsetValues();
 
 				groupHeaders.resize(groupsSection.refs.size());
 				brsarInfoGroupHeader* currGroupHeader = nullptr;
 				for (std::size_t i = 0; i < groupsSection.refs.size(); i++)
 				{
 					currGroupHeader = &groupHeaders[i];
-					currGroupHeader->populate(bodyIn, groupsSection.refs[i].getAddress(address + 0x08));
+					currGroupHeader->populate(*this, bodyIn, groupsSection.refs[i].getAddress(address + 0x08));
 					result &= currGroupHeader->entryReferenceList.populate(bodyIn, currGroupHeader->listOffset.getAddress(address + 0x08));
 
 					for (std::size_t u = 0; u < currGroupHeader->entryReferenceList.refs.size(); u++)
 					{
 						currGroupHeader->entries.push_back(brsarInfoGroupEntry());
-						result &= currGroupHeader->entries.back().populate(bodyIn, currGroupHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
+						result &= currGroupHeader->entries.back().populate(*currGroupHeader, bodyIn, currGroupHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
 					}
+					currGroupHeader->updateGroupEntryOffsetValues();
 				}
-
+				updateGroupHeaderOffsetValues();
+				
 				std::size_t cursor = footerReference.getAddress(address + 0x08);
 				sequenceMax = bodyIn.getShort(cursor, &cursor);
 				sequenceTrackMax = bodyIn.getShort(cursor, &cursor);
@@ -1788,6 +1851,26 @@ namespace lava
 				relativeOffset += playerEntries[i].size();
 			}
 		}
+		void brsarInfoSection::updateFileHeaderOffsetValues()
+		{
+			unsigned long relativeOffset = size(infoSectionLandmark::iSL_PlayerEntries); // Get size up to and including the player entries.
+			relativeOffset += filesSection.size();
+			for (std::size_t i = 0; i < fileHeaders.size(); i++)
+			{
+				fileHeaders[i].parentRelativeOffset = relativeOffset;
+				relativeOffset += fileHeaders[i].size();
+			}
+		}
+		void brsarInfoSection::updateGroupHeaderOffsetValues()
+		{
+			unsigned long relativeOffset = size(infoSectionLandmark::iSL_FileHeaders); // Get size up to and including the file headers.
+			relativeOffset += groupsSection.size();
+			for (std::size_t i = 0; i < groupHeaders.size(); i++)
+			{
+				groupHeaders[i].parentRelativeOffset = relativeOffset;
+				relativeOffset += groupHeaders[i].size();
+			}
+		}
 
 		brsarInfoGroupHeader* brsarInfoSection::getGroupWithID(unsigned long groupIDIn)
 		{
@@ -1856,7 +1939,7 @@ namespace lava
 				for (unsigned long i = 0; i < fileHeaders.size(); i++)
 				{
 					brsarInfoFileHeader* currHeaderPtr = &fileHeaders[i];
-					output << "File Info #" << i << " (@ 0x" << numToHexStringWithPadding(currHeaderPtr->address, 0x08) << "):\n";
+					output << "File Info #" << i << " (@ 0x" << numToHexStringWithPadding(currHeaderPtr->getAddress(), 0x08) << "):\n";
 					output << "\tFile String: \"";
 					if (!currHeaderPtr->stringContent.empty())
 					{
@@ -1870,7 +1953,7 @@ namespace lava
 					for (unsigned long u = 0; u < currHeaderPtr->entries.size(); u++)
 					{
 						brsarInfoFileEntry* currEntryPtr = &currHeaderPtr->entries[u];
-						output << "\tEntry #" << u << " (@ 0x" << numToHexStringWithPadding(currEntryPtr->address, 0x08) << "):\n";
+						output << "\tEntry #" << u << " (@ 0x" << numToHexStringWithPadding(currEntryPtr->getAddress(), 0x08) << "):\n";
 						output << "\t\tEntry Index: " << currEntryPtr->index << "\n";
 						output << "\t\tGroup ID: " << currEntryPtr->groupID << "\n";
 					}
@@ -2831,7 +2914,7 @@ namespace lava
 				currentGroup = &infoSection.groupHeaders[i];
 				if (groupIDIn == currentGroup->groupID)
 				{
-					result = currentGroup->address;
+					result = currentGroup->getAddress();
 					done = 1;
 				}
 				else

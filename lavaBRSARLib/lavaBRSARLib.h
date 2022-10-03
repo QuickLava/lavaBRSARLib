@@ -425,20 +425,30 @@ namespace lava
 			bool populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
+
+		struct brsarInfoFileHeader; // Info File Header Struct Forward Decl.
+
 		struct brsarInfoFileEntry
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoFileHeader* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned long groupID = ULONG_MAX;
 			unsigned long index = ULONG_MAX;
 
 			static constexpr unsigned long size();
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoFileHeader& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
 		struct brsarInfoFileHeader
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoSection* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned long headerLength = ULONG_MAX;
 			unsigned long dataLength = ULONG_MAX;
@@ -450,12 +460,20 @@ namespace lava
 			std::vector<brsarInfoFileEntry> entries;
 
 			unsigned long size() const;
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
+
+			void updateFileEntryOffsetValues();
 		};
+
+		struct brsarInfoGroupHeader; // Info Group Header Forward Decl.
 		struct brsarInfoGroupEntry
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoGroupHeader* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned long fileID = ULONG_MAX;
 			unsigned long headerOffset = ULONG_MAX;
@@ -465,12 +483,16 @@ namespace lava
 			unsigned long reserved = ULONG_MAX;
 
 			static constexpr unsigned long size();
-			bool populate(lava::byteArray& bodyIn, std::size_t address);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoGroupHeader& parentIn, lava::byteArray& bodyIn, std::size_t address);
 			bool exportContents(std::ostream& destinationStream);
 		};
 		struct brsarInfoGroupHeader
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoSection* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned long groupID = ULONG_MAX;
 			unsigned long entryNum = ULONG_MAX;
@@ -484,8 +506,11 @@ namespace lava
 			std::vector<brsarInfoGroupEntry> entries;
 
 			unsigned long size() const;
-			bool populate(lava::byteArray& bodyIn, std::size_t address);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t address);
 			bool exportContents(std::ostream& destinationStream);
+
+			void updateGroupEntryOffsetValues();
 			unsigned long getSynonymFileID(std::size_t headerLengthIn = SIZE_MAX) const;
 			bool usesFileID(unsigned long fileIDIn = ULONG_MAX) const;
 		};
@@ -547,6 +572,8 @@ namespace lava
 
 			void updateBankEntryOffsetValues();
 			void updatePlayerEntryOffsetValues();
+			void updateFileHeaderOffsetValues();
+			void updateGroupHeaderOffsetValues();
 
 			brsarInfoGroupHeader* getGroupWithID(unsigned long groupIDIn);
 			brsarInfoGroupHeader* getGroupWithInfoIndex(unsigned long infoIndexIn);
