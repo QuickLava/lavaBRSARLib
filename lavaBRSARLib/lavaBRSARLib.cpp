@@ -1172,16 +1172,21 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoBankEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoBankEntry::getAddress()
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoBankEntry::populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
 				result = 1;
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 				
-				std::size_t cursor = address;
+				std::size_t cursor = originalAddress;
 				stringID = bodyIn.getLong(cursor, &cursor);
 				fileID = bodyIn.getLong(cursor, &cursor);
 				padding = bodyIn.getLong(cursor, &cursor);
@@ -1593,8 +1598,9 @@ namespace lava
 				bankEntries.resize(banksSection.refs.size());
 				for (std::size_t i = 0; i < banksSection.refs.size(); i++)
 				{
-					result &= bankEntries[i].populate(bodyIn, banksSection.refs[i].getAddress(address + 0x08));
+					result &= bankEntries[i].populate(*this, bodyIn, banksSection.refs[i].getAddress(address + 0x08));
 				}
+				updateBankEntryOffsetValues();
 
 				playerEntries.resize(playerSection.refs.size());
 				for (std::size_t i = 0; i < playerSection.refs.size(); i++)
@@ -1721,6 +1727,40 @@ namespace lava
 			}
 			return result;
 		}
+
+		bool brsarInfoSection::updateBankEntryOffsetValues()
+		{
+			bool result = 0;
+
+			unsigned long relativeOffset = 0;
+			if (relativeOffset != ULONG_MAX)
+			{
+				relativeOffset += 0x04; // INFO Tag
+				relativeOffset += sizeof(unsigned long); // Length
+				relativeOffset += soundsSectionReference.size();
+				relativeOffset += banksSectionReference.size();
+				relativeOffset += playerSectionReference.size();
+				relativeOffset += filesSectionReference.size();
+				relativeOffset += groupsSectionReference.size();
+				relativeOffset += footerReference.size();
+				relativeOffset += soundsSection.size();
+				for (std::size_t i = 0; i < soundEntries.size(); i++)
+				{
+					relativeOffset += soundEntries[i].size();
+				}
+				relativeOffset += banksSection.size();
+				for (std::size_t i = 0; i < bankEntries.size(); i++)
+				{
+					bankEntries[i].parentRelativeOffset = relativeOffset;
+					relativeOffset += bankEntries[i].size();
+				}
+
+				result = 1;
+			}
+
+			return result;
+		}
+
 		brsarInfoGroupHeader* brsarInfoSection::getGroupWithID(unsigned long groupIDIn)
 		{
 			brsarInfoGroupHeader* result = nullptr;
