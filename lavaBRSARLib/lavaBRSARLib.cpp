@@ -72,6 +72,11 @@ namespace lava
 
 			return result;
 		}
+		int padLengthTo(unsigned long lengthIn, unsigned long padTo)
+		{
+			unsigned long padLength = padTo - (lengthIn % 0x10);
+			return lengthIn + padLength;
+		}
 
 		/* Misc. */
 
@@ -664,7 +669,7 @@ namespace lava
 			unsigned long result = 0;
 
 			result += 0x04; // SYMB Tag
-			result += sizeof(length);
+			result += sizeof(unsigned long); // Length
 			result += sizeof(stringListOffset);
 			result += sizeof(soundTrieOffset);
 			result += sizeof(playerTrieOffset);
@@ -677,6 +682,10 @@ namespace lava
 
 			return result;
 		}
+		unsigned long brsarSymbSection::paddedSize(unsigned long padTo) const
+		{
+			return padLengthTo(size(), padTo);
+		}
 		bool brsarSymbSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -688,7 +697,7 @@ namespace lava
 
 				std::size_t cursor1 = address + 0x04;
 
-				length = bodyIn.getLong(cursor1, &cursor1);
+				bodyIn.getLong(cursor1, &cursor1); // Move Past Length Entry
 				stringListOffset = bodyIn.getLong(cursor1, &cursor1);
 
 				soundTrieOffset = bodyIn.getLong(cursor1, &cursor1);
@@ -731,7 +740,7 @@ namespace lava
 				unsigned long initialStreamPos = destinationStream.tellp();
 
 				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_SYMB);
-				lava::writeRawDataToStream(destinationStream, length);
+				lava::writeRawDataToStream(destinationStream, paddedSize());
 				lava::writeRawDataToStream(destinationStream, stringListOffset);
 				lava::writeRawDataToStream(destinationStream, soundTrieOffset);
 				lava::writeRawDataToStream(destinationStream, playerTrieOffset);
@@ -762,9 +771,10 @@ namespace lava
 
 				unsigned long finalStreamPos = destinationStream.tellp();
 				unsigned long amountWritten = finalStreamPos - initialStreamPos;
-				if (length > amountWritten)
+				unsigned long expectedLength = paddedSize();
+				if (expectedLength > amountWritten)
 				{
-					std::vector<char> finalPadding(length - amountWritten, 0x00);
+					std::vector<char> finalPadding(expectedLength - amountWritten, 0x00);
 					destinationStream.write(finalPadding.data(), finalPadding.size());
 				}
 
@@ -1473,7 +1483,7 @@ namespace lava
 			unsigned long result = 0;
 
 			result += 0x04; // INFO Tag
-			result += sizeof(length);
+			result += sizeof(unsigned long); // Length
 			result += soundsSectionReference.size();
 			result += banksSectionReference.size();
 			result += playerSectionReference.size();
@@ -1512,6 +1522,10 @@ namespace lava
 
 			return result;
 		}
+		unsigned long brsarInfoSection::paddedSize(unsigned long padTo) const
+		{
+			return padLengthTo(size(), padTo);
+		}
 		bool brsarInfoSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -1521,7 +1535,7 @@ namespace lava
 				result = 1;
 				address = addressIn;
 
-				length = bodyIn.getLong(address + 0x04);
+				//length = bodyIn.getLong(address + 0x04); No longer needed!
 				soundsSectionReference = brawlReference(bodyIn.getLLong(address + 0x08));
 				banksSectionReference = brawlReference(bodyIn.getLLong(address + 0x10));
 				playerSectionReference = brawlReference(bodyIn.getLLong(address + 0x18));
@@ -1640,7 +1654,7 @@ namespace lava
 				unsigned long initialStreamPos = destinationStream.tellp();
 
 				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_INFO);
-				lava::writeRawDataToStream(destinationStream, length);
+				lava::writeRawDataToStream(destinationStream, paddedSize());
 				lava::writeRawDataToStream(destinationStream, soundsSectionReference.getHex());
 				lava::writeRawDataToStream(destinationStream, banksSectionReference.getHex());
 				lava::writeRawDataToStream(destinationStream, playerSectionReference.getHex());
@@ -1686,9 +1700,10 @@ namespace lava
 
 				unsigned long finalStreamPos = destinationStream.tellp();
 				unsigned long amountWritten = finalStreamPos - initialStreamPos;
-				if (length > amountWritten)
+				unsigned long expectedLength = paddedSize();
+				if (expectedLength > amountWritten)
 				{
-					std::vector<char> finalPadding(length - amountWritten, 0x00);
+					std::vector<char> finalPadding(expectedLength - amountWritten, 0x00);
 					destinationStream.write(finalPadding.data(), finalPadding.size());
 				}
 
@@ -1875,7 +1890,7 @@ namespace lava
 			unsigned long result = 0;
 
 			result += 0x04; // FILE Tag
-			result += sizeof(length);
+			result += sizeof(unsigned long); // Length
 			result += 0x18; // Padding
 			for (unsigned long i = 0; i < fileContents.size(); i++)
 			{
@@ -1891,7 +1906,7 @@ namespace lava
 			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_FILE)
 			{
 				address = addressIn;
-				length = bodyIn.getLong(address + 0x04);
+				//length = bodyIn.getLong(address + 0x04); No longer needed!
 				brsarInfoGroupHeader* currHeader = nullptr;
 				brsarInfoGroupEntry* currEntry = nullptr;
 				for (std::size_t i = 0; i < infoSectionIn.groupHeaders.size(); i++)
@@ -1922,9 +1937,9 @@ namespace lava
 
 			if (destinationStream.good())
 			{
-				byteArray tempArray(length, 0x00);
+				byteArray tempArray(size(), 0x00);
 				tempArray.setLong(brsarHexTags::bht_FILE, 0x00);
-				tempArray.setLong(length, 0x04);
+				tempArray.setLong(size(), 0x04);
 				for (unsigned long i = 0; i < fileContents.size(); i++)
 				{
 					brsarFileFileContents* currFilePtr = &fileContents[i];
@@ -1989,7 +2004,6 @@ namespace lava
 		{
 			bool result = 1;
 
-			length += changeAmount;
 			for (unsigned long i = 0; i < fileContents.size(); i++)
 			{
 				brsarFileFileContents* currFile = &fileContents[i];
@@ -2632,6 +2646,10 @@ namespace lava
 
 		/* BRSAR */
 
+		unsigned long brsar::size() const
+		{
+			return headerLength + symbSection.paddedSize() + infoSection.paddedSize() + fileSection.size();
+		}
 		bool brsar::init(std::string filePathIn)
 		{
 			bool result = 0;
@@ -2648,7 +2666,7 @@ namespace lava
 					result = 1;
 					byteOrderMarker = contents.getShort(cursor, &cursor);
 					version = contents.getShort(cursor, &cursor);
-					length = contents.getLong(cursor, &cursor);
+					contents.getLong(cursor, &cursor); // Move Past Length Entry
 					headerLength = contents.getShort(cursor, &cursor);
 					sectionCount = contents.getShort(cursor, &cursor);
 
@@ -2666,15 +2684,15 @@ namespace lava
 			writeRawDataToStream(destinationStream, brsarHexTags::bht_RSAR);
 			writeRawDataToStream(destinationStream, byteOrderMarker);
 			writeRawDataToStream(destinationStream, version);
-			writeRawDataToStream(destinationStream, length);
+			writeRawDataToStream(destinationStream, size());
 			writeRawDataToStream(destinationStream, headerLength);
 			writeRawDataToStream(destinationStream, sectionCount);
-			writeRawDataToStream(destinationStream, symbSection.address);
-			writeRawDataToStream(destinationStream, symbSection.length);
-			writeRawDataToStream(destinationStream, infoSection.address);
-			writeRawDataToStream(destinationStream, infoSection.length);
-			writeRawDataToStream(destinationStream, fileSection.address);
-			writeRawDataToStream(destinationStream, fileSection.length);
+			writeRawDataToStream(destinationStream, unsigned long (headerLength));
+			writeRawDataToStream(destinationStream, symbSection.paddedSize());
+			writeRawDataToStream(destinationStream, headerLength + symbSection.paddedSize());
+			writeRawDataToStream(destinationStream, infoSection.paddedSize());
+			writeRawDataToStream(destinationStream, headerLength + symbSection.paddedSize() + infoSection.paddedSize());
+			writeRawDataToStream(destinationStream, fileSection.size());
 			if (headerLength > destinationStream.tellp())
 			{
 				std::vector<char> padding(headerLength - destinationStream.tellp(), 0x00);
@@ -2837,7 +2855,6 @@ namespace lava
 						result &= fileSection.propogateFileLengthChange(dataLengthChange, currOccurence->dataAddress);
 						// Update BRSAR's length value.
 						// Note that the above propogation functions will update the FILE section's length.
-						length += headerLengthChange + dataLengthChange;
 					}
 					// Update this file's fileHeader (it's the only one that needs its length updated)
 					fileHeaderPtr->headerLength = headerIn.size();

@@ -47,9 +47,9 @@ constexpr bool ENABLE_MULTI_WAVE_INFO_TO_WAV_TEST = false;
 // Tests importing a WAV into an RWSD Wave Info entry.
 constexpr bool ENABLE_WAV_TO_WAVE_INFO_TEST = false;
 // Tests addign new WAV entries to an RWSD
-constexpr bool ENABLE_PUSH_RWSD_WAV_ENTRY_TEST = true;
+constexpr bool ENABLE_PUSH_RWSD_WAV_ENTRY_TEST = false;
 // Tests lossiness of the dsp-to-wav conversion process
-constexpr bool ENABLE_CONV_LOSS_TEST = true;
+constexpr bool ENABLE_CONV_LOSS_TEST = false;
 // Tests lavaByteArray's Operations for errors.
 constexpr bool ENABLE_BYTE_ARRAY_TEST = false;
 

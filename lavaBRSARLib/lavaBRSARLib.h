@@ -74,6 +74,7 @@ namespace lava
 		unsigned long validateHexTag(unsigned long tagIn);
 		bool detectHexTags(const byteArray& bodyIn, unsigned long startingAddress = 0x00);
 		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress);
+		int padLengthTo(unsigned long lengthIn, unsigned long padTo);
 
 		/* Misc. */
 
@@ -258,7 +259,6 @@ namespace lava
 		{
 			unsigned long address = ULONG_MAX;
 
-			unsigned long length = ULONG_MAX;
 			unsigned long stringListOffset = ULONG_MAX;
 
 			unsigned long soundTrieOffset;
@@ -276,6 +276,7 @@ namespace lava
 			std::vector<unsigned char> stringBlock{};
 
 			unsigned long size() const;
+			unsigned long paddedSize(unsigned long padTo = 0x20) const;
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream) const;
 
@@ -480,8 +481,6 @@ namespace lava
 		{
 			unsigned long address = ULONG_MAX;
 
-			unsigned long length = ULONG_MAX;
-
 			brawlReference soundsSectionReference = ULLONG_MAX;
 			brawlReference banksSectionReference = ULLONG_MAX;
 			brawlReference playerSectionReference = ULLONG_MAX;
@@ -514,6 +513,7 @@ namespace lava
 			// Footer
 
 			unsigned long size() const;
+			unsigned long paddedSize(unsigned long padTo = 0x10) const;
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 			brsarInfoGroupHeader* getGroupWithID(unsigned long groupIDIn);
@@ -551,7 +551,6 @@ namespace lava
 		{
 			unsigned long address = ULONG_MAX;
 
-			unsigned long length = ULONG_MAX;
 			std::vector<brsarFileFileContents> fileContents{};
 			std::unordered_map<unsigned long, std::vector<std::size_t>> fileIDToIndex{};
 
@@ -667,7 +666,6 @@ namespace lava
 		{
 			unsigned short byteOrderMarker = USHRT_MAX;
 			unsigned short version = USHRT_MAX;
-			unsigned long length = ULONG_MAX;
 			unsigned short headerLength = USHRT_MAX;
 			unsigned short sectionCount = USHRT_MAX;
 
@@ -675,6 +673,7 @@ namespace lava
 			brsarInfoSection infoSection;
 			brsarFileSection fileSection;
 
+			unsigned long size() const;
 			bool init(std::string filePathIn);
 			bool exportContents(std::ostream& destinationStream);
 			bool exportContents(std::string outputFilename);
