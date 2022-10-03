@@ -143,7 +143,7 @@ namespace lava
 
 			wavePacket packetContents;
 
-			unsigned long getWaveEntryLengthInBytes() const;
+			unsigned long size() const;
 			unsigned long getAudioLengthInBytes() const;
 
 			void copyOverWaveInfoProperties(const waveInfo& sourceInfo);

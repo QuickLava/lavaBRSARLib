@@ -18,8 +18,6 @@ namespace lava
 
 		struct channelInfo
 		{
-			static constexpr unsigned long size = 0x1C;
-
 			unsigned long address = ULONG_MAX;
 
 			unsigned long channelDataOffset = ULONG_MAX;
@@ -30,13 +28,25 @@ namespace lava
 			unsigned long volBackRight = ULONG_MAX;
 			unsigned long reserved = ULONG_MAX;
 
+			static constexpr unsigned long size()
+			{
+				unsigned long result = 0;
+
+				result += sizeof(channelDataOffset);
+				result += sizeof(adpcmInfoOffset);
+				result += sizeof(volFrontLeft);
+				result += sizeof(volFrontRight);
+				result += sizeof(volBackLeft);
+				result += sizeof(volBackRight);
+				result += sizeof(reserved);
+
+				return result;
+			}
 			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
 		struct adpcmInfo
 		{
-			static constexpr unsigned long size = 0x30;
-
 			unsigned long address = ULONG_MAX;
 
 			std::array<unsigned short, 0x10> coefficients;
@@ -49,6 +59,22 @@ namespace lava
 			unsigned short lyn2 = USHRT_MAX;
 			unsigned short pad = 0x00;
 
+			static constexpr unsigned long size()
+			{
+				unsigned long result = 0;
+
+				result += 0x10 * sizeof(unsigned short);
+				result += sizeof(gain);
+				result += sizeof(ps);
+				result += sizeof(yn1);
+				result += sizeof(yn2);
+				result += sizeof(lps);
+				result += sizeof(lyn1);
+				result += sizeof(lyn2);
+				result += sizeof(pad);
+
+				return result;
+			}
 			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
 			bool exportContents(std::ostream& destinationStream) const;
 		};

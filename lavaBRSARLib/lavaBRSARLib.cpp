@@ -204,41 +204,29 @@ namespace lava
 
 			return result;
 		}
-		unsigned long waveInfo::getWaveEntryLengthInBytes() const
-		{
-			return 0x1C + (channelInfoTable.size() * 4) + (channelInfoEntries.size() * channelInfo::size) + (adpcmInfoEntries.size() * adpcmInfo::size);
-		}
-		unsigned long waveInfo::getAudioLengthInBytes() const
-		{
-			unsigned long result = ULONG_MAX;
 
-			if (address != ULONG_MAX)
-			{
-				auto divResult = ldiv(nibbles, 2);
-				result = divResult.quot + divResult.rem;
-			}
+		unsigned long waveInfo::size() const
+		{
+			unsigned long result = 0;
+
+			result += sizeof(encoding);
+			result += sizeof(looped);
+			result += sizeof(channels);
+			result += sizeof(sampleRate24);
+			result += sizeof(sampleRate);
+			result += sizeof(dataLocationType);
+			result += sizeof(pad);
+			result += sizeof(loopStartSample);
+			result += sizeof(nibbles);
+			result += sizeof(channelInfoTableOffset);
+			result += sizeof(dataLocation);
+			result += sizeof(reserved);
+			result += channelInfoTable.size() * sizeof(unsigned long);
+			result += channelInfoEntries.size() * channelInfo::size();
+			result += adpcmInfoEntries.size() * adpcmInfo::size();
 
 			return result;
 		}
-		void waveInfo::copyOverWaveInfoProperties(const waveInfo& sourceInfo)
-		{
-			address = brsarAddressConsts::bac_NOT_IN_FILE;
-
-			encoding = sourceInfo.encoding;
-			looped = sourceInfo.looped;
-			channels = sourceInfo.channels;
-			sampleRate24 = sourceInfo.sampleRate24;
-			sampleRate = sourceInfo.sampleRate;
-			pad = sourceInfo.pad;
-			loopStartSample = sourceInfo.loopStartSample;
-			nibbles = sourceInfo.nibbles;
-			channelInfoTableOffset = sourceInfo.channelInfoTableOffset;
-			reserved = sourceInfo.reserved;
-			channelInfoTable = sourceInfo.channelInfoTable;
-			channelInfoEntries = sourceInfo.channelInfoEntries;
-			adpcmInfoEntries = sourceInfo.adpcmInfoEntries;
-		}
-
 		bool waveInfo::populate(const lava::byteArray& bodyIn, unsigned long addressIn)
 		{
 			bool result = 0;
@@ -312,6 +300,35 @@ namespace lava
 				result = destinationStream.good();
 			}
 			return result;
+		}
+		unsigned long waveInfo::getAudioLengthInBytes() const
+		{
+			unsigned long result = ULONG_MAX;
+
+			if (address != ULONG_MAX)
+			{
+				result = lava::brawl::nibblesToBytes(nibbles);
+			}
+
+			return result;
+		}
+		void waveInfo::copyOverWaveInfoProperties(const waveInfo& sourceInfo)
+		{
+			address = brsarAddressConsts::bac_NOT_IN_FILE;
+
+			encoding = sourceInfo.encoding;
+			looped = sourceInfo.looped;
+			channels = sourceInfo.channels;
+			sampleRate24 = sourceInfo.sampleRate24;
+			sampleRate = sourceInfo.sampleRate;
+			pad = sourceInfo.pad;
+			loopStartSample = sourceInfo.loopStartSample;
+			nibbles = sourceInfo.nibbles;
+			channelInfoTableOffset = sourceInfo.channelInfoTableOffset;
+			reserved = sourceInfo.reserved;
+			channelInfoTable = sourceInfo.channelInfoTable;
+			channelInfoEntries = sourceInfo.channelInfoEntries;
+			adpcmInfoEntries = sourceInfo.adpcmInfoEntries;
 		}
 
 		void dataInfo::copyOverDataInfoProperties(const dataInfo& sourceInfo)
@@ -1945,7 +1962,7 @@ namespace lava
 					entryOffsets[i] += 0x04;
 				}
 
-				entryOffsets.push_back(entryOffsets.back() + entries.back().getWaveEntryLengthInBytes());
+				entryOffsets.push_back(entryOffsets.back() + entries.back().size());
 			}
 			else
 			{
@@ -1954,7 +1971,7 @@ namespace lava
 
 			entries.push_back(sourceWave);
 
-			length += 0x04 + sourceWave.getWaveEntryLengthInBytes();
+			length += 0x04 + sourceWave.size();
 		}
 		void rwsdWaveSection::waveEntryPushFront(const waveInfo& sourceWave)
 		{
@@ -1963,7 +1980,7 @@ namespace lava
 				unsigned long initialEntryAddress = entryOffsets.front();
 				for (unsigned long i = 0; i < entryOffsets.size(); i++)
 				{
-					entryOffsets[i] += 0x04 + sourceWave.getWaveEntryLengthInBytes();
+					entryOffsets[i] += 0x04 + sourceWave.size();
 				}
 				entryOffsets.push_back(initialEntryAddress + 0x04);
 			}
@@ -1974,7 +1991,7 @@ namespace lava
 
 			entries.insert(entries.begin(), sourceWave);
 
-			length += 0x04 + sourceWave.getWaveEntryLengthInBytes();
+			length += 0x04 + sourceWave.size();
 		}
 
 		bool rwsdWaveSection::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
@@ -2360,8 +2377,8 @@ namespace lava
 			if (updateWaveEntryDataLocations())
 			{
 				dataSection.entries[dataSectionIndex].ntWaveIndex = waveSection.entries.size() - 1;
-				header.headerLength += 0x04 + sourceWave.getWaveEntryLengthInBytes();
-				header.waveLength += 0x04 + sourceWave.getWaveEntryLengthInBytes();
+				header.headerLength += 0x04 + sourceWave.size();
+				header.waveLength += 0x04 + sourceWave.size();
 			}
 
 			return result;
