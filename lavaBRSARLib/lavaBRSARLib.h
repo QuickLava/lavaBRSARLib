@@ -538,6 +538,8 @@ namespace lava
 			std::vector<unsigned char> header{};
 			unsigned long dataAddress = SIZE_MAX;
 			std::vector<unsigned char> data{};
+
+			unsigned long size() const;
 			bool dumpToStream(std::ostream& output);
 			bool dumpHeaderToStream(std::ostream& output);
 			bool dumpDataToStream(std::ostream& output);
@@ -553,13 +555,12 @@ namespace lava
 			std::vector<brsarFileFileContents> fileContents{};
 			std::unordered_map<unsigned long, std::vector<std::size_t>> fileIDToIndex{};
 
-			std::vector<brsarFileFileContents*> getFileContentsPointerVector(unsigned long fileID);
-			brsarFileFileContents* getFileContentsPointer(unsigned long fileID, unsigned long groupID = ULONG_MAX);
-
-			bool propogateFileLengthChange(signed long changeAmount, unsigned long pastThisAddress);
-
+			unsigned long size() const;
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
 			bool exportContents(std::ostream& destinationStream);
+			std::vector<brsarFileFileContents*> getFileContentsPointerVector(unsigned long fileID);
+			brsarFileFileContents* getFileContentsPointer(unsigned long fileID, unsigned long groupID = ULONG_MAX);
+			bool propogateFileLengthChange(signed long changeAmount, unsigned long pastThisAddress);
 		};
 		
 		struct rwsdDataSection

@@ -1726,6 +1726,10 @@ namespace lava
 
 		/* BRSAR File Section */
 
+		unsigned long brsarFileFileContents::size() const
+		{
+			return header.size() + data.size();
+		}
 		bool brsarFileFileContents::dumpToStream(std::ostream& output)
 		{
 			bool result = 0;
@@ -1799,50 +1803,16 @@ namespace lava
 			return result;
 		}
 
-		std::vector<brsarFileFileContents*> brsarFileSection::getFileContentsPointerVector(unsigned long fileID)
+		unsigned long brsarFileSection::size() const
 		{
-			std::vector<brsarFileFileContents*> result{};
+			unsigned long result = 0;
 
-			auto findRes = fileIDToIndex.find(fileID);
-			if (findRes != fileIDToIndex.end())
-			{
-				std::vector<std::size_t>* indexVecPtr = &findRes->second;
-				for (unsigned long i = 0; i < indexVecPtr->size(); i++)
-				{
-					brsarFileFileContents* currFileContentsPtr = &fileContents[(*indexVecPtr)[i]];
-					result.push_back(currFileContentsPtr);
-				}
-			}
-
-			return result;
-		}
-		brsarFileFileContents* brsarFileSection::getFileContentsPointer(unsigned long fileID, unsigned long groupID)
-		{
-			brsarFileFileContents* result = nullptr;
-
-			std::vector<brsarFileFileContents*> pointerVec = getFileContentsPointerVector(fileID);
-			unsigned long i = 0;
-			while (result == nullptr && i < pointerVec.size())
-			{
-				if (groupID == ULONG_MAX || pointerVec[i]->groupID == groupID)
-				{
-					result = pointerVec[i];
-				}
-				i++;
-			}
-
-			return result;
-		}
-		bool brsarFileSection::propogateFileLengthChange(signed long changeAmount, unsigned long pastThisAddress)
-		{
-			bool result = 1;
-
-			length += changeAmount;
+			result += 0x04; // FILE Tag
+			result += sizeof(length);
+			result += 0x18; // Padding
 			for (unsigned long i = 0; i < fileContents.size(); i++)
 			{
-				brsarFileFileContents* currFile = &fileContents[i];
-				adjustOffset(0x00, currFile->headerAddress, changeAmount, pastThisAddress);
-				adjustOffset(0x00, currFile->dataAddress, changeAmount, pastThisAddress);
+				result += fileContents[i].size();
 			}
 
 			return result;
@@ -1914,6 +1884,55 @@ namespace lava
 
 			return result;
 		}
+		std::vector<brsarFileFileContents*> brsarFileSection::getFileContentsPointerVector(unsigned long fileID)
+		{
+			std::vector<brsarFileFileContents*> result{};
+
+			auto findRes = fileIDToIndex.find(fileID);
+			if (findRes != fileIDToIndex.end())
+			{
+				std::vector<std::size_t>* indexVecPtr = &findRes->second;
+				for (unsigned long i = 0; i < indexVecPtr->size(); i++)
+				{
+					brsarFileFileContents* currFileContentsPtr = &fileContents[(*indexVecPtr)[i]];
+					result.push_back(currFileContentsPtr);
+				}
+			}
+
+			return result;
+		}
+		brsarFileFileContents* brsarFileSection::getFileContentsPointer(unsigned long fileID, unsigned long groupID)
+		{
+			brsarFileFileContents* result = nullptr;
+
+			std::vector<brsarFileFileContents*> pointerVec = getFileContentsPointerVector(fileID);
+			unsigned long i = 0;
+			while (result == nullptr && i < pointerVec.size())
+			{
+				if (groupID == ULONG_MAX || pointerVec[i]->groupID == groupID)
+				{
+					result = pointerVec[i];
+				}
+				i++;
+			}
+
+			return result;
+		}
+		bool brsarFileSection::propogateFileLengthChange(signed long changeAmount, unsigned long pastThisAddress)
+		{
+			bool result = 1;
+
+			length += changeAmount;
+			for (unsigned long i = 0; i < fileContents.size(); i++)
+			{
+				brsarFileFileContents* currFile = &fileContents[i];
+				adjustOffset(0x00, currFile->headerAddress, changeAmount, pastThisAddress);
+				adjustOffset(0x00, currFile->dataAddress, changeAmount, pastThisAddress);
+			}
+
+			return result;
+		}
+		
 
 		/* RWSD */
 
