@@ -686,7 +686,11 @@ namespace lava
 		{
 			return padLengthTo(size(), padTo);
 		}
-		bool brsarSymbSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarSymbSection::getAddress() const
+		{
+			return (parent != nullptr) ? parent->calculateSYMBSectionAddress() : ULONG_MAX;
+		}
+		bool brsarSymbSection::populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
@@ -694,6 +698,7 @@ namespace lava
 			{
 				result = 1;
 				address = addressIn;
+				parent = &parentIn;
 
 				std::size_t cursor1 = address + 0x04;
 
@@ -1175,7 +1180,7 @@ namespace lava
 			{
 				result = 1;
 				address = addressIn;
-
+				
 				std::size_t cursor = address;
 				stringID = bodyIn.getLong(cursor, &cursor);
 				fileID = bodyIn.getLong(cursor, &cursor);
@@ -1526,13 +1531,18 @@ namespace lava
 		{
 			return padLengthTo(size(), padTo);
 		}
-		bool brsarInfoSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoSection::getAddress() const
+		{
+			return (parent != nullptr) ? parent->calculateINFOSectionAddress() : ULONG_MAX;
+		}
+		bool brsarInfoSection::populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_INFO)
 			{
 				result = 1;
+				parent = &parentIn;
 				address = addressIn;
 
 				//length = bodyIn.getLong(address + 0x04); No longer needed!
@@ -1899,13 +1909,20 @@ namespace lava
 
 			return result;
 		}
-		bool brsarFileSection::populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn)
+		unsigned long brsarFileSection::getAddress() const
+		{
+			return (parent != nullptr) ? parent->calculateFILESectionAddress() : ULONG_MAX;
+		}
+		bool brsarFileSection::populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_FILE)
 			{
+				result = 1;
+				parent = &parentIn;
 				address = addressIn;
+
 				//length = bodyIn.getLong(address + 0x04); No longer needed!
 				brsarInfoGroupHeader* currHeader = nullptr;
 				brsarInfoGroupEntry* currEntry = nullptr;
@@ -1926,7 +1943,6 @@ namespace lava
 						fileIDToIndex[currEntry->fileID].push_back(fileContents.size() - 1);
 					}
 				}
-				result = 1;
 			}
 
 			return result;
@@ -2670,9 +2686,9 @@ namespace lava
 					headerLength = contents.getShort(cursor, &cursor);
 					sectionCount = contents.getShort(cursor, &cursor);
 
-					result &= symbSection.populate(contents, contents.getLong(0x10));
-					result &= infoSection.populate(contents, contents.getLong(0x18));
-					result &= fileSection.populate(contents, contents.getLong(0x20), infoSection);
+					result &= symbSection.populate(*this, contents, contents.getLong(0x10));
+					result &= infoSection.populate(*this, contents, contents.getLong(0x18));
+					result &= fileSection.populate(*this, contents, contents.getLong(0x20), infoSection);
 				}
 			}
 			return result;

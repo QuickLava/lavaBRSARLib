@@ -213,7 +213,7 @@ namespace lava
 
 		/*Sound Data Structs*/
 
-
+		struct brsar; //Brsar Forward Decl.
 
 		/* BRSAR Symb Section */
 
@@ -257,6 +257,8 @@ namespace lava
 		};
 		struct brsarSymbSection
 		{
+			const brsar* parent = nullptr;
+
 			unsigned long address = ULONG_MAX;
 
 			unsigned long stringListOffset = ULONG_MAX;
@@ -277,7 +279,8 @@ namespace lava
 
 			unsigned long size() const;
 			unsigned long paddedSize(unsigned long padTo = 0x20) const;
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream) const;
 
 			std::string getString(std::size_t idIn) const;
@@ -479,6 +482,8 @@ namespace lava
 
 		struct brsarInfoSection
 		{
+			const brsar* parent = nullptr;
+
 			unsigned long address = ULONG_MAX;
 
 			brawlReference soundsSectionReference = ULLONG_MAX;
@@ -514,7 +519,8 @@ namespace lava
 
 			unsigned long size() const;
 			unsigned long paddedSize(unsigned long padTo = 0x10) const;
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 			brsarInfoGroupHeader* getGroupWithID(unsigned long groupIDIn);
 			brsarInfoGroupHeader* getGroupWithInfoIndex(unsigned long infoIndexIn);
@@ -549,13 +555,16 @@ namespace lava
 		};
 		struct brsarFileSection
 		{
+			const brsar* parent = nullptr;
+
 			unsigned long address = ULONG_MAX;
 
 			std::vector<brsarFileFileContents> fileContents{};
 			std::unordered_map<unsigned long, std::vector<std::size_t>> fileIDToIndex{};
 
 			unsigned long size() const;
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
+			unsigned long getAddress() const;
+			bool populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
 			bool exportContents(std::ostream& destinationStream);
 			std::vector<brsarFileFileContents*> getFileContentsPointerVector(unsigned long fileID);
 			brsarFileFileContents* getFileContentsPointer(unsigned long fileID, unsigned long groupID = ULONG_MAX);
