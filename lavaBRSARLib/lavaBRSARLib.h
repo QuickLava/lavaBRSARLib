@@ -296,9 +296,13 @@ namespace lava
 
 		struct brsarInfoSection; // Info Section Forward Decl.
 
+		struct brsarInfoSoundEntry; // Info Sound Struct Forward Decl.
 		struct brsarInfo3DSoundInfo
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoSoundEntry* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned long flags = ULONG_MAX;
 			unsigned char decayCurve = UCHAR_MAX;
@@ -308,12 +312,16 @@ namespace lava
 			unsigned long reserved = ULONG_MAX;
 
 			static constexpr unsigned long size();
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoSoundEntry& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
 		struct brsarInfoSequenceSoundInfo
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoSoundEntry* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned int dataID = ULONG_MAX;
 			unsigned int bankID = ULONG_MAX;
@@ -325,12 +333,16 @@ namespace lava
 			unsigned long reserved = ULONG_MAX;
 
 			static constexpr unsigned long size();
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoSoundEntry& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		}; 
 		struct brsarInfoStreamSoundInfo
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoSoundEntry* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned long startPosition = ULONG_MAX;
 			unsigned short allocChannelCount = USHRT_MAX;
@@ -338,12 +350,16 @@ namespace lava
 			unsigned long reserved = ULONG_MAX;
 
 			static constexpr unsigned long size();
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoSoundEntry& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		}; 
 		struct brsarInfoWaveSoundInfo
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoSoundEntry* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned long soundIndex = ULONG_MAX;
 			unsigned long allocTrack = ULONG_MAX;
@@ -354,13 +370,16 @@ namespace lava
 			unsigned long reserved = ULONG_MAX;
 
 			static constexpr unsigned long size();
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoSoundEntry& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
-
 		struct brsarInfoSoundEntry
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoSection* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned long stringID = ULONG_MAX;
 			unsigned long fileID = ULONG_MAX;
@@ -387,9 +406,14 @@ namespace lava
 			};
 
 			unsigned long size() const;
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
+
+			void updateSound3DInfoOffsetValue();
+			void updateSpecificSoundOffsetValue();
 		};
+
 		struct brsarInfoBankEntry
 		{
 			const brsarInfoSection* parent = nullptr;
@@ -425,9 +449,7 @@ namespace lava
 			bool populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
-
 		struct brsarInfoFileHeader; // Info File Header Struct Forward Decl.
-
 		struct brsarInfoFileEntry
 		{
 			const brsarInfoFileHeader* parent = nullptr;
@@ -466,7 +488,6 @@ namespace lava
 
 			void updateFileEntryOffsetValues();
 		};
-
 		struct brsarInfoGroupHeader; // Info Group Header Forward Decl.
 		struct brsarInfoGroupEntry
 		{
@@ -570,6 +591,7 @@ namespace lava
 			bool populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 
+			void updateSoundEntryOffsetValues();
 			void updateBankEntryOffsetValues();
 			void updatePlayerEntryOffsetValues();
 			void updateFileHeaderOffsetValues();

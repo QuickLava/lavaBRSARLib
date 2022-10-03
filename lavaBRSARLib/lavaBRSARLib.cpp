@@ -851,16 +851,21 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfo3DSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfo3DSoundInfo::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfo3DSoundInfo::populate(const brsarInfoSoundEntry& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
 				result = 1;
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				std::size_t cursor = address;
+				std::size_t cursor = originalAddress;
 				flags = bodyIn.getLong(cursor, &cursor);
 				decayCurve = bodyIn.getChar(cursor, &cursor);
 				decayRatio = bodyIn.getChar(cursor, &cursor);
@@ -903,16 +908,21 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoSequenceSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoSequenceSoundInfo::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoSequenceSoundInfo::populate(const brsarInfoSoundEntry& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
 				result = 1;
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				std::size_t cursor = address;
+				std::size_t cursor = originalAddress;
 				dataID = bodyIn.getLong(cursor, &cursor);
 				bankID = bodyIn.getLong(cursor, &cursor);
 				allocTrack = bodyIn.getLong(cursor, &cursor);
@@ -955,16 +965,21 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoStreamSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoStreamSoundInfo::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoStreamSoundInfo::populate(const brsarInfoSoundEntry& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
 				result = 1;
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				std::size_t cursor = address;
+				std::size_t cursor = originalAddress;
 				startPosition = bodyIn.getLong(cursor, &cursor);
 				allocChannelCount = bodyIn.getShort(cursor, &cursor);
 				allocTrackFlag = bodyIn.getShort(cursor, &cursor);
@@ -1002,16 +1017,21 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoWaveSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoWaveSoundInfo::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoWaveSoundInfo::populate(const brsarInfoSoundEntry& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
 				result = 1;
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				std::size_t cursor = address;
+				std::size_t cursor = originalAddress;
 				soundIndex = bodyIn.getLong(cursor, &cursor);
 				allocTrack = bodyIn.getLong(cursor, &cursor);
 				channelPriority = bodyIn.getChar(cursor, &cursor);
@@ -1086,30 +1106,36 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoSoundEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoSoundEntry::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoSoundEntry::populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
 				result = 1;
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				stringID = bodyIn.getLong(address);
-				fileID = bodyIn.getLong(address + 0x04);
-				playerID = bodyIn.getLong(address + 0x08);
-				param3DRefOffset = brawlReference(bodyIn.getLLong(address + 0x0C));
-				volume = bodyIn.getChar(address + 0x14);
-				playerPriority = bodyIn.getChar(address + 0x15);
-				soundType = bodyIn.getChar(address + 0x16);
-				remoteFilter = bodyIn.getChar(address + 0x17);
-				soundInfoRef = brawlReference(bodyIn.getLLong(address + 0x18));
-				userParam1 = bodyIn.getLong(address + 0x20);
-				userParam2 = bodyIn.getLong(address + 0x24);
-				panMode = bodyIn.getChar(address + 0x28);
-				panCurve = bodyIn.getChar(address + 0x29);
-				actorPlayerID = bodyIn.getChar(address + 0x2A);
-				reserved = bodyIn.getChar(address + 0x2B);
+				std::size_t cursor = originalAddress;
+				stringID = bodyIn.getLong(cursor, &cursor);
+				fileID = bodyIn.getLong(cursor, &cursor);
+				playerID = bodyIn.getLong(cursor, &cursor);
+				param3DRefOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
+				volume = bodyIn.getChar(cursor, &cursor);
+				playerPriority = bodyIn.getChar(cursor, &cursor);
+				soundType = bodyIn.getChar(cursor, &cursor);
+				remoteFilter = bodyIn.getChar(cursor, &cursor);
+				soundInfoRef = brawlReference(bodyIn.getLLong(cursor, &cursor));
+				userParam1 = bodyIn.getLong(cursor, &cursor);
+				userParam2 = bodyIn.getLong(cursor, &cursor);
+				panMode = bodyIn.getChar(cursor, &cursor);
+				panCurve = bodyIn.getChar(cursor, &cursor);
+				actorPlayerID = bodyIn.getChar(cursor, &cursor);
+				reserved = bodyIn.getChar(cursor, &cursor);
 			}
 
 			return result;
@@ -1160,6 +1186,89 @@ namespace lava
 				result = destinationStream.good();
 			}
 			return result;
+		}
+		void brsarInfoSoundEntry::updateSound3DInfoOffsetValue()
+		{
+			unsigned long relativeOffset = 0;
+			relativeOffset += sizeof(stringID);
+			relativeOffset += sizeof(fileID);
+			relativeOffset += sizeof(playerID);
+			relativeOffset += param3DRefOffset.size();
+			relativeOffset += sizeof(volume);
+			relativeOffset += sizeof(playerPriority);
+			relativeOffset += sizeof(soundType);
+			relativeOffset += sizeof(remoteFilter);
+			relativeOffset += soundInfoRef.size();
+			relativeOffset += sizeof(userParam1);
+			relativeOffset += sizeof(userParam2);
+			relativeOffset += sizeof(panMode);
+			relativeOffset += sizeof(panCurve);
+			relativeOffset += sizeof(actorPlayerID);
+			relativeOffset += sizeof(reserved);
+			switch (soundType)
+			{
+				case sit_SEQUENCE:
+				{
+					relativeOffset += seqSoundInfo.size();
+					break;
+				}
+				case sit_STREAM:
+				{
+					relativeOffset += streamSoundInfo.size();
+					break;
+				}
+				case sit_WAVE:
+				{
+					relativeOffset += waveSoundInfo.size();
+					break;
+				}
+				default:
+				{
+					break;
+				}
+			}
+			sound3DInfo.parentRelativeOffset = relativeOffset;
+		}
+		void brsarInfoSoundEntry::updateSpecificSoundOffsetValue()
+		{
+			unsigned long relativeOffset = 0;
+			relativeOffset += sizeof(stringID);
+			relativeOffset += sizeof(fileID);
+			relativeOffset += sizeof(playerID);
+			relativeOffset += param3DRefOffset.size();
+			relativeOffset += sizeof(volume);
+			relativeOffset += sizeof(playerPriority);
+			relativeOffset += sizeof(soundType);
+			relativeOffset += sizeof(remoteFilter);
+			relativeOffset += soundInfoRef.size();
+			relativeOffset += sizeof(userParam1);
+			relativeOffset += sizeof(userParam2);
+			relativeOffset += sizeof(panMode);
+			relativeOffset += sizeof(panCurve);
+			relativeOffset += sizeof(actorPlayerID);
+			relativeOffset += sizeof(reserved);
+			switch (soundType)
+			{
+				case sit_SEQUENCE:
+				{
+					seqSoundInfo.parentRelativeOffset = relativeOffset;
+					break;
+				}
+				case sit_STREAM:
+				{
+					streamSoundInfo.parentRelativeOffset = relativeOffset;
+					break;
+				}
+				case sit_WAVE:
+				{
+					waveSoundInfo.parentRelativeOffset = relativeOffset;
+					break;
+				}
+				default:
+				{
+					break;
+				}
+			}
 		}
 
 		constexpr unsigned long brsarInfoBankEntry::size()
@@ -1667,23 +1776,23 @@ namespace lava
 				for (std::size_t i = 0; i < soundsSection.refs.size(); i++)
 				{
 					currSoundEntry = &soundEntries[i];
-					result &= currSoundEntry->populate(bodyIn, soundsSection.refs[i].getAddress(address + 0x08));
-					currSoundEntry->sound3DInfo.populate(bodyIn, currSoundEntry->param3DRefOffset.getAddress(address + 0x08));
+					result &= currSoundEntry->populate(*this, bodyIn, soundsSection.refs[i].getAddress(address + 0x08));
+					currSoundEntry->sound3DInfo.populate(*currSoundEntry, bodyIn, currSoundEntry->param3DRefOffset.getAddress(address + 0x08));
 					switch (currSoundEntry->soundType)
 					{
 					case sit_SEQUENCE:
 					{
-						currSoundEntry->seqSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
+						currSoundEntry->seqSoundInfo.populate(*currSoundEntry, bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
 						break;
 					}
 					case sit_STREAM:
 					{
-						currSoundEntry->streamSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
+						currSoundEntry->streamSoundInfo.populate(*currSoundEntry, bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
 						break;
 					}
 					case sit_WAVE:
 					{
-						currSoundEntry->waveSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
+						currSoundEntry->waveSoundInfo.populate(*currSoundEntry, bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
 						break;
 					}
 					default:
@@ -1692,6 +1801,7 @@ namespace lava
 					}
 					}
 				}
+				updateSoundEntryOffsetValues();
 
 				bankEntries.resize(banksSection.refs.size());
 				for (std::size_t i = 0; i < banksSection.refs.size(); i++)
@@ -1829,6 +1939,22 @@ namespace lava
 			return result;
 		}
 
+		void brsarInfoSection::updateSoundEntryOffsetValues()
+		{
+			unsigned long relativeOffset = size(infoSectionLandmark::iSL_VecReferences); // Get size up to and including the vector references.
+			relativeOffset += soundsSection.size();
+			for (std::size_t i = 0; i < soundEntries.size(); i++)
+			{
+				soundEntries[i].parentRelativeOffset = relativeOffset;
+				if (soundEntries[i].getAddress() != soundEntries[i].originalAddress)
+				{
+					int ruhroh = 0;
+				}
+				soundEntries[i].updateSpecificSoundOffsetValue();
+				soundEntries[i].updateSound3DInfoOffsetValue();
+				relativeOffset += soundEntries[i].size();
+			}
+		}
 		void brsarInfoSection::updateBankEntryOffsetValues()
 		{
 			unsigned long relativeOffset = size(infoSectionLandmark::iSL_SoundEntries); // Get size up to and including the sound entries.
