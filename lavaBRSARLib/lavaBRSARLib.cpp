@@ -79,6 +79,10 @@ namespace lava
 
 		/* Brawl Reference */
 
+		constexpr unsigned long brawlReference::size()
+		{
+			return 0x08;
+		}
 		brawlReference::brawlReference(unsigned long long valueIn)
 		{
 			addressType = valueIn >> 0x20;
@@ -110,6 +114,10 @@ namespace lava
 			return result;
 		}
 
+		unsigned long brawlReferenceVector::size() const
+		{
+			return 0x04 + (refs.size() * brawlReference::size());
+		}
 		bool brawlReferenceVector::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -196,12 +204,10 @@ namespace lava
 
 			return result;
 		}
-
 		unsigned long waveInfo::getWaveEntryLengthInBytes() const
 		{
 			return 0x1C + (channelInfoTable.size() * 4) + (channelInfoEntries.size() * channelInfo::size) + (adpcmInfoEntries.size() * adpcmInfo::size);
 		}
-
 		unsigned long waveInfo::getAudioLengthInBytes() const
 		{
 			unsigned long result = ULONG_MAX;
@@ -457,6 +463,10 @@ namespace lava
 
 		/* BRSAR Symb Section */
 
+		constexpr unsigned long brsarSymbPTrieNode::size()
+		{
+			return 0x14;
+		}
 		bool brsarSymbPTrieNode::populate(lava::byteArray& bodyIn, unsigned long addressIn)
 		{
 			bool result = 0;
@@ -507,6 +517,10 @@ namespace lava
 			return charIn & comparisonTerm;
 		}
 
+		unsigned long brsarSymbPTrie::size() const
+		{
+			return 0x08 + (entries.size() * brsarSymbPTrieNode::size());
+		}
 		bool brsarSymbPTrie::populate(lava::byteArray& bodyIn, unsigned long addressIn)
 		{
 			bool result = 0;
@@ -578,6 +592,24 @@ namespace lava
 			return brsarSymbPTrieNode();
 		}
 
+		unsigned long brsarSymbSection::size() const
+		{
+			unsigned long result = 0;
+
+			result += 0x04; // SYMB Tag
+			result += sizeof(length);
+			result += sizeof(stringListOffset);
+			result += sizeof(soundTrieOffset);
+			result += sizeof(playerTrieOffset);
+			result += sizeof(groupTrieOffset);
+			result += sizeof(bankTrieOffset);
+			result += sizeof(unsigned long); // String Entry Count
+			result += stringEntryOffsets.size() * sizeof(unsigned long); // Size of OffsetVec
+			result += soundTrie.size() + playerTrie.size() + groupTrie.size() + bankTrie.size(); // Collective Size of Tries
+			result += stringBlock.size() * sizeof(unsigned char); // Size of String Blocks
+
+			return result;
+		}
 		bool brsarSymbSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;

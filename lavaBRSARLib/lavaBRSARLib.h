@@ -85,7 +85,9 @@ namespace lava
 			unsigned long addressType = ULONG_MAX;
 			unsigned long address = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			brawlReference(unsigned long long valueIn = ULONG_MAX);
+
 			bool isOffset();
 			unsigned long getAddress(unsigned long relativeToIn = ULONG_MAX);
 			std::string getAddressString(unsigned long relativeToIn = ULONG_MAX);
@@ -95,8 +97,10 @@ namespace lava
 		{
 			std::vector<brawlReference> refs{};
 
+			unsigned long size() const;
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn = SIZE_MAX);
 			std::vector<unsigned long> getHex();
+
 			bool exportContents(std::ostream& destinationStream);
 		};
 
@@ -140,8 +144,8 @@ namespace lava
 			wavePacket packetContents;
 
 			unsigned long getWaveEntryLengthInBytes() const;
-
 			unsigned long getAudioLengthInBytes() const;
+
 			void copyOverWaveInfoProperties(const waveInfo& sourceInfo);
 
 			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
@@ -223,12 +227,16 @@ namespace lava
 			unsigned long stringID = ULONG_MAX;
 			unsigned long infoID = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			bool populate(lava::byteArray& bodyIn, unsigned long addressIn);
+
 			bool exportContents(std::ostream& destinationStream) const;
 
 			unsigned long getBit() const;
 			unsigned long getPos() const;
 			bool compareCharAndBit(char charIn) const;
+
+			
 		};
 		struct brsarSymbPTrie
 		{
@@ -239,10 +247,12 @@ namespace lava
 
 			std::vector<brsarSymbPTrieNode> entries{};
 
+			unsigned long size() const;
 			bool populate(lava::byteArray& bodyIn, unsigned long addressIn);
 			bool exportContents(std::ostream& destinationStream) const;
 
 			brsarSymbPTrieNode findString(std::string stringIn) const;
+
 		};
 		struct brsarSymbSection
 		{
@@ -265,6 +275,7 @@ namespace lava
 
 			std::vector<unsigned char> stringBlock{};
 
+			unsigned long size() const;
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream) const;
 
