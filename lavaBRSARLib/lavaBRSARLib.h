@@ -402,13 +402,16 @@ namespace lava
 			unsigned long padding = ULONG_MAX;
 
 			static constexpr unsigned long size();
-			unsigned long getAddress();
+			unsigned long getAddress() const;
 			bool populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
 		struct brsarInfoPlayerEntry
 		{
-			unsigned long address = ULONG_MAX;
+			const brsarInfoSection* parent = nullptr;
+			unsigned long parentRelativeOffset = ULONG_MAX;
+
+			unsigned long originalAddress = ULONG_MAX;
 
 			unsigned long stringID = ULONG_MAX;
 			unsigned char playableSoundCount = UCHAR_MAX;
@@ -418,7 +421,8 @@ namespace lava
 			unsigned long reserved = ULONG_MAX;
 
 			static constexpr unsigned long size();
-			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
+			unsigned long getAddress() const;
+			bool populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
 		struct brsarInfoFileEntry
@@ -488,6 +492,18 @@ namespace lava
 
 		struct brsarInfoSection
 		{
+			enum class infoSectionLandmark
+			{
+				iSL_Header = 0,
+				iSL_VecReferences,
+				iSL_SoundEntries,
+				iSL_BankEntries,
+				iSL_PlayerEntries,
+				iSL_FileHeaders,
+				iSL_GroupHeaders,
+				iSL_Footer,
+			};
+
 			const brsar* parent = nullptr;
 
 			unsigned long address = ULONG_MAX;
@@ -523,13 +539,14 @@ namespace lava
 			unsigned long reserved = ULONG_MAX;
 			// Footer
 
-			unsigned long size() const;
+			unsigned long size(infoSectionLandmark tallyUpTo = infoSectionLandmark::iSL_Footer) const;
 			unsigned long paddedSize(unsigned long padTo = 0x10) const;
 			unsigned long getAddress() const;
 			bool populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 
-			bool updateBankEntryOffsetValues();
+			void updateBankEntryOffsetValues();
+			void updatePlayerEntryOffsetValues();
 
 			brsarInfoGroupHeader* getGroupWithID(unsigned long groupIDIn);
 			brsarInfoGroupHeader* getGroupWithInfoIndex(unsigned long infoIndexIn);

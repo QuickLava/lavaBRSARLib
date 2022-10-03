@@ -1172,7 +1172,7 @@ namespace lava
 
 			return result;
 		}
-		unsigned long brsarInfoBankEntry::getAddress()
+		unsigned long brsarInfoBankEntry::getAddress() const
 		{
 			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
 		}
@@ -1221,16 +1221,21 @@ namespace lava
 
 			return result;
 		}
-		bool brsarInfoPlayerEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
+		unsigned long brsarInfoPlayerEntry::getAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeOffset : ULONG_MAX;
+		}
+		bool brsarInfoPlayerEntry::populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
 			if (bodyIn.populated())
 			{
 				result = 1;
-				address = addressIn;
+				originalAddress = addressIn;
+				parent = &parentIn;
 
-				std::size_t cursor = address;
+				std::size_t cursor = originalAddress;
 				stringID = bodyIn.getLong(cursor, &cursor);
 				playableSoundCount = bodyIn.getChar(cursor, &cursor);
 				padding = bodyIn.getChar(cursor, &cursor);
@@ -1488,36 +1493,70 @@ namespace lava
 			return result;
 		}
 
-		unsigned long brsarInfoSection::size() const
+		unsigned long brsarInfoSection::size(infoSectionLandmark tallyUpTo) const
 		{
 			unsigned long result = 0;
 
 			result += 0x04; // INFO Tag
 			result += sizeof(unsigned long); // Length
+			if (tallyUpTo <= infoSectionLandmark::iSL_Header)
+			{
+				return result;
+			}
+
 			result += soundsSectionReference.size();
 			result += banksSectionReference.size();
 			result += playerSectionReference.size();
 			result += filesSectionReference.size();
 			result += groupsSectionReference.size();
 			result += footerReference.size();
+			if (tallyUpTo <= infoSectionLandmark::iSL_VecReferences)
+			{
+				return result;
+			}
+
 			result += soundsSection.size();
 			for (std::size_t i = 0; i < soundEntries.size(); i++)
 			{
 				result += soundEntries[i].size();
 			}
+			if (tallyUpTo <= infoSectionLandmark::iSL_SoundEntries)
+			{
+				return result;
+			}
+
 			result += banksSection.size();
 			result += bankEntries.size() * brsarInfoBankEntry::size();
+			if (tallyUpTo <= infoSectionLandmark::iSL_BankEntries)
+			{
+				return result;
+			}
+
 			result += playerSection.size();
 			result += playerEntries.size() * brsarInfoPlayerEntry::size();
+			if (tallyUpTo <= infoSectionLandmark::iSL_PlayerEntries)
+			{
+				return result;
+			}
+
 			result += filesSection.size();
 			for (std::size_t i = 0; i < fileHeaders.size(); i++)
 			{
 				result += fileHeaders[i].size();
 			}
+			if (tallyUpTo <= infoSectionLandmark::iSL_FileHeaders)
+			{
+				return result;
+			}
+
 			result += groupsSection.size();
 			for (std::size_t i = 0; i < groupHeaders.size(); i++)
 			{
 				result += groupHeaders[i].size();
+			}
+			if (tallyUpTo <= infoSectionLandmark::iSL_GroupHeaders)
+			{
+				return result;
 			}
 
 			result += sizeof(sequenceMax);
@@ -1605,8 +1644,9 @@ namespace lava
 				playerEntries.resize(playerSection.refs.size());
 				for (std::size_t i = 0; i < playerSection.refs.size(); i++)
 				{
-					result &= playerEntries[i].populate(bodyIn, playerSection.refs[i].getAddress(address + 0x08));
+					result &= playerEntries[i].populate(*this, bodyIn, playerSection.refs[i].getAddress(address + 0x08));
 				}
+				updatePlayerEntryOffsetValues();
 
 				fileHeaders.resize(filesSection.refs.size());
 				brsarInfoFileHeader* currFileHeader = nullptr;
@@ -1728,37 +1768,25 @@ namespace lava
 			return result;
 		}
 
-		bool brsarInfoSection::updateBankEntryOffsetValues()
+		void brsarInfoSection::updateBankEntryOffsetValues()
 		{
-			bool result = 0;
-
-			unsigned long relativeOffset = 0;
-			if (relativeOffset != ULONG_MAX)
+			unsigned long relativeOffset = size(infoSectionLandmark::iSL_SoundEntries); // Get size up to and including the sound entries.
+			relativeOffset += banksSection.size();
+			for (std::size_t i = 0; i < bankEntries.size(); i++)
 			{
-				relativeOffset += 0x04; // INFO Tag
-				relativeOffset += sizeof(unsigned long); // Length
-				relativeOffset += soundsSectionReference.size();
-				relativeOffset += banksSectionReference.size();
-				relativeOffset += playerSectionReference.size();
-				relativeOffset += filesSectionReference.size();
-				relativeOffset += groupsSectionReference.size();
-				relativeOffset += footerReference.size();
-				relativeOffset += soundsSection.size();
-				for (std::size_t i = 0; i < soundEntries.size(); i++)
-				{
-					relativeOffset += soundEntries[i].size();
-				}
-				relativeOffset += banksSection.size();
-				for (std::size_t i = 0; i < bankEntries.size(); i++)
-				{
-					bankEntries[i].parentRelativeOffset = relativeOffset;
-					relativeOffset += bankEntries[i].size();
-				}
-
-				result = 1;
+				bankEntries[i].parentRelativeOffset = relativeOffset;
+				relativeOffset += bankEntries[i].size();
 			}
-
-			return result;
+		}
+		void brsarInfoSection::updatePlayerEntryOffsetValues()
+		{
+			unsigned long relativeOffset = size(infoSectionLandmark::iSL_BankEntries); // Get size up to and including the bank entries.
+			relativeOffset += playerSection.size();
+			for (std::size_t i = 0; i < playerEntries.size(); i++)
+			{
+				playerEntries[i].parentRelativeOffset = relativeOffset;
+				relativeOffset += playerEntries[i].size();
+			}
 		}
 
 		brsarInfoGroupHeader* brsarInfoSection::getGroupWithID(unsigned long groupIDIn)
