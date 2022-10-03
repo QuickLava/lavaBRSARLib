@@ -301,6 +301,7 @@ namespace lava
 			unsigned char padding = UCHAR_MAX;
 			unsigned long reserved = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -317,6 +318,7 @@ namespace lava
 			unsigned char pad2 = UCHAR_MAX;
 			unsigned long reserved = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		}; 
@@ -329,6 +331,7 @@ namespace lava
 			unsigned short allocTrackFlag = USHRT_MAX;
 			unsigned long reserved = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		}; 
@@ -344,6 +347,7 @@ namespace lava
 			unsigned char pad2 = UCHAR_MAX;
 			unsigned long reserved = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -376,6 +380,7 @@ namespace lava
 				brsarInfoStreamSoundInfo streamSoundInfo;
 			};
 
+			unsigned long size() const;
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -387,6 +392,7 @@ namespace lava
 			unsigned long fileID = ULONG_MAX;
 			unsigned long padding = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -401,6 +407,7 @@ namespace lava
 			unsigned long heapSize = ULONG_MAX;
 			unsigned long reserved = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -411,6 +418,7 @@ namespace lava
 			unsigned long groupID = ULONG_MAX;
 			unsigned long index = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -427,6 +435,7 @@ namespace lava
 			lava::brawl::brawlReferenceVector entryReferenceList;
 			std::vector<brsarInfoFileEntry> entries;
 
+			unsigned long size() const;
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -441,6 +450,7 @@ namespace lava
 			unsigned long dataLength = ULONG_MAX;
 			unsigned long reserved = ULONG_MAX;
 
+			static constexpr unsigned long size();
 			bool populate(lava::byteArray& bodyIn, std::size_t address);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -459,10 +469,11 @@ namespace lava
 			lava::brawl::brawlReferenceVector entryReferenceList;
 			std::vector<brsarInfoGroupEntry> entries;
 
-			unsigned long getSynonymFileID(std::size_t headerLengthIn = SIZE_MAX) const;
-			bool usesFileID(unsigned long fileIDIn = ULONG_MAX) const;
+			unsigned long size() const;
 			bool populate(lava::byteArray& bodyIn, std::size_t address);
 			bool exportContents(std::ostream& destinationStream);
+			unsigned long getSynonymFileID(std::size_t headerLengthIn = SIZE_MAX) const;
+			bool usesFileID(unsigned long fileIDIn = ULONG_MAX) const;
 		};
 
 		struct brsarInfoSection
@@ -502,18 +513,14 @@ namespace lava
 			unsigned long reserved = ULONG_MAX;
 			// Footer
 
-			brsarInfoGroupHeader* getGroupWithID(unsigned long groupIDIn);
-			brsarInfoGroupHeader* getGroupWithInfoIndex(unsigned long infoIndexIn);
-
-			std::vector<brsarInfoFileHeader*> getFilesWithGroupID(unsigned long groupIDIn);
-			brsarInfoFileHeader* getFileHeaderPointer(unsigned long fileID);
-
-
-			bool summarizeFileEntryData(std::ostream& output);
-
-
+			unsigned long size() const;
 			bool populate(lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
+			brsarInfoGroupHeader* getGroupWithID(unsigned long groupIDIn);
+			brsarInfoGroupHeader* getGroupWithInfoIndex(unsigned long infoIndexIn);
+			std::vector<brsarInfoFileHeader*> getFilesWithGroupID(unsigned long groupIDIn);
+			brsarInfoFileHeader* getFileHeaderPointer(unsigned long fileID);
+			bool summarizeFileEntryData(std::ostream& output);
 		};
 
 		/* BRSAR Info Section */

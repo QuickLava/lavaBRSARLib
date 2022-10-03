@@ -756,6 +756,19 @@ namespace lava
 
 		/* BRSAR Info Section */
 
+		constexpr unsigned long brsarInfo3DSoundInfo::size()
+		{
+			unsigned long result = 0;
+
+			result += sizeof(flags);
+			result += sizeof(decayCurve);
+			result += sizeof(decayRatio);
+			result += sizeof(dopplerFactor);
+			result += sizeof(padding);
+			result += sizeof(reserved);
+
+			return result;
+		}
 		bool brsarInfo3DSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -793,6 +806,21 @@ namespace lava
 			return result;
 		}
 
+		constexpr unsigned long brsarInfoSequenceSoundInfo::size()
+		{
+			unsigned long result = 0;
+
+			result += sizeof(dataID);
+			result += sizeof(bankID);
+			result += sizeof(allocTrack);
+			result += sizeof(channelPriority);
+			result += sizeof(releasePriorityFix);
+			result += sizeof(pad1);
+			result += sizeof(pad2);
+			result += sizeof(reserved);
+
+			return result;
+		}
 		bool brsarInfoSequenceSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -834,6 +862,17 @@ namespace lava
 			return result;
 		}
 
+		constexpr unsigned long brsarInfoStreamSoundInfo::size()
+		{
+			unsigned long result = 0;
+
+			result += sizeof(startPosition);
+			result += sizeof(allocChannelCount);
+			result += sizeof(allocTrackFlag);
+			result += sizeof(reserved);
+
+			return result;
+		}
 		bool brsarInfoStreamSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -867,6 +906,20 @@ namespace lava
 			return result;
 		}
 
+		constexpr unsigned long brsarInfoWaveSoundInfo::size()
+		{
+			unsigned long result = 0;
+
+			result += sizeof(soundIndex);
+			result += sizeof(allocTrack);
+			result += sizeof(channelPriority);
+			result += sizeof(releasePriorityFix);
+			result += sizeof(pad1);
+			result += sizeof(pad2);
+			result += sizeof(reserved);
+
+			return result;
+		}
 		bool brsarInfoWaveSoundInfo::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -906,6 +959,51 @@ namespace lava
 			return result;
 		}
 
+		unsigned long brsarInfoSoundEntry::size() const
+		{
+			unsigned long result = 0;
+
+			result += sizeof(stringID);
+			result += sizeof(fileID);
+			result += sizeof(playerID);
+			result += param3DRefOffset.size();
+			result += sizeof(volume);
+			result += sizeof(playerPriority);
+			result += sizeof(soundType);
+			result += sizeof(remoteFilter);
+			result += soundInfoRef.size();
+			result += sizeof(userParam1);
+			result += sizeof(userParam2);
+			result += sizeof(panMode);
+			result += sizeof(panCurve);
+			result += sizeof(actorPlayerID);
+			result += sizeof(reserved);
+			switch (soundType)
+			{
+				case sit_SEQUENCE:
+				{
+					result += seqSoundInfo.size();
+					break;
+				}
+				case sit_STREAM:
+				{
+					result += streamSoundInfo.size();
+					break;
+				}
+				case sit_WAVE:
+				{
+					result += waveSoundInfo.size();
+					break;
+				}
+				default:
+				{
+					break;
+				}
+			}
+			result += sound3DInfo.size();
+
+			return result;
+		}
 		bool brsarInfoSoundEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -982,6 +1080,16 @@ namespace lava
 			return result;
 		}
 
+		constexpr unsigned long brsarInfoBankEntry::size()
+		{
+			unsigned long result = 0;
+
+			result += sizeof(stringID);
+			result += sizeof(fileID);
+			result += sizeof(padding);
+
+			return result;
+		}
 		bool brsarInfoBankEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -1013,6 +1121,19 @@ namespace lava
 			return result;
 		}
 
+		constexpr unsigned long brsarInfoPlayerEntry::size()
+		{
+			unsigned long result = 0;
+
+			result += sizeof(stringID);
+			result += sizeof(playableSoundCount);
+			result += sizeof(padding);
+			result += sizeof(padding2);
+			result += sizeof(heapSize);
+			result += sizeof(reserved);
+
+			return result;
+		}
 		bool brsarInfoPlayerEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -1050,6 +1171,15 @@ namespace lava
 			return result;
 		}
 
+		constexpr unsigned long brsarInfoFileEntry::size()
+		{
+			unsigned long result = 0;
+
+			result += sizeof(groupID);
+			result += sizeof(index);
+
+			return result;
+		}
 		bool brsarInfoFileEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -1075,6 +1205,22 @@ namespace lava
 
 				result = destinationStream.good();
 			}
+			return result;
+		}
+
+		unsigned long brsarInfoFileHeader::size() const
+		{
+			unsigned result = 0;
+
+			result += sizeof(headerLength);
+			result += sizeof(dataLength);
+			result += sizeof(entryNumber);
+			result += stringOffset.size();
+			result += listOffset.size();
+			result += stringContent.size() * sizeof(unsigned char);
+			result += entryReferenceList.size();
+			result += entries.size() * brsarInfoFileEntry::size();
+
 			return result;
 		}
 		bool brsarInfoFileHeader::populate(lava::byteArray& bodyIn, std::size_t addressIn)
@@ -1117,6 +1263,19 @@ namespace lava
 			return result;
 		}
 
+		constexpr unsigned long brsarInfoGroupEntry::size()
+		{
+			unsigned long result = 0;
+
+			result += sizeof(fileID);
+			result += sizeof(headerOffset);
+			result += sizeof(headerLength);
+			result += sizeof(dataOffset);
+			result += sizeof(dataLength);
+			result += sizeof(reserved);
+
+			return result;
+		}
 		bool brsarInfoGroupEntry::populate(lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -1153,28 +1312,21 @@ namespace lava
 			}
 			return result;
 		}
-		unsigned long brsarInfoGroupHeader::getSynonymFileID(std::size_t headerLengthIn) const
+
+		unsigned long brsarInfoGroupHeader::size() const
 		{
-			unsigned long result = ULONG_MAX;
+			unsigned long result = 0;
 
-			for (unsigned long i = 0; result == ULONG_MAX && i < entries.size(); i++)
-			{
-				if (headerLengthIn == entries[i].headerLength)
-				{
-					result = entries[i].fileID;
-				}
-			}
-
-			return result;
-		}
-		bool brsarInfoGroupHeader::usesFileID(unsigned long fileIDIn) const
-		{
-			bool result = 0;
-
-			for (unsigned long i = 0; !result && i < entries.size(); i++)
-			{
-				result = fileIDIn == entries[i].fileID;
-			}
+			result += sizeof(groupID);
+			result += sizeof(entryNum);
+			result += extFilePathRef.size();
+			result += sizeof(headerAddress);
+			result += sizeof(headerLength);
+			result += sizeof(dataAddress);
+			result += sizeof(dataLength);
+			result += listOffset.size();
+			result += entryReferenceList.size();
+			result += entries.size() * brsarInfoGroupEntry::size();
 
 			return result;
 		}
@@ -1223,98 +1375,74 @@ namespace lava
 			}
 			return result;
 		}
-
-		brsarInfoGroupHeader* brsarInfoSection::getGroupWithID(unsigned long groupIDIn)
+		unsigned long brsarInfoGroupHeader::getSynonymFileID(std::size_t headerLengthIn) const
 		{
-			brsarInfoGroupHeader* result = nullptr;
+			unsigned long result = ULONG_MAX;
 
-			unsigned long i = 0;
-
-			while (result == nullptr && i < groupHeaders.size())
+			for (unsigned long i = 0; result == ULONG_MAX && i < entries.size(); i++)
 			{
-				if (groupIDIn == groupHeaders[i].groupID)
+				if (headerLengthIn == entries[i].headerLength)
 				{
-					result = &groupHeaders[i];
-				}
-				i++;
-			}
-
-			return result;
-		}
-		brsarInfoGroupHeader* brsarInfoSection::getGroupWithInfoIndex(unsigned long infoIndexIn)
-		{
-			brsarInfoGroupHeader* result = nullptr;
-
-			if (infoIndexIn < groupHeaders.size())
-			{
-				result = &groupHeaders[infoIndexIn];
-			}
-
-			return result;
-		}
-
-		std::vector<brsarInfoFileHeader*> brsarInfoSection::getFilesWithGroupID(unsigned long groupIDIn)
-		{
-			std::vector<brsarInfoFileHeader*> result{};
-
-			brsarInfoGroupHeader* targetGroupHeader = getGroupWithID(groupIDIn);
-			if (targetGroupHeader != nullptr)
-			{
-				for (unsigned long i = 0; i < targetGroupHeader->entries.size(); i++)
-				{
-					brsarInfoGroupEntry* currentGroupEntry = &targetGroupHeader->entries[i];
-					if (currentGroupEntry->fileID < fileHeaders.size())
-					{
-						result.push_back( &fileHeaders[currentGroupEntry->fileID]);
-					}
+					result = entries[i].fileID;
 				}
 			}
 
 			return result;
 		}
-		brsarInfoFileHeader* brsarInfoSection::getFileHeaderPointer(unsigned long fileID)
-		{
-			brsarInfoFileHeader* result = nullptr;
-
-			if (fileID < fileHeaders.size())
-			{
-				result = &fileHeaders[fileID];
-			}
-
-			return result;
-		}
-
-
-		bool brsarInfoSection::summarizeFileEntryData(std::ostream& output)
+		bool brsarInfoGroupHeader::usesFileID(unsigned long fileIDIn) const
 		{
 			bool result = 0;
-			if (output.good())
+
+			for (unsigned long i = 0; !result && i < entries.size(); i++)
 			{
-				output << "There are " << fileHeaders.size() << " File Info Entries(s) in this BRSAR:\n";
-				for (unsigned long i = 0; i < fileHeaders.size(); i++)
-				{
-					brsarInfoFileHeader* currHeaderPtr = &fileHeaders[i];
-					output << "File Info #" << i << " (@ 0x" << numToHexStringWithPadding(currHeaderPtr->address, 0x08) << "):\n";
-					output << "\tFile String: \"";
-					if (!currHeaderPtr->stringContent.empty())
-					{
-						output << std::string((char*)currHeaderPtr->stringContent.data());
-					}
-					output << "\"\n";
-					output << "\tFile Header Length: " << currHeaderPtr->headerLength << " byte(s)\n";
-					output << "\tFile Data Length: " << currHeaderPtr->dataLength << " byte(s)\n";
-					output << "\tFile Entry Number: " << currHeaderPtr->entryNumber << "\n";
-					output << "\tFile Entries:\n";
-					for (unsigned long u = 0; u < currHeaderPtr->entries.size(); u++)
-					{
-						brsarInfoFileEntry* currEntryPtr = &currHeaderPtr->entries[u];
-						output << "\tEntry #" << u << " (@ 0x" << numToHexStringWithPadding(currEntryPtr->address, 0x08) << "):\n";
-						output << "\t\tEntry Index: " << currEntryPtr->index << "\n";
-						output << "\t\tGroup ID: " << currEntryPtr->groupID << "\n";
-					}
-				}
-				result = output.good();
+				result = fileIDIn == entries[i].fileID;
 			}
+
+			return result;
+		}
+
+		unsigned long brsarInfoSection::size() const
+		{
+			unsigned long result = 0;
+
+			result += 0x04; // INFO Tag
+			result += sizeof(length);
+			result += soundsSectionReference.size();
+			result += banksSectionReference.size();
+			result += playerSectionReference.size();
+			result += filesSectionReference.size();
+			result += groupsSectionReference.size();
+			result += footerReference.size();
+			result += soundsSection.size();
+			for (std::size_t i = 0; i < soundEntries.size(); i++)
+			{
+				result += soundEntries[i].size();
+			}
+			result += banksSection.size();
+			result += bankEntries.size() * brsarInfoBankEntry::size();
+			result += playerSection.size();
+			result += playerEntries.size() * brsarInfoPlayerEntry::size();
+			result += filesSection.size();
+			for (std::size_t i = 0; i < fileHeaders.size(); i++)
+			{
+				result += fileHeaders[i].size();
+			}
+			result += groupsSection.size();
+			for (std::size_t i = 0; i < groupHeaders.size(); i++)
+			{
+				result += groupHeaders[i].size();
+			}
+
+			result += sizeof(sequenceMax);
+			result += sizeof(sequenceTrackMax);
+			result += sizeof(streamMax);
+			result += sizeof(streamTrackMax);
+			result += sizeof(streamChannelsMax);
+			result += sizeof(waveMax);
+			result += sizeof(waveTrackMax);
+			result += sizeof(padding);
+			result += sizeof(reserved);
+
 			return result;
 		}
 		bool brsarInfoSection::populate(lava::byteArray& bodyIn, std::size_t addressIn)
@@ -1349,25 +1477,25 @@ namespace lava
 					currSoundEntry->sound3DInfo.populate(bodyIn, currSoundEntry->param3DRefOffset.getAddress(address + 0x08));
 					switch (currSoundEntry->soundType)
 					{
-						case sit_SEQUENCE:
-						{
-							currSoundEntry->seqSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
-							break;
-						}
-						case sit_STREAM:
-						{
-							currSoundEntry->streamSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
-							break;
-						}
-						case sit_WAVE:
-						{
-							currSoundEntry->waveSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
-							break;
-						}
-						default:
-						{
-							break;
-						}
+					case sit_SEQUENCE:
+					{
+						currSoundEntry->seqSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
+						break;
+					}
+					case sit_STREAM:
+					{
+						currSoundEntry->streamSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
+						break;
+					}
+					case sit_WAVE:
+					{
+						currSoundEntry->waveSoundInfo.populate(bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
+						break;
+					}
+					default:
+					{
+						break;
+					}
 					}
 				}
 
@@ -1501,7 +1629,97 @@ namespace lava
 			}
 			return result;
 		}
+		brsarInfoGroupHeader* brsarInfoSection::getGroupWithID(unsigned long groupIDIn)
+		{
+			brsarInfoGroupHeader* result = nullptr;
 
+			unsigned long i = 0;
+
+			while (result == nullptr && i < groupHeaders.size())
+			{
+				if (groupIDIn == groupHeaders[i].groupID)
+				{
+					result = &groupHeaders[i];
+				}
+				i++;
+			}
+
+			return result;
+		}
+		brsarInfoGroupHeader* brsarInfoSection::getGroupWithInfoIndex(unsigned long infoIndexIn)
+		{
+			brsarInfoGroupHeader* result = nullptr;
+
+			if (infoIndexIn < groupHeaders.size())
+			{
+				result = &groupHeaders[infoIndexIn];
+			}
+
+			return result;
+		}
+		std::vector<brsarInfoFileHeader*> brsarInfoSection::getFilesWithGroupID(unsigned long groupIDIn)
+		{
+			std::vector<brsarInfoFileHeader*> result{};
+
+			brsarInfoGroupHeader* targetGroupHeader = getGroupWithID(groupIDIn);
+			if (targetGroupHeader != nullptr)
+			{
+				for (unsigned long i = 0; i < targetGroupHeader->entries.size(); i++)
+				{
+					brsarInfoGroupEntry* currentGroupEntry = &targetGroupHeader->entries[i];
+					if (currentGroupEntry->fileID < fileHeaders.size())
+					{
+						result.push_back( &fileHeaders[currentGroupEntry->fileID]);
+					}
+				}
+			}
+
+			return result;
+		}
+		brsarInfoFileHeader* brsarInfoSection::getFileHeaderPointer(unsigned long fileID)
+		{
+			brsarInfoFileHeader* result = nullptr;
+
+			if (fileID < fileHeaders.size())
+			{
+				result = &fileHeaders[fileID];
+			}
+
+			return result;
+		}
+		bool brsarInfoSection::summarizeFileEntryData(std::ostream& output)
+		{
+			bool result = 0;
+			if (output.good())
+			{
+				output << "There are " << fileHeaders.size() << " File Info Entries(s) in this BRSAR:\n";
+				for (unsigned long i = 0; i < fileHeaders.size(); i++)
+				{
+					brsarInfoFileHeader* currHeaderPtr = &fileHeaders[i];
+					output << "File Info #" << i << " (@ 0x" << numToHexStringWithPadding(currHeaderPtr->address, 0x08) << "):\n";
+					output << "\tFile String: \"";
+					if (!currHeaderPtr->stringContent.empty())
+					{
+						output << std::string((char*)currHeaderPtr->stringContent.data());
+					}
+					output << "\"\n";
+					output << "\tFile Header Length: " << currHeaderPtr->headerLength << " byte(s)\n";
+					output << "\tFile Data Length: " << currHeaderPtr->dataLength << " byte(s)\n";
+					output << "\tFile Entry Number: " << currHeaderPtr->entryNumber << "\n";
+					output << "\tFile Entries:\n";
+					for (unsigned long u = 0; u < currHeaderPtr->entries.size(); u++)
+					{
+						brsarInfoFileEntry* currEntryPtr = &currHeaderPtr->entries[u];
+						output << "\tEntry #" << u << " (@ 0x" << numToHexStringWithPadding(currEntryPtr->address, 0x08) << "):\n";
+						output << "\t\tEntry Index: " << currEntryPtr->index << "\n";
+						output << "\t\tGroup ID: " << currEntryPtr->groupID << "\n";
+					}
+				}
+				result = output.good();
+			}
+			return result;
+		}
+		
 		/* BRSAR Info Section */
 
 
