@@ -1148,6 +1148,30 @@ namespace lava
 				panCurve = bodyIn.getChar(cursor, &cursor);
 				actorPlayerID = bodyIn.getChar(cursor, &cursor);
 				reserved = bodyIn.getChar(cursor, &cursor);
+
+				result &= sound3DInfo.populate(*this, bodyIn, param3DRefOffset.getAddress(parent->getAddress() + 0x08));
+				switch (soundType)
+				{
+					case sit_SEQUENCE:
+					{
+						result &= seqSoundInfo.populate(*this, bodyIn, soundInfoRef.getAddress(parent->getAddress() + 0x08));
+						break;
+					}
+					case sit_STREAM:
+					{
+						result &= streamSoundInfo.populate(*this, bodyIn, soundInfoRef.getAddress(parent->getAddress() + 0x08));
+						break;
+					}
+					case sit_WAVE:
+					{
+						result &= waveSoundInfo.populate(*this, bodyIn, soundInfoRef.getAddress(parent->getAddress() + 0x08));
+						break;
+					}
+					default:
+					{
+						break;
+					}
+				}
 			}
 
 			return result;
@@ -1462,6 +1486,23 @@ namespace lava
 				entryNumber = bodyIn.getLong(cursor, &cursor);
 				stringOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
 				listOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
+
+				if (stringOffset.getAddress() != 0x00)
+				{
+					std::string measurementString = bodyIn.data() + (stringOffset.getAddress(parent->getAddress() + 0x08));
+					std::size_t sizePrescription = measurementString.size() + (0x04 - (measurementString.size() % 0x04));
+					stringContent = bodyIn.getBytes(sizePrescription, stringOffset.getAddress(parent->getAddress() + 0x08));
+					result &= stringContent.size() == sizePrescription;
+				}
+				if (listOffset.getAddress() != 0x00)
+				{
+					result &= entryReferenceList.populate(bodyIn, listOffset.getAddress(parent->getAddress() + 0x08));
+					for (std::size_t u = 0; u < entryReferenceList.refs.size(); u++)
+					{
+						entries.push_back(brsarInfoFileEntry());
+						result &= entries.back().populate(*this, bodyIn, entryReferenceList.refs[u].getAddress(parent->getAddress() + 0x08));
+					}
+				}
 			}
 
 			return result;
@@ -1587,6 +1628,7 @@ namespace lava
 
 			if (bodyIn.populated())
 			{
+				result = 1;
 				originalAddress = addressIn;
 				parent = &parentIn;
 
@@ -1601,7 +1643,12 @@ namespace lava
 				dataLength = bodyIn.getLong(cursor, &cursor);
 				listOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
 
-				result = 1;
+				result &= entryReferenceList.populate(bodyIn, listOffset.getAddress(parent->getAddress() + 0x08));
+				for (std::size_t u = 0; u < entryReferenceList.refs.size(); u++)
+				{
+					entries.push_back(brsarInfoGroupEntry());
+					result &= entries.back().populate(*this, bodyIn, entryReferenceList.refs[u].getAddress(parent->getAddress() + 0x08));
+				}
 			}
 
 			return result;
@@ -1795,29 +1842,6 @@ namespace lava
 				{
 					currSoundEntry = &soundEntries[i];
 					result &= currSoundEntry->populate(*this, bodyIn, soundsSection.refs[i].getAddress(address + 0x08));
-					currSoundEntry->sound3DInfo.populate(*currSoundEntry, bodyIn, currSoundEntry->param3DRefOffset.getAddress(address + 0x08));
-					switch (currSoundEntry->soundType)
-					{
-					case sit_SEQUENCE:
-					{
-						currSoundEntry->seqSoundInfo.populate(*currSoundEntry, bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
-						break;
-					}
-					case sit_STREAM:
-					{
-						currSoundEntry->streamSoundInfo.populate(*currSoundEntry, bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
-						break;
-					}
-					case sit_WAVE:
-					{
-						currSoundEntry->waveSoundInfo.populate(*currSoundEntry, bodyIn, currSoundEntry->soundInfoRef.getAddress(address + 0x08));
-						break;
-					}
-					default:
-					{
-						break;
-					}
-					}
 				}
 				updateSoundEntryOffsetValues();
 
@@ -1841,22 +1865,6 @@ namespace lava
 				{
 					currFileHeader = &fileHeaders[i];
 					currFileHeader->populate(*this, bodyIn, filesSection.refs[i].getAddress(address + 0x08));
-					if (currFileHeader->stringOffset.getAddress() != 0x00)
-					{
-						std::string measurementString = bodyIn.data() + (currFileHeader->stringOffset.getAddress(address + 0x08));
-						std::size_t sizePrescription = measurementString.size() + (0x04 - (measurementString.size() % 0x04));
-						currFileHeader->stringContent = bodyIn.getBytes(sizePrescription, currFileHeader->stringOffset.getAddress(address + 0x08));
-						result &= currFileHeader->stringContent.size() == sizePrescription;
-					}
-					if (currFileHeader->listOffset.getAddress() != 0x00)
-					{
-						result &= currFileHeader->entryReferenceList.populate(bodyIn, currFileHeader->listOffset.getAddress(address + 0x08));
-						for (std::size_t u = 0; u < currFileHeader->entryReferenceList.refs.size(); u++)
-						{
-							currFileHeader->entries.push_back(brsarInfoFileEntry());
-							result &= currFileHeader->entries.back().populate(*currFileHeader, bodyIn, currFileHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
-						}
-					}
 				}
 				updateFileHeaderOffsetValues();
 
@@ -1866,13 +1874,6 @@ namespace lava
 				{
 					currGroupHeader = &groupHeaders[i];
 					currGroupHeader->populate(*this, bodyIn, groupsSection.refs[i].getAddress(address + 0x08));
-					result &= currGroupHeader->entryReferenceList.populate(bodyIn, currGroupHeader->listOffset.getAddress(address + 0x08));
-
-					for (std::size_t u = 0; u < currGroupHeader->entryReferenceList.refs.size(); u++)
-					{
-						currGroupHeader->entries.push_back(brsarInfoGroupEntry());
-						result &= currGroupHeader->entries.back().populate(*currGroupHeader, bodyIn, currGroupHeader->entryReferenceList.refs[u].getAddress(address + 0x08));
-					}
 				}
 				updateGroupHeaderOffsetValues();
 				
