@@ -17,7 +17,7 @@ const std::string testFilePath = testFileName + testFileSuffix;
 const std::string testFileOutputPath = testFileName + "_edit" + testFileSuffix;
 
 // Test which overwrites File 0x06 with itself, shouldn't actually change anything.
-constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = true;
+constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = false;
 // Test which overwrites File 0x06's header and data with zeroed-out 0x20 byte vectors.
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_2 = false;
 // Test which exports the entire .brsar.

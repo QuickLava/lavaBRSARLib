@@ -86,7 +86,7 @@ namespace lava
 
 		constexpr unsigned long brawlReference::size()
 		{
-			return 0x08;
+			return sizeof(addressType) + sizeof(address);
 		}
 		brawlReference::brawlReference(unsigned long long valueIn)
 		{
@@ -121,7 +121,7 @@ namespace lava
 
 		unsigned long brawlReferenceVector::size() const
 		{
-			return 0x04 + (refs.size() * brawlReference::size());
+			return sizeof(unsigned long) + (refs.size() * brawlReference::size());
 		}
 		bool brawlReferenceVector::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
@@ -169,6 +169,16 @@ namespace lava
 				}
 				result = destinationStream.good();
 			}
+
+			return result;
+		}
+
+		unsigned long calcRefVecSize(unsigned long entryCount)
+		{
+			unsigned long result = 0;
+
+			result += sizeof(unsigned long); // Count Value
+			result += sizeof(unsigned long long) * entryCount;
 
 			return result;
 		}
@@ -1685,7 +1695,7 @@ namespace lava
 				return result;
 			}
 
-			result += soundsSection.size();
+			result += calcRefVecSize(soundEntries.size());
 			for (std::size_t i = 0; i < soundEntries.size(); i++)
 			{
 				result += soundEntries[i].size();
@@ -1695,21 +1705,21 @@ namespace lava
 				return result;
 			}
 
-			result += banksSection.size();
+			result += calcRefVecSize(bankEntries.size());
 			result += bankEntries.size() * brsarInfoBankEntry::size();
 			if (tallyUpTo <= infoSectionLandmark::iSL_BankEntries)
 			{
 				return result;
 			}
 
-			result += playerSection.size();
+			result += calcRefVecSize(playerEntries.size());
 			result += playerEntries.size() * brsarInfoPlayerEntry::size();
 			if (tallyUpTo <= infoSectionLandmark::iSL_PlayerEntries)
 			{
 				return result;
 			}
 
-			result += filesSection.size();
+			result += calcRefVecSize(fileHeaders.size());
 			for (std::size_t i = 0; i < fileHeaders.size(); i++)
 			{
 				result += fileHeaders[i].size();
@@ -1719,7 +1729,7 @@ namespace lava
 				return result;
 			}
 
-			result += groupsSection.size();
+			result += calcRefVecSize(groupHeaders.size());
 			for (std::size_t i = 0; i < groupHeaders.size(); i++)
 			{
 				result += groupHeaders[i].size();
@@ -1766,6 +1776,12 @@ namespace lava
 				filesSectionReference = brawlReference(bodyIn.getLLong(address + 0x20));
 				groupsSectionReference = brawlReference(bodyIn.getLLong(address + 0x28));
 				footerReference = brawlReference(bodyIn.getLLong(address + 0x30));
+
+				brawlReferenceVector soundsSection;
+				brawlReferenceVector banksSection;
+				brawlReferenceVector playerSection;
+				brawlReferenceVector filesSection;
+				brawlReferenceVector groupsSection;
 
 				result &= soundsSection.populate(bodyIn, soundsSectionReference.getAddress(address + 0x08));
 				result &= banksSection.populate(bodyIn, banksSectionReference.getAddress(address + 0x08));
@@ -1892,31 +1908,37 @@ namespace lava
 				lava::writeRawDataToStream(destinationStream, filesSectionReference.getHex());
 				lava::writeRawDataToStream(destinationStream, groupsSectionReference.getHex());
 				lava::writeRawDataToStream(destinationStream, footerReference.getHex());
-				soundsSection.exportContents(destinationStream);
+
+				writeSoundRefVec(destinationStream);
 				for (std::size_t i = 0; i < soundEntries.size(); i++)
 				{
 					soundEntries[i].exportContents(destinationStream);
 				}
-				banksSection.exportContents(destinationStream);
+
+				writeBankRefVec(destinationStream);
 				for (std::size_t i = 0; i < bankEntries.size(); i++)
 				{
 					bankEntries[i].exportContents(destinationStream);
 				}
-				playerSection.exportContents(destinationStream);
+
+				writePlayerRefVec(destinationStream);
 				for (std::size_t i = 0; i < playerEntries.size(); i++)
 				{
 					playerEntries[i].exportContents(destinationStream);
 				}
-				filesSection.exportContents(destinationStream);
+
+				writeFileRefVec(destinationStream);
 				for (std::size_t i = 0; i < fileHeaders.size(); i++)
 				{
 					fileHeaders[i].exportContents(destinationStream);
 				}
-				groupsSection.exportContents(destinationStream);
+
+				writeGroupRefVec(destinationStream);
 				for (std::size_t i = 0; i < groupHeaders.size(); i++)
 				{
 					groupHeaders[i].exportContents(destinationStream);
 				}
+
 				unsigned long pos = destinationStream.tellp();
 
 				lava::writeRawDataToStream(destinationStream, sequenceMax);
@@ -1943,10 +1965,97 @@ namespace lava
 			return result;
 		}
 
+		
+		unsigned long brsarInfoSection::writeSoundRefVec(std::ostream& destinationStream) const
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, unsigned long(soundEntries.size()));
+				for (std::size_t i = 0; i < soundEntries.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
+					lava::writeRawDataToStream(destinationStream, soundEntries[i].parentRelativeOffset - 0x08);
+				}
+				result = destinationStream.good();
+			}
+
+			return result;
+		}
+		unsigned long brsarInfoSection::writeBankRefVec(std::ostream& destinationStream) const
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, unsigned long(bankEntries.size()));
+				for (std::size_t i = 0; i < bankEntries.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
+					lava::writeRawDataToStream(destinationStream, bankEntries[i].parentRelativeOffset - 0x08);
+				}
+				result = destinationStream.good();
+			}
+
+			return result;
+		}
+		unsigned long brsarInfoSection::writePlayerRefVec(std::ostream& destinationStream) const
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, unsigned long(playerEntries.size()));
+				for (std::size_t i = 0; i < playerEntries.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
+					lava::writeRawDataToStream(destinationStream, playerEntries[i].parentRelativeOffset - 0x08);
+				}
+				result = destinationStream.good();
+			}
+
+			return result;
+		}
+		unsigned long brsarInfoSection::writeFileRefVec(std::ostream& destinationStream) const
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, unsigned long(fileHeaders.size()));
+				for (std::size_t i = 0; i < fileHeaders.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
+					lava::writeRawDataToStream(destinationStream, fileHeaders[i].parentRelativeOffset - 0x08);
+				}
+				result = destinationStream.good();
+			}
+
+			return result;
+		}
+		unsigned long brsarInfoSection::writeGroupRefVec(std::ostream& destinationStream) const
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, unsigned long(groupHeaders.size()));
+				for (std::size_t i = 0; i < groupHeaders.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
+					lava::writeRawDataToStream(destinationStream, groupHeaders[i].parentRelativeOffset - 0x08);
+				}
+				result = destinationStream.good();
+			}
+
+			return result;
+		}
+
 		void brsarInfoSection::updateSoundEntryOffsetValues()
 		{
 			unsigned long relativeOffset = size(infoSectionLandmark::iSL_VecReferences); // Get size up to and including the vector references.
-			relativeOffset += soundsSection.size();
+			relativeOffset += calcRefVecSize(soundEntries.size());
 			for (std::size_t i = 0; i < soundEntries.size(); i++)
 			{
 				soundEntries[i].parentRelativeOffset = relativeOffset;
@@ -1962,7 +2071,7 @@ namespace lava
 		void brsarInfoSection::updateBankEntryOffsetValues()
 		{
 			unsigned long relativeOffset = size(infoSectionLandmark::iSL_SoundEntries); // Get size up to and including the sound entries.
-			relativeOffset += banksSection.size();
+			relativeOffset += calcRefVecSize(bankEntries.size());
 			for (std::size_t i = 0; i < bankEntries.size(); i++)
 			{
 				bankEntries[i].parentRelativeOffset = relativeOffset;
@@ -1972,7 +2081,7 @@ namespace lava
 		void brsarInfoSection::updatePlayerEntryOffsetValues()
 		{
 			unsigned long relativeOffset = size(infoSectionLandmark::iSL_BankEntries); // Get size up to and including the bank entries.
-			relativeOffset += playerSection.size();
+			relativeOffset += calcRefVecSize(playerEntries.size());
 			for (std::size_t i = 0; i < playerEntries.size(); i++)
 			{
 				playerEntries[i].parentRelativeOffset = relativeOffset;
@@ -1982,7 +2091,7 @@ namespace lava
 		void brsarInfoSection::updateFileHeaderOffsetValues()
 		{
 			unsigned long relativeOffset = size(infoSectionLandmark::iSL_PlayerEntries); // Get size up to and including the player entries.
-			relativeOffset += filesSection.size();
+			relativeOffset += calcRefVecSize(fileHeaders.size());
 			for (std::size_t i = 0; i < fileHeaders.size(); i++)
 			{
 				fileHeaders[i].parentRelativeOffset = relativeOffset;
@@ -1993,7 +2102,7 @@ namespace lava
 		void brsarInfoSection::updateGroupHeaderOffsetValues()
 		{
 			unsigned long relativeOffset = size(infoSectionLandmark::iSL_FileHeaders); // Get size up to and including the file headers.
-			relativeOffset += groupsSection.size();
+			relativeOffset += calcRefVecSize(groupHeaders.size());
 			for (std::size_t i = 0; i < groupHeaders.size(); i++)
 			{
 				groupHeaders[i].parentRelativeOffset = relativeOffset;

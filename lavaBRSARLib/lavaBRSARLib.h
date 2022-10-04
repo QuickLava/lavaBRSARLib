@@ -104,6 +104,7 @@ namespace lava
 
 			bool exportContents(std::ostream& destinationStream) const;
 		};
+		unsigned long calcRefVecSize(unsigned long entryCount);
 
 		/* Brawl Reference */
 
@@ -561,12 +562,6 @@ namespace lava
 			brawlReference groupsSectionReference = ULLONG_MAX;
 			brawlReference footerReference = ULLONG_MAX;
 
-			brawlReferenceVector soundsSection;
-			brawlReferenceVector banksSection;
-			brawlReferenceVector playerSection;
-			brawlReferenceVector filesSection;
-			brawlReferenceVector groupsSection;
-
 			std::vector<brsarInfoSoundEntry> soundEntries{};
 			std::vector<brsarInfoBankEntry> bankEntries;
 			std::vector<brsarInfoPlayerEntry> playerEntries;
@@ -590,6 +585,12 @@ namespace lava
 			unsigned long getAddress() const;
 			bool populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
+
+			unsigned long writeSoundRefVec(std::ostream& destinationStream) const;
+			unsigned long writeBankRefVec(std::ostream& destinationStream) const;
+			unsigned long writePlayerRefVec(std::ostream& destinationStream) const;
+			unsigned long writeFileRefVec(std::ostream& destinationStream) const;
+			unsigned long writeGroupRefVec(std::ostream& destinationStream) const;
 
 			void updateSoundEntryOffsetValues();
 			void updateBankEntryOffsetValues();
