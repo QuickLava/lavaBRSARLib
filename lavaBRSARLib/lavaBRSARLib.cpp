@@ -688,9 +688,9 @@ namespace lava
 		}
 		unsigned long brsarSymbSection::getAddress() const
 		{
-			return (parent != nullptr) ? parent->calculateSYMBSectionAddress() : ULONG_MAX;
+			return (parent != nullptr) ? parent->getSYMBSectionAddress() : ULONG_MAX;
 		}
-		bool brsarSymbSection::populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
+		bool brsarSymbSection::populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
@@ -732,6 +732,8 @@ namespace lava
 						stringBlock = bodyIn.getBytes(stringBlockEndAddr - stringBlockStartAddr, stringBlockStartAddr);
 					}
 				}
+
+				parent->signalSYMBSectionSizeChange();
 			}
 
 			return result;
@@ -1745,9 +1747,9 @@ namespace lava
 		}
 		unsigned long brsarInfoSection::getAddress() const
 		{
-			return (parent != nullptr) ? parent->calculateINFOSectionAddress() : ULONG_MAX;
+			return (parent != nullptr) ? parent->getINFOSectionAddress() : ULONG_MAX;
 		}
-		bool brsarInfoSection::populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
+		bool brsarInfoSection::populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
@@ -1868,6 +1870,8 @@ namespace lava
 				waveTrackMax = bodyIn.getShort(cursor, &cursor);
 				padding = bodyIn.getShort(cursor, &cursor);
 				reserved = bodyIn.getLong(cursor, &cursor);
+
+				parent->signalINFOSectionSizeChange();
 			}
 
 			return result;
@@ -2099,6 +2103,14 @@ namespace lava
 		{
 			return header.size() + data.size();
 		}
+		unsigned long brsarFileFileContents::getHeaderAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeHeaderOffset : ULONG_MAX;
+		}
+		unsigned long brsarFileFileContents::getDataAddress() const
+		{
+			return (parent != nullptr) ? parent->getAddress() + parentRelativeDataOffset : ULONG_MAX;
+		}
 		bool brsarFileFileContents::dumpToStream(std::ostream& output)
 		{
 			bool result = 0;
@@ -2188,9 +2200,9 @@ namespace lava
 		}
 		unsigned long brsarFileSection::getAddress() const
 		{
-			return (parent != nullptr) ? parent->calculateFILESectionAddress() : ULONG_MAX;
+			return (parent != nullptr) ? parent->getFILESectionAddress() : ULONG_MAX;
 		}
-		bool brsarFileSection::populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn)
+		bool brsarFileSection::populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn)
 		{
 			bool result = 0;
 
@@ -2198,7 +2210,7 @@ namespace lava
 			{
 				result = 1;
 				parent = &parentIn;
-				address = addressIn;
+				originalAddress = addressIn;
 
 				//length = bodyIn.getLong(address + 0x04); No longer needed!
 				brsarInfoGroupHeader* currHeader = nullptr;
@@ -2213,13 +2225,20 @@ namespace lava
 						fileContents.back().fileID = currEntry->fileID;
 						fileContents.back().groupInfoIndex = i;
 						fileContents.back().groupID = currHeader->groupID;
-						fileContents.back().headerAddress = currHeader->headerAddress + currEntry->headerOffset;
+						fileContents.back().originalHeaderAddress = currHeader->headerAddress + currEntry->headerOffset;
 						fileContents.back().header = bodyIn.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset);
-						fileContents.back().dataAddress = currHeader->dataAddress + currEntry->dataOffset;
+						fileContents.back().originalDataAddress = currHeader->dataAddress + currEntry->dataOffset;
 						fileContents.back().data = bodyIn.getBytes(currEntry->dataLength, currHeader->dataAddress + currEntry->dataOffset);
+
+						fileContents.back().parent = this;
+						fileContents.back().parentRelativeHeaderOffset = fileContents.back().originalHeaderAddress - getAddress();
+						fileContents.back().parentRelativeDataOffset = fileContents.back().originalDataAddress - getAddress();
+
 						fileIDToIndex[currEntry->fileID].push_back(fileContents.size() - 1);
 					}
 				}
+
+				parent->signalFILESectionSizeChange();
 			}
 
 			return result;
@@ -2236,17 +2255,17 @@ namespace lava
 				for (unsigned long i = 0; i < fileContents.size(); i++)
 				{
 					brsarFileFileContents* currFilePtr = &fileContents[i];
-					if (currFilePtr->headerAddress > address)
+					if (currFilePtr->getHeaderAddress() > getAddress())
 					{
-						tempArray.setBytes(currFilePtr->header, currFilePtr->headerAddress - address);
+						tempArray.setBytes(currFilePtr->header, currFilePtr->getHeaderAddress() - getAddress());
 					}
 					else
 					{
 						std::cerr << "Invalid header address!\n";
 					}
-					if (currFilePtr->dataAddress > address)
+					if (currFilePtr->getDataAddress() > getAddress())
 					{
-						tempArray.setBytes(currFilePtr->data, currFilePtr->dataAddress - address);
+						tempArray.setBytes(currFilePtr->data, currFilePtr->getDataAddress() - getAddress());
 					}
 					else
 					{
@@ -2300,8 +2319,8 @@ namespace lava
 			for (unsigned long i = 0; i < fileContents.size(); i++)
 			{
 				brsarFileFileContents* currFile = &fileContents[i];
-				adjustOffset(0x00, currFile->headerAddress, changeAmount, pastThisAddress);
-				adjustOffset(0x00, currFile->dataAddress, changeAmount, pastThisAddress);
+				adjustOffset(getAddress(), currFile->parentRelativeHeaderOffset, changeAmount, pastThisAddress);
+				adjustOffset(getAddress(), currFile->parentRelativeDataOffset, changeAmount, pastThisAddress);
 			}
 
 			return result;
@@ -2939,9 +2958,9 @@ namespace lava
 
 		/* BRSAR */
 
-		unsigned long brsar::size() const
+		unsigned long brsar::size()
 		{
-			return headerLength + symbSection.paddedSize() + infoSection.paddedSize() + fileSection.size();
+			return headerLength + getSYMBSectionSize() + getINFOSectionSize() + getFILESectionSize();
 		}
 		bool brsar::init(std::string filePathIn)
 		{
@@ -2966,6 +2985,8 @@ namespace lava
 					result &= symbSection.populate(*this, contents, contents.getLong(0x10));
 					result &= infoSection.populate(*this, contents, contents.getLong(0x18));
 					result &= fileSection.populate(*this, contents, contents.getLong(0x20), infoSection);
+
+					updateInfoSectionFileOffsets();
 				}
 			}
 			return result;
@@ -2980,11 +3001,11 @@ namespace lava
 			writeRawDataToStream(destinationStream, size());
 			writeRawDataToStream(destinationStream, headerLength);
 			writeRawDataToStream(destinationStream, sectionCount);
-			writeRawDataToStream(destinationStream, calculateSYMBSectionAddress());
+			writeRawDataToStream(destinationStream, getSYMBSectionAddress());
 			writeRawDataToStream(destinationStream, symbSection.paddedSize());
-			writeRawDataToStream(destinationStream, calculateINFOSectionAddress());
+			writeRawDataToStream(destinationStream, getINFOSectionAddress());
 			writeRawDataToStream(destinationStream, infoSection.paddedSize());
-			writeRawDataToStream(destinationStream, calculateFILESectionAddress());
+			writeRawDataToStream(destinationStream, getFILESectionAddress());
 			writeRawDataToStream(destinationStream, fileSection.size());
 			if (headerLength > destinationStream.tellp())
 			{
@@ -3010,17 +3031,55 @@ namespace lava
 			return result;
 		}
 
-		unsigned long brsar::calculateSYMBSectionAddress() const
+		void brsar::signalSYMBSectionSizeChange()
+		{
+			symbSectionCachedSize = ULONG_MAX;
+		}
+		void brsar::signalINFOSectionSizeChange()
+		{
+			infoSectionCachedSize = ULONG_MAX;
+		}
+		void brsar::signalFILESectionSizeChange()
+		{
+			fileSectionCachedSize = ULONG_MAX;
+		}
+
+		unsigned long brsar::getSYMBSectionSize()
+		{
+			if (symbSectionCachedSize == ULONG_MAX)
+			{
+				symbSectionCachedSize = symbSection.paddedSize();
+			}
+			return symbSectionCachedSize;
+		}
+		unsigned long brsar::getINFOSectionSize()
+		{
+			if (infoSectionCachedSize == ULONG_MAX)
+			{
+				infoSectionCachedSize = infoSection.paddedSize();
+			}
+			return infoSectionCachedSize;
+		}
+		unsigned long brsar::getFILESectionSize()
+		{
+			if (fileSectionCachedSize == ULONG_MAX)
+			{
+				fileSectionCachedSize = fileSection.size();
+			}
+			return fileSectionCachedSize;
+		}
+
+		unsigned long brsar::getSYMBSectionAddress()
 		{
 			return headerLength;
 		}
-		unsigned long brsar::calculateINFOSectionAddress() const
+		unsigned long brsar::getINFOSectionAddress()
 		{
-			return calculateSYMBSectionAddress() + symbSection.paddedSize();
+			return headerLength + getSYMBSectionSize();
 		}
-		unsigned long brsar::calculateFILESectionAddress() const
+		unsigned long brsar::getFILESectionAddress()
 		{
-			return calculateINFOSectionAddress() + infoSection.paddedSize();
+			return headerLength + getSYMBSectionSize() + getINFOSectionSize();
 		}
 
 		std::string brsar::getSymbString(unsigned long indexIn)
@@ -3080,8 +3139,8 @@ namespace lava
 							if (u == 0)
 							{
 								// ... update the header and data address values to point to the right spots.
-								currGroupHeader->headerAddress = currFileContents->headerAddress;
-								currGroupHeader->dataAddress = currFileContents->dataAddress;
+								currGroupHeader->headerAddress = currFileContents->getHeaderAddress();
+								currGroupHeader->dataAddress = currFileContents->getDataAddress();
 							}
 							// Additionally, we'll always update the offset values if we're on the first entry.
 							if (u == 0)
@@ -3157,9 +3216,8 @@ namespace lava
 						currOccurence->data = dataIn;
 						// Propogate the changes in size across the fileSection
 						// Note that this needs to be done in two steps, because the dataAddress will likely change after the first step.
-						result &= fileSection.propogateFileLengthChange(headerLengthChange, currOccurence->headerAddress);
-						result &= fileSection.propogateFileLengthChange(dataLengthChange, currOccurence->dataAddress);
-						// Update BRSAR's length value.
+						result &= fileSection.propogateFileLengthChange(headerLengthChange, currOccurence->getHeaderAddress());
+						result &= fileSection.propogateFileLengthChange(dataLengthChange, currOccurence->getDataAddress());
 						// Note that the above propogation functions will update the FILE section's length.
 					}
 					// Update this file's fileHeader (it's the only one that needs its length updated)
@@ -3230,7 +3288,7 @@ namespace lava
 						brsarFileFileContents* fileContentsPtr = &fileSection.fileContents[(*idToIndexVecPtr)[y]];
 						if (fileContentsPtr->groupID == currHeader->groupID)
 						{
-							metadataOutput << "\tFile " << numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << numToHexStringWithPadding(fileContentsPtr->headerAddress, 0x08) << "\n";
+							metadataOutput << "\tFile " << numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << numToHexStringWithPadding(fileContentsPtr->getHeaderAddress(), 0x08) << "\n";
 							metadataOutput << "\t\tFile Type: ";
 							if (fileContentsPtr->header.size() >= 0x04)
 							{

@@ -17,7 +17,7 @@ const std::string testFilePath = testFileName + testFileSuffix;
 const std::string testFileOutputPath = testFileName + "_edit" + testFileSuffix;
 
 // Test which overwrites File 0x06 with itself, shouldn't actually change anything.
-constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = false;
+constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = true;
 // Test which overwrites File 0x06's header and data with zeroed-out 0x20 byte vectors.
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_2 = false;
 // Test which exports the entire .brsar.
@@ -33,7 +33,7 @@ constexpr bool ENABLE_FILE_DUMP_TEST = false;
 // Test which dumps all the strings in the SYMB section.
 constexpr bool ENABLE_STRING_DUMP_TEST = false;
 // Test which summarizes data for every brsarInfoFileHeader in the .brsar.
-constexpr bool ENABLE_FILE_INFO_SUMMARY_TEST = false;
+constexpr bool ENABLE_FILE_INFO_SUMMARY_TEST = true;
 // Tests the .spt to .dsp header conversion system (see "lavaDSP.h").
 constexpr bool ENABLE_SPT_TO_DSP_HEADER_TEST = false;
 // Tests exporting an RWSD Wave Info entry into a DSP.

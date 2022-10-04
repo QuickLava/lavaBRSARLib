@@ -257,7 +257,7 @@ namespace lava
 		};
 		struct brsarSymbSection
 		{
-			const brsar* parent = nullptr;
+			brsar* parent = nullptr;
 
 			unsigned long address = ULONG_MAX;
 
@@ -280,7 +280,7 @@ namespace lava
 			unsigned long size() const;
 			unsigned long paddedSize(unsigned long padTo = 0x20) const;
 			unsigned long getAddress() const;
-			bool populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
+			bool populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream) const;
 
 			std::string getString(std::size_t idIn) const;
@@ -550,7 +550,7 @@ namespace lava
 				iSL_Footer,
 			};
 
-			const brsar* parent = nullptr;
+			brsar* parent = nullptr;
 
 			unsigned long address = ULONG_MAX;
 
@@ -588,7 +588,7 @@ namespace lava
 			unsigned long size(infoSectionLandmark tallyUpTo = infoSectionLandmark::iSL_Footer) const;
 			unsigned long paddedSize(unsigned long padTo = 0x10) const;
 			unsigned long getAddress() const;
-			bool populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
+			bool populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 
 			void updateSoundEntryOffsetValues();
@@ -610,17 +610,25 @@ namespace lava
 
 		/* BRSAR File Section */
 
+		struct brsarFileSection; // File Section Forward Decl.
+
 		struct brsarFileFileContents
 		{
+			const brsarFileSection* parent = nullptr;
+			unsigned long parentRelativeHeaderOffset = ULONG_MAX;
+			unsigned long parentRelativeDataOffset = ULONG_MAX;
+
 			unsigned long groupInfoIndex = ULONG_MAX;
 			unsigned long groupID = ULONG_MAX;
 			unsigned long fileID = ULONG_MAX;
-			unsigned long headerAddress = SIZE_MAX;
+			unsigned long originalHeaderAddress = SIZE_MAX;
 			std::vector<unsigned char> header{};
-			unsigned long dataAddress = SIZE_MAX;
+			unsigned long originalDataAddress = SIZE_MAX;
 			std::vector<unsigned char> data{};
 
 			unsigned long size() const;
+			unsigned long getHeaderAddress() const;
+			unsigned long getDataAddress() const;
 			bool dumpToStream(std::ostream& output);
 			bool dumpHeaderToStream(std::ostream& output);
 			bool dumpDataToStream(std::ostream& output);
@@ -630,16 +638,16 @@ namespace lava
 		};
 		struct brsarFileSection
 		{
-			const brsar* parent = nullptr;
+			brsar* parent = nullptr;
 
-			unsigned long address = ULONG_MAX;
+			unsigned long originalAddress = ULONG_MAX;
 
 			std::vector<brsarFileFileContents> fileContents{};
 			std::unordered_map<unsigned long, std::vector<std::size_t>> fileIDToIndex{};
 
 			unsigned long size() const;
 			unsigned long getAddress() const;
-			bool populate(const brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
+			bool populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn);
 			bool exportContents(std::ostream& destinationStream);
 			std::vector<brsarFileFileContents*> getFileContentsPointerVector(unsigned long fileID);
 			brsarFileFileContents* getFileContentsPointer(unsigned long fileID, unsigned long groupID = ULONG_MAX);
@@ -757,13 +765,28 @@ namespace lava
 			brsarInfoSection infoSection;
 			brsarFileSection fileSection;
 
-			unsigned long size() const;
+		private:
+			unsigned long symbSectionCachedSize = ULONG_MAX;
+			unsigned long infoSectionCachedSize = ULONG_MAX;
+			unsigned long fileSectionCachedSize = ULONG_MAX;
+		public:
+
+			unsigned long size();
 			bool init(std::string filePathIn);
 			bool exportContents(std::ostream& destinationStream);
 			bool exportContents(std::string outputFilename);
-			unsigned long calculateSYMBSectionAddress() const;
-			unsigned long calculateINFOSectionAddress() const;
-			unsigned long calculateFILESectionAddress() const;
+
+			void signalSYMBSectionSizeChange();
+			void signalINFOSectionSizeChange();
+			void signalFILESectionSizeChange();
+
+			unsigned long getSYMBSectionSize();
+			unsigned long getINFOSectionSize();
+			unsigned long getFILESectionSize();
+
+			unsigned long getSYMBSectionAddress();
+			unsigned long getINFOSectionAddress();
+			unsigned long getFILESectionAddress();
 
 			std::string getSymbString(unsigned long indexIn);
 			unsigned long getGroupOffset(unsigned long groupIDIn);
