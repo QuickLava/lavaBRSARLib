@@ -562,11 +562,11 @@ namespace lava
 			brawlReference groupsSectionReference = ULLONG_MAX;
 			brawlReference footerReference = ULLONG_MAX;
 
-			std::vector<brsarInfoSoundEntry> soundEntries{};
+			std::vector<std::unique_ptr<brsarInfoSoundEntry>> soundEntries{};
 			std::vector<brsarInfoBankEntry> bankEntries;
 			std::vector<brsarInfoPlayerEntry> playerEntries;
-			std::vector<brsarInfoFileHeader> fileHeaders{};
-			std::vector<brsarInfoGroupHeader> groupHeaders{};
+			std::vector<std::unique_ptr<brsarInfoFileHeader>> fileHeaders{};
+			std::vector<std::unique_ptr<brsarInfoGroupHeader>> groupHeaders{};
 
 			// Footer
 			unsigned short sequenceMax = USHRT_MAX;

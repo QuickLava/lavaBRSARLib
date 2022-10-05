@@ -1819,7 +1819,7 @@ namespace lava
 			result += calcRefVecSize(soundEntries.size());
 			for (std::size_t i = 0; i < soundEntries.size(); i++)
 			{
-				result += soundEntries[i].size();
+				result += soundEntries[i]->size();
 			}
 			if (tallyUpTo <= infoSectionLandmark::iSL_SoundEntries)
 			{
@@ -1843,7 +1843,7 @@ namespace lava
 			result += calcRefVecSize(fileHeaders.size());
 			for (std::size_t i = 0; i < fileHeaders.size(); i++)
 			{
-				result += fileHeaders[i].size();
+				result += fileHeaders[i]->size();
 			}
 			if (tallyUpTo <= infoSectionLandmark::iSL_FileHeaders)
 			{
@@ -1853,7 +1853,7 @@ namespace lava
 			result += calcRefVecSize(groupHeaders.size());
 			for (std::size_t i = 0; i < groupHeaders.size(); i++)
 			{
-				result += groupHeaders[i].size();
+				result += groupHeaders[i]->size();
 			}
 			if (tallyUpTo <= infoSectionLandmark::iSL_GroupHeaders)
 			{
@@ -1914,7 +1914,8 @@ namespace lava
 				soundEntries.resize(soundsSection.refs.size());
 				for (std::size_t i = 0; i < soundsSection.refs.size(); i++)
 				{
-					currSoundEntry = &soundEntries[i];
+					soundEntries[i] = std::make_unique<brsarInfoSoundEntry>();
+					currSoundEntry = soundEntries[i].get();
 					result &= currSoundEntry->populate(*this, bodyIn, soundsSection.refs[i].getAddress(address + 0x08));
 				}
 				updateSoundEntryOffsetValues();
@@ -1937,7 +1938,8 @@ namespace lava
 				brsarInfoFileHeader* currFileHeader = nullptr;
 				for (std::size_t i = 0; i < filesSection.refs.size(); i++)
 				{
-					currFileHeader = &fileHeaders[i];
+					fileHeaders[i] = std::make_unique<brsarInfoFileHeader>();
+					currFileHeader = fileHeaders[i].get();
 					currFileHeader->populate(*this, bodyIn, filesSection.refs[i].getAddress(address + 0x08));
 				}
 				updateFileHeaderOffsetValues();
@@ -1946,7 +1948,8 @@ namespace lava
 				brsarInfoGroupHeader* currGroupHeader = nullptr;
 				for (std::size_t i = 0; i < groupsSection.refs.size(); i++)
 				{
-					currGroupHeader = &groupHeaders[i];
+					groupHeaders[i] = std::make_unique<brsarInfoGroupHeader>();
+					currGroupHeader = groupHeaders[i].get();
 					currGroupHeader->populate(*this, bodyIn, groupsSection.refs[i].getAddress(address + 0x08));
 				}
 				updateGroupHeaderOffsetValues();
@@ -1987,7 +1990,7 @@ namespace lava
 				writeSoundRefVec(destinationStream);
 				for (std::size_t i = 0; i < soundEntries.size(); i++)
 				{
-					soundEntries[i].exportContents(destinationStream);
+					soundEntries[i]->exportContents(destinationStream);
 				}
 
 				writeBankRefVec(destinationStream);
@@ -2005,13 +2008,13 @@ namespace lava
 				writeFileRefVec(destinationStream);
 				for (std::size_t i = 0; i < fileHeaders.size(); i++)
 				{
-					fileHeaders[i].exportContents(destinationStream);
+					fileHeaders[i]->exportContents(destinationStream);
 				}
 
 				writeGroupRefVec(destinationStream);
 				for (std::size_t i = 0; i < groupHeaders.size(); i++)
 				{
-					groupHeaders[i].exportContents(destinationStream);
+					groupHeaders[i]->exportContents(destinationStream);
 				}
 
 				unsigned long pos = destinationStream.tellp();
@@ -2051,7 +2054,7 @@ namespace lava
 				for (std::size_t i = 0; i < soundEntries.size(); i++)
 				{
 					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
-					lava::writeRawDataToStream(destinationStream, soundEntries[i].parentRelativeOffset - 0x08);
+					lava::writeRawDataToStream(destinationStream, soundEntries[i]->parentRelativeOffset - 0x08);
 				}
 				result = destinationStream.good();
 			}
@@ -2102,7 +2105,7 @@ namespace lava
 				for (std::size_t i = 0; i < fileHeaders.size(); i++)
 				{
 					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
-					lava::writeRawDataToStream(destinationStream, fileHeaders[i].parentRelativeOffset - 0x08);
+					lava::writeRawDataToStream(destinationStream, fileHeaders[i]->parentRelativeOffset - 0x08);
 				}
 				result = destinationStream.good();
 			}
@@ -2119,7 +2122,7 @@ namespace lava
 				for (std::size_t i = 0; i < groupHeaders.size(); i++)
 				{
 					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
-					lava::writeRawDataToStream(destinationStream, groupHeaders[i].parentRelativeOffset - 0x08);
+					lava::writeRawDataToStream(destinationStream, groupHeaders[i]->parentRelativeOffset - 0x08);
 				}
 				result = destinationStream.good();
 			}
@@ -2133,14 +2136,14 @@ namespace lava
 			relativeOffset += calcRefVecSize(soundEntries.size());
 			for (std::size_t i = 0; i < soundEntries.size(); i++)
 			{
-				soundEntries[i].parentRelativeOffset = relativeOffset;
-				if (soundEntries[i].getAddress() != soundEntries[i].originalAddress)
+				soundEntries[i]->parentRelativeOffset = relativeOffset;
+				if (soundEntries[i]->getAddress() != soundEntries[i]->originalAddress)
 				{
 					int ruhroh = 0;
 				}
-				soundEntries[i].updateSpecificSoundOffsetValue();
-				soundEntries[i].updateSound3DInfoOffsetValue();
-				relativeOffset += soundEntries[i].size();
+				soundEntries[i]->updateSpecificSoundOffsetValue();
+				soundEntries[i]->updateSound3DInfoOffsetValue();
+				relativeOffset += soundEntries[i]->size();
 			}
 		}
 		void brsarInfoSection::updateBankEntryOffsetValues()
@@ -2169,9 +2172,9 @@ namespace lava
 			relativeOffset += calcRefVecSize(fileHeaders.size());
 			for (std::size_t i = 0; i < fileHeaders.size(); i++)
 			{
-				fileHeaders[i].parentRelativeOffset = relativeOffset;
-				fileHeaders[i].updateFileEntryOffsetValues();
-				relativeOffset += fileHeaders[i].size();
+				fileHeaders[i]->parentRelativeOffset = relativeOffset;
+				fileHeaders[i]->updateFileEntryOffsetValues();
+				relativeOffset += fileHeaders[i]->size();
 			}
 		}
 		void brsarInfoSection::updateGroupHeaderOffsetValues()
@@ -2180,9 +2183,9 @@ namespace lava
 			relativeOffset += calcRefVecSize(groupHeaders.size());
 			for (std::size_t i = 0; i < groupHeaders.size(); i++)
 			{
-				groupHeaders[i].parentRelativeOffset = relativeOffset;
-				groupHeaders[i].updateGroupEntryOffsetValues();
-				relativeOffset += groupHeaders[i].size();
+				groupHeaders[i]->parentRelativeOffset = relativeOffset;
+				groupHeaders[i]->updateGroupEntryOffsetValues();
+				relativeOffset += groupHeaders[i]->size();
 			}
 		}
 
@@ -2194,9 +2197,9 @@ namespace lava
 
 			while (result == nullptr && i < groupHeaders.size())
 			{
-				if (groupIDIn == groupHeaders[i].groupID)
+				if (groupIDIn == groupHeaders[i]->groupID)
 				{
-					result = &groupHeaders[i];
+					result = groupHeaders[i].get();
 				}
 				i++;
 			}
@@ -2209,7 +2212,7 @@ namespace lava
 
 			if (infoIndexIn < groupHeaders.size())
 			{
-				result = &groupHeaders[infoIndexIn];
+				result = groupHeaders[infoIndexIn].get();
 			}
 
 			return result;
@@ -2226,7 +2229,7 @@ namespace lava
 					brsarInfoGroupEntry* currentGroupEntry = &targetGroupHeader->entries[i];
 					if (currentGroupEntry->fileID < fileHeaders.size())
 					{
-						result.push_back( &fileHeaders[currentGroupEntry->fileID]);
+						result.push_back( fileHeaders[currentGroupEntry->fileID].get());
 					}
 				}
 			}
@@ -2239,7 +2242,7 @@ namespace lava
 
 			if (fileID < fileHeaders.size())
 			{
-				result = &fileHeaders[fileID];
+				result = fileHeaders[fileID].get();
 			}
 
 			return result;
@@ -2252,7 +2255,7 @@ namespace lava
 				output << "There are " << fileHeaders.size() << " File Info Entries(s) in this BRSAR:\n";
 				for (unsigned long i = 0; i < fileHeaders.size(); i++)
 				{
-					brsarInfoFileHeader* currHeaderPtr = &fileHeaders[i];
+					brsarInfoFileHeader* currHeaderPtr = fileHeaders[i].get();
 					output << "File Info #" << i << " (@ 0x" << numToHexStringWithPadding(currHeaderPtr->getAddress(), 0x08) << "):\n";
 					output << "\tFile String: \"";
 					if (!currHeaderPtr->stringContent.empty())
@@ -2401,7 +2404,7 @@ namespace lava
 				brsarInfoGroupEntry* currEntry = nullptr;
 				for (std::size_t i = 0; i < infoSectionIn.groupHeaders.size(); i++)
 				{
-					currHeader = &infoSectionIn.groupHeaders[i];
+					currHeader = infoSectionIn.groupHeaders[i].get();
 					for (std::size_t u = 0; u < currHeader->entries.size(); u++)
 					{
 						currEntry = &currHeader->entries[u];
@@ -3280,7 +3283,7 @@ namespace lava
 			const brsarInfoGroupHeader* currentGroup = nullptr;
 			while (!done && i < infoSection.groupHeaders.size())
 			{
-				currentGroup = &infoSection.groupHeaders[i];
+				currentGroup = infoSection.groupHeaders[i].get();
 				if (groupIDIn == currentGroup->groupID)
 				{
 					result = currentGroup->getAddress();
@@ -3302,7 +3305,7 @@ namespace lava
 			for (unsigned long i = 0; i < infoSection.groupHeaders.size(); i++)
 			{
 				// Grab a pointer to a given header
-				brsarInfoGroupHeader* currGroupHeader = &infoSection.groupHeaders[i];
+				brsarInfoGroupHeader* currGroupHeader = infoSection.groupHeaders[i].get();
 				// Reset its lengths to 0, because we'll be using this and building it as we go.
 				currGroupHeader->headerLength = 0x00;
 				currGroupHeader->dataLength = 0x00;
@@ -3370,7 +3373,7 @@ namespace lava
 					// However, vBrawl handles it this way, so that's how we'll do it as well.
 					if (i > 0)
 					{
-						brsarInfoGroupHeader* prevGroupHeader = &infoSection.groupHeaders[i - 1];
+						brsarInfoGroupHeader* prevGroupHeader = infoSection.groupHeaders[i - 1].get();
 						currGroupHeader->headerAddress = prevGroupHeader->dataAddress + prevGroupHeader->dataLength;
 						currGroupHeader->dataAddress = currGroupHeader->headerAddress;
 					}
@@ -3425,9 +3428,9 @@ namespace lava
 
 			if (output.good() && symbSection.address != ULONG_MAX)
 			{
-				unsigned long fileID = infoSection.soundEntries[startingIndex].fileID;
+				unsigned long fileID = infoSection.soundEntries[startingIndex]->fileID;
 				std::size_t i = startingIndex;
-				while (i < infoSection.soundEntries.size() && infoSection.soundEntries[i].fileID == fileID)
+				while (i < infoSection.soundEntries.size() && infoSection.soundEntries[i]->fileID == fileID)
 				{
 					output << "\t[String 0x" << numToHexStringWithPadding(i, 0x04) << "] " << getSymbString(i) << "\n";
 					i++;
@@ -3449,7 +3452,7 @@ namespace lava
 			MD5 md5Object;
 			for (std::size_t i = 0; i < infoSection.groupHeaders.size(); i++)
 			{
-				currHeader = &infoSection.groupHeaders[i];
+				currHeader = infoSection.groupHeaders[i].get();
 				std::string groupName = symbSection.getString(currHeader->groupID);
 				if (groupName.size() == 0x00)
 				{
