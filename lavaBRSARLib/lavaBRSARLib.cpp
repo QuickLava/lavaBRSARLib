@@ -2041,7 +2041,7 @@ namespace lava
 		}
 
 		
-		unsigned long brsarInfoSection::writeSoundRefVec(std::ostream& destinationStream) const
+		bool brsarInfoSection::writeSoundRefVec(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 
@@ -2058,7 +2058,7 @@ namespace lava
 
 			return result;
 		}
-		unsigned long brsarInfoSection::writeBankRefVec(std::ostream& destinationStream) const
+		bool brsarInfoSection::writeBankRefVec(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 
@@ -2075,7 +2075,7 @@ namespace lava
 
 			return result;
 		}
-		unsigned long brsarInfoSection::writePlayerRefVec(std::ostream& destinationStream) const
+		bool brsarInfoSection::writePlayerRefVec(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 
@@ -2092,7 +2092,7 @@ namespace lava
 
 			return result;
 		}
-		unsigned long brsarInfoSection::writeFileRefVec(std::ostream& destinationStream) const
+		bool brsarInfoSection::writeFileRefVec(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 
@@ -2109,7 +2109,7 @@ namespace lava
 
 			return result;
 		}
-		unsigned long brsarInfoSection::writeGroupRefVec(std::ostream& destinationStream) const
+		bool brsarInfoSection::writeGroupRefVec(std::ostream& destinationStream) const
 		{
 			bool result = 0;
 

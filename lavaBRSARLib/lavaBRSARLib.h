@@ -479,7 +479,7 @@ namespace lava
 			brawlReference stringOffset = ULLONG_MAX;
 			brawlReference listOffset = ULLONG_MAX;
 			std::vector<unsigned char> stringContent{};
-			std::vector<brsarInfoFileEntry> entries;
+			std::vector<brsarInfoFileEntry> entries{};
 
 			unsigned long size() const;
 			unsigned long getAddress() const;
@@ -524,7 +524,7 @@ namespace lava
 			unsigned long dataAddress = ULONG_MAX;
 			unsigned long dataLength = ULONG_MAX;
 			brawlReference listOffset = ULLONG_MAX;
-			std::vector<brsarInfoGroupEntry> entries;
+			std::vector<brsarInfoGroupEntry> entries{};
 
 			unsigned long size() const;
 			unsigned long getAddress() const;
@@ -586,11 +586,11 @@ namespace lava
 			bool populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 
-			unsigned long writeSoundRefVec(std::ostream& destinationStream) const;
-			unsigned long writeBankRefVec(std::ostream& destinationStream) const;
-			unsigned long writePlayerRefVec(std::ostream& destinationStream) const;
-			unsigned long writeFileRefVec(std::ostream& destinationStream) const;
-			unsigned long writeGroupRefVec(std::ostream& destinationStream) const;
+			bool writeSoundRefVec(std::ostream& destinationStream) const;
+			bool writeBankRefVec(std::ostream& destinationStream) const;
+			bool writePlayerRefVec(std::ostream& destinationStream) const;
+			bool writeFileRefVec(std::ostream& destinationStream) const;
+			bool writeGroupRefVec(std::ostream& destinationStream) const;
 
 			void updateSoundEntryOffsetValues();
 			void updateBankEntryOffsetValues();
