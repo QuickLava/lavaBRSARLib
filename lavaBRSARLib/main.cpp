@@ -20,6 +20,8 @@ const std::string testFileOutputPath = testFileName + "_edit" + testFileSuffix;
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = false;
 // Test which overwrites File 0x06's header and data with zeroed-out 0x20 byte vectors.
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_2 = false;
+// Test which clones a specified file, handling all necessary INFO and FILE section changes.
+constexpr bool ENABLE_FILE_CLONE_TEST = false;
 // Test which exports the entire .brsar.
 constexpr bool ENABLE_BRSAR_EXPORT_TEST = true;
 // Test which exports the full SYMB section.
@@ -67,6 +69,10 @@ int main()
 		std::vector<unsigned char> fakeHeader(0x20, 0x00);
 		std::vector<unsigned char> fakeData(0x20, 0x00);
 		testBrsar.overwriteFile(fakeHeader, fakeData, fileOverwriteTestTargetFile);
+	}
+	if (ENABLE_FILE_CLONE_TEST)
+	{
+		testBrsar.cloneFileTest(0x32D, 0x01);
 	}
 	if (ENABLE_BRSAR_EXPORT_TEST)
 	{

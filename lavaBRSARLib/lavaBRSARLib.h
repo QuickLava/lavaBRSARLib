@@ -592,11 +592,7 @@ namespace lava
 			bool writeFileRefVec(std::ostream& destinationStream) const;
 			bool writeGroupRefVec(std::ostream& destinationStream) const;
 
-			void updateSoundEntryOffsetValues();
-			void updateBankEntryOffsetValues();
-			void updatePlayerEntryOffsetValues();
-			void updateFileHeaderOffsetValues();
-			void updateGroupHeaderOffsetValues();
+			void updateChildStructOffsetValues(infoSectionLandmark startFrom = infoSectionLandmark::iSL_Header);
 
 			brsarInfoGroupHeader* getGroupWithID(unsigned long groupIDIn);
 			brsarInfoGroupHeader* getGroupWithInfoIndex(unsigned long infoIndexIn);
@@ -794,6 +790,7 @@ namespace lava
 
 			bool updateInfoSectionFileOffsets();
 			bool overwriteFile(const std::vector<unsigned char>& headerIn, const std::vector<unsigned char>& dataIn, unsigned long fileIDIn);
+			bool cloneFileTest(unsigned long fileIDToClone, unsigned long groupToLink);
 
 			bool summarizeSymbStringData(std::ostream& output = std::cout);
 			bool outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output = std::cout);

@@ -1555,9 +1555,11 @@ namespace lava
 			relativeOffset += sizeof(headerLength);
 			relativeOffset += sizeof(dataLength);
 			relativeOffset += sizeof(entryNumber);
+
 			// If there's actual string content, calculate the new offset address for it
 			if (stringContent.size() > 0x00)
 			{
+				stringOffset.addressType = 0x01000000;
 				// Update the offset stored in stringOffset
 				// This needs to point to after listOffset (which comes right after this)
 				// Offset of this File Header into the Info Section
@@ -1570,9 +1572,12 @@ namespace lava
 			// Otherwise, make sure the offset value is nulled out
 			else
 			{
+				stringOffset.addressType = 0x00000000;
 				stringOffset.address = 0x00000000;
 			}
 			relativeOffset += stringOffset.size();
+			// Ensure that the address is recorded
+			listOffset.addressType = 0x01000000;
 			// Also update the offset stored in listOffset
 			// Should point to after the string content (which comes right after this)
 			// Offset of this File Header into the Info Section
@@ -1753,6 +1758,7 @@ namespace lava
 			relativeOffset += sizeof(headerLength);
 			relativeOffset += sizeof(dataAddress);
 			relativeOffset += sizeof(dataLength);
+			listOffset.addressType = 0x01000000;
 			// Update the offset stored in listOffset
 			// This needs to point to right after itself, so it'll be:
 			// Offset of this Group Header into the Info Section
@@ -1918,21 +1924,18 @@ namespace lava
 					currSoundEntry = soundEntries[i].get();
 					result &= currSoundEntry->populate(*this, bodyIn, soundsSection.refs[i].getAddress(address + 0x08));
 				}
-				updateSoundEntryOffsetValues();
 
 				bankEntries.resize(banksSection.refs.size());
 				for (std::size_t i = 0; i < banksSection.refs.size(); i++)
 				{
 					result &= bankEntries[i].populate(*this, bodyIn, banksSection.refs[i].getAddress(address + 0x08));
 				}
-				updateBankEntryOffsetValues();
 
 				playerEntries.resize(playerSection.refs.size());
 				for (std::size_t i = 0; i < playerSection.refs.size(); i++)
 				{
 					result &= playerEntries[i].populate(*this, bodyIn, playerSection.refs[i].getAddress(address + 0x08));
 				}
-				updatePlayerEntryOffsetValues();
 
 				fileHeaders.resize(filesSection.refs.size());
 				brsarInfoFileHeader* currFileHeader = nullptr;
@@ -1942,7 +1945,6 @@ namespace lava
 					currFileHeader = fileHeaders[i].get();
 					currFileHeader->populate(*this, bodyIn, filesSection.refs[i].getAddress(address + 0x08));
 				}
-				updateFileHeaderOffsetValues();
 
 				groupHeaders.resize(groupsSection.refs.size());
 				brsarInfoGroupHeader* currGroupHeader = nullptr;
@@ -1952,7 +1954,6 @@ namespace lava
 					currGroupHeader = groupHeaders[i].get();
 					currGroupHeader->populate(*this, bodyIn, groupsSection.refs[i].getAddress(address + 0x08));
 				}
-				updateGroupHeaderOffsetValues();
 				
 				std::size_t cursor = footerReference.getAddress(address + 0x08);
 				sequenceMax = bodyIn.getShort(cursor, &cursor);
@@ -1964,6 +1965,8 @@ namespace lava
 				waveTrackMax = bodyIn.getShort(cursor, &cursor);
 				padding = bodyIn.getShort(cursor, &cursor);
 				reserved = bodyIn.getLong(cursor, &cursor);
+
+				updateChildStructOffsetValues();
 
 				parent->signalINFOSectionSizeChange();
 			}
@@ -2130,62 +2133,91 @@ namespace lava
 			return result;
 		}
 
-		void brsarInfoSection::updateSoundEntryOffsetValues()
+		void brsarInfoSection::updateChildStructOffsetValues(infoSectionLandmark startFrom)
 		{
-			unsigned long relativeOffset = size(infoSectionLandmark::iSL_VecReferences); // Get size up to and including the vector references.
-			relativeOffset += calcRefVecSize(soundEntries.size());
-			for (std::size_t i = 0; i < soundEntries.size(); i++)
+			unsigned long relativeOffset = ULONG_MAX;
+			if (startFrom <= infoSectionLandmark::iSL_SoundEntries)
 			{
-				soundEntries[i]->parentRelativeOffset = relativeOffset;
-				if (soundEntries[i]->getAddress() != soundEntries[i]->originalAddress)
+				if (relativeOffset == ULONG_MAX)
 				{
-					int ruhroh = 0;
+					relativeOffset = size(infoSectionLandmark::iSL_VecReferences); // Get size up to and including the vector references.
 				}
-				soundEntries[i]->updateSpecificSoundOffsetValue();
-				soundEntries[i]->updateSound3DInfoOffsetValue();
-				relativeOffset += soundEntries[i]->size();
+				soundsSectionReference.address = relativeOffset - 0x08;
+				relativeOffset += calcRefVecSize(soundEntries.size());
+				for (std::size_t i = 0; i < soundEntries.size(); i++)
+				{
+					soundEntries[i]->parentRelativeOffset = relativeOffset;
+					if (soundEntries[i]->getAddress() != soundEntries[i]->originalAddress)
+					{
+						int ruhroh = 0;
+					}
+					soundEntries[i]->updateSpecificSoundOffsetValue();
+					soundEntries[i]->updateSound3DInfoOffsetValue();
+					relativeOffset += soundEntries[i]->size();
+				}
 			}
-		}
-		void brsarInfoSection::updateBankEntryOffsetValues()
-		{
-			unsigned long relativeOffset = size(infoSectionLandmark::iSL_SoundEntries); // Get size up to and including the sound entries.
-			relativeOffset += calcRefVecSize(bankEntries.size());
-			for (std::size_t i = 0; i < bankEntries.size(); i++)
+			if (startFrom <= infoSectionLandmark::iSL_BankEntries)
 			{
-				bankEntries[i].parentRelativeOffset = relativeOffset;
-				relativeOffset += bankEntries[i].size();
+				if (relativeOffset == ULONG_MAX)
+				{
+					relativeOffset = size(infoSectionLandmark::iSL_SoundEntries); // Get size up to and including the sound entries.
+				}
+				banksSectionReference.address = relativeOffset - 0x08;
+				relativeOffset += calcRefVecSize(bankEntries.size());
+				for (std::size_t i = 0; i < bankEntries.size(); i++)
+				{
+					bankEntries[i].parentRelativeOffset = relativeOffset;
+					relativeOffset += bankEntries[i].size();
+				}
 			}
-		}
-		void brsarInfoSection::updatePlayerEntryOffsetValues()
-		{
-			unsigned long relativeOffset = size(infoSectionLandmark::iSL_BankEntries); // Get size up to and including the bank entries.
-			relativeOffset += calcRefVecSize(playerEntries.size());
-			for (std::size_t i = 0; i < playerEntries.size(); i++)
+			if (startFrom <= infoSectionLandmark::iSL_PlayerEntries)
 			{
-				playerEntries[i].parentRelativeOffset = relativeOffset;
-				relativeOffset += playerEntries[i].size();
+				if (relativeOffset == ULONG_MAX)
+				{
+					relativeOffset = size(infoSectionLandmark::iSL_BankEntries); // Get size up to and including the bank entries.
+				}
+				playerSectionReference.address = relativeOffset - 0x08;
+				relativeOffset += calcRefVecSize(playerEntries.size());
+				for (std::size_t i = 0; i < playerEntries.size(); i++)
+				{
+					playerEntries[i].parentRelativeOffset = relativeOffset;
+					relativeOffset += playerEntries[i].size();
+				}
 			}
-		}
-		void brsarInfoSection::updateFileHeaderOffsetValues()
-		{
-			unsigned long relativeOffset = size(infoSectionLandmark::iSL_PlayerEntries); // Get size up to and including the player entries.
-			relativeOffset += calcRefVecSize(fileHeaders.size());
-			for (std::size_t i = 0; i < fileHeaders.size(); i++)
+			if (startFrom <= infoSectionLandmark::iSL_FileHeaders)
 			{
-				fileHeaders[i]->parentRelativeOffset = relativeOffset;
-				fileHeaders[i]->updateFileEntryOffsetValues();
-				relativeOffset += fileHeaders[i]->size();
+				if (relativeOffset == ULONG_MAX)
+				{
+					relativeOffset = size(infoSectionLandmark::iSL_PlayerEntries); // Get size up to and including the player entries.
+				}
+				filesSectionReference.address = relativeOffset - 0x08;
+				relativeOffset += calcRefVecSize(fileHeaders.size());
+				for (std::size_t i = 0; i < fileHeaders.size(); i++)
+				{
+					fileHeaders[i]->parentRelativeOffset = relativeOffset;
+					fileHeaders[i]->updateFileEntryOffsetValues();
+					relativeOffset += fileHeaders[i]->size();
+				}
 			}
-		}
-		void brsarInfoSection::updateGroupHeaderOffsetValues()
-		{
-			unsigned long relativeOffset = size(infoSectionLandmark::iSL_FileHeaders); // Get size up to and including the file headers.
-			relativeOffset += calcRefVecSize(groupHeaders.size());
-			for (std::size_t i = 0; i < groupHeaders.size(); i++)
+			if (startFrom <= infoSectionLandmark::iSL_GroupHeaders)
 			{
-				groupHeaders[i]->parentRelativeOffset = relativeOffset;
-				groupHeaders[i]->updateGroupEntryOffsetValues();
-				relativeOffset += groupHeaders[i]->size();
+				if (relativeOffset == ULONG_MAX)
+				{
+					relativeOffset = size(infoSectionLandmark::iSL_FileHeaders); // Get size up to and including the file headers.
+				}
+				groupsSectionReference.address = relativeOffset - 0x08;
+				relativeOffset += calcRefVecSize(groupHeaders.size());
+				for (std::size_t i = 0; i < groupHeaders.size(); i++)
+				{
+					groupHeaders[i]->parentRelativeOffset = relativeOffset;
+					groupHeaders[i]->updateGroupEntryOffsetValues();
+					relativeOffset += groupHeaders[i]->size();
+				}
+			}
+			if (startFrom <= infoSectionLandmark::iSL_Footer)
+			{
+				relativeOffset = size(infoSectionLandmark::iSL_GroupHeaders); // Get size up to and including the file headers.
+				footerReference.address = relativeOffset - 0x08;
 			}
 		}
 
@@ -3412,6 +3444,50 @@ namespace lava
 					fileHeaderPtr->dataLength = dataIn.size();
 					// Update the rest of the infoSection to correct the changes to file locations
 					result &= updateInfoSectionFileOffsets();
+				}
+			}
+
+			return result;
+		}
+		bool brsar::cloneFileTest(unsigned long fileIDToClone, unsigned long groupToLink)
+		{
+			bool result = 0;
+
+			brsarInfoFileHeader* targetFileHeader = infoSection.getFileHeaderPointer(fileIDToClone);
+			if (targetFileHeader != nullptr)
+			{
+				if (!fileSection.getFileContentsPointerVector(fileIDToClone).empty())
+				{
+					fileSection.fileContents.push_back(brsarFileFileContents());
+					brsarFileFileContents* sourceFileContents = fileSection.getFileContentsPointerVector(fileIDToClone).front();
+					brsarFileFileContents* newFileContents = &fileSection.fileContents.back();
+					newFileContents->parent = &fileSection;
+					newFileContents->originalHeaderAddress = bac_NOT_IN_FILE;
+					newFileContents->originalDataAddress = bac_NOT_IN_FILE;
+					newFileContents->header = sourceFileContents->header;
+					newFileContents->data = sourceFileContents->data;
+					newFileContents->fileID = infoSection.fileHeaders.size();
+					newFileContents->groupID = groupToLink;
+					newFileContents->parentRelativeHeaderOffset = getFILESectionSize();
+					newFileContents->parentRelativeDataOffset = getFILESectionSize() + newFileContents->header.size();
+					fileSection.fileIDToIndex[newFileContents->fileID] = std::vector<std::size_t>{ fileSection.fileContents.size() - 1 };
+
+					infoSection.fileHeaders.push_back(std::make_unique<brsarInfoFileHeader>());
+					brsarInfoFileHeader* newFileHeader = infoSection.fileHeaders.back().get();
+					newFileHeader->parent = &infoSection;
+					newFileHeader->headerLength = newFileContents->header.size();
+					newFileHeader->dataLength = newFileContents->data.size();
+					newFileHeader->entries.push_back(brsarInfoFileEntry());
+					brsarInfoFileEntry* newFileEntry = &newFileHeader->entries.back();
+					newFileEntry->parent = newFileHeader;
+					newFileEntry->index = 0x00;
+					newFileEntry->groupID = groupToLink;
+
+					signalINFOSectionSizeChange();
+					signalFILESectionSizeChange();
+
+					infoSection.updateChildStructOffsetValues(brsarInfoSection::infoSectionLandmark::iSL_FileHeaders);
+					updateInfoSectionFileOffsets();
 				}
 			}
 
