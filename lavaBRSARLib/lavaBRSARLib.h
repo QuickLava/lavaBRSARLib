@@ -479,7 +479,6 @@ namespace lava
 			brawlReference stringOffset = ULLONG_MAX;
 			brawlReference listOffset = ULLONG_MAX;
 			std::vector<unsigned char> stringContent{};
-			lava::brawl::brawlReferenceVector entryReferenceList;
 			std::vector<brsarInfoFileEntry> entries;
 
 			unsigned long size() const;
@@ -487,6 +486,7 @@ namespace lava
 			bool populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 
+			bool writeFileEntryRefVec(std::ostream& destinationStream) const;
 			void updateFileEntryOffsetValues();
 		};
 		struct brsarInfoGroupHeader; // Info Group Header Forward Decl.

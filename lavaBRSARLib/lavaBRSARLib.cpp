@@ -1461,7 +1461,7 @@ namespace lava
 			result += stringOffset.size();
 			result += listOffset.size();
 			result += stringContent.size() * sizeof(unsigned char);
-			result += entryReferenceList.size();
+			result += calcRefVecSize(entries.size()); // Size of the Entry List We'll Be Generating
 			result += entries.size() * brsarInfoFileEntry::size();
 
 			return result;
@@ -1496,6 +1496,7 @@ namespace lava
 				}
 				if (listOffset.getAddress() != 0x00)
 				{
+					lava::brawl::brawlReferenceVector entryReferenceList;
 					result &= entryReferenceList.populate(bodyIn, listOffset.getAddress(parent->getAddress() + 0x08));
 					for (std::size_t u = 0; u < entryReferenceList.refs.size(); u++)
 					{
@@ -1519,7 +1520,8 @@ namespace lava
 				lava::writeRawDataToStream(destinationStream, stringOffset.getHex());
 				lava::writeRawDataToStream(destinationStream, listOffset.getHex());
 				destinationStream.write((char*)stringContent.data(), stringContent.size());
-				result &= entryReferenceList.exportContents(destinationStream);
+				// Write BrawlRef Vec into stream
+				result &= writeFileEntryRefVec(destinationStream);
 				for (std::size_t i = 0; i < entries.size(); i++)
 				{
 					result &= entries[i].exportContents(destinationStream);
@@ -1528,16 +1530,60 @@ namespace lava
 			}
 			return result;
 		}
+		bool brsarInfoFileHeader::writeFileEntryRefVec(std::ostream& destinationStream) const
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, unsigned long(entries.size()));
+				for (std::size_t i = 0; i < entries.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
+					// Offset into section is gonna be:
+					// The stuct's pRO + the child's pRO - 0x08 to uncount the INFO Block's Tag and Size Field
+					lava::writeRawDataToStream(destinationStream, (parentRelativeOffset + entries[i].parentRelativeOffset) - 0x08);
+				}
+				result = destinationStream.good();
+			}
+
+			return result;
+		}
 		void brsarInfoFileHeader::updateFileEntryOffsetValues()
 		{
 			unsigned long relativeOffset = 0;
 			relativeOffset += sizeof(headerLength);
 			relativeOffset += sizeof(dataLength);
 			relativeOffset += sizeof(entryNumber);
+			// If there's actual string content, calculate the new offset address for it
+			if (stringContent.size() > 0x00)
+			{
+				// Update the offset stored in stringOffset
+				// This needs to point to after listOffset (which comes right after this)
+				// Offset of this File Header into the Info Section
+				// + The offset of listOffset into this Group Header
+				// + The size of this reference (so that we point to after it)
+				// + The size of listReference (so we also point to after that)
+				// - 0x08 (to "uncount" the INFO Section Tag and Size fields' length)
+				stringOffset.address = (parentRelativeOffset + relativeOffset + stringOffset.size() + listOffset.size()) - 0x08;
+			}
+			// Otherwise, make sure the offset value is nulled out
+			else
+			{
+				stringOffset.address = 0x00000000;
+			}
 			relativeOffset += stringOffset.size();
+			// Also update the offset stored in listOffset
+			// Should point to after the string content (which comes right after this)
+			// Offset of this File Header into the Info Section
+			// + The offset of listOffset into this Group Header
+			// + The size of this reference (so that we point to after it)
+			// + The length of this File Header's string content
+			// - 0x08 (to "uncount" the INFO Section Tag and Size fields' length)
+			listOffset.address = (parentRelativeOffset + relativeOffset + listOffset.size() + (stringContent.size() * sizeof(unsigned char))) - 0x08;
 			relativeOffset += listOffset.size();
 			relativeOffset += stringContent.size() * sizeof(unsigned char);
-			relativeOffset += entryReferenceList.size();
+			relativeOffset += calcRefVecSize(entries.size()); // Size of the Entry List We'll Be Generating
 			for (std::size_t i = 0; i < entries.size(); i++)
 			{
 				entries[i].parentRelativeOffset = relativeOffset;
