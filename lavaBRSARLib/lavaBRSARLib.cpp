@@ -1613,7 +1613,7 @@ namespace lava
 			result += sizeof(dataAddress);
 			result += sizeof(dataLength);
 			result += listOffset.size();
-			result += entryReferenceList.size();
+			result += calcRefVecSize(entries.size()); // Size of the Entry List We'll Be Generating
 			result += entries.size() * brsarInfoGroupEntry::size();
 
 			return result;
@@ -1642,7 +1642,7 @@ namespace lava
 				dataAddress = bodyIn.getLong(cursor, &cursor);
 				dataLength = bodyIn.getLong(cursor, &cursor);
 				listOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
-
+				lava::brawl::brawlReferenceVector entryReferenceList;
 				result &= entryReferenceList.populate(bodyIn, listOffset.getAddress(parent->getAddress() + 0x08));
 				for (std::size_t u = 0; u < entryReferenceList.refs.size(); u++)
 				{
@@ -1667,13 +1667,34 @@ namespace lava
 				lava::writeRawDataToStream(destinationStream, dataAddress);
 				lava::writeRawDataToStream(destinationStream, dataLength);
 				lava::writeRawDataToStream(destinationStream, listOffset.getHex());
-				result &= entryReferenceList.exportContents(destinationStream);
+				// Write BrawlRef Vec into stream
+				result &= writeGroupEntryRefVec(destinationStream);
 				for (std::size_t i = 0; i < entries.size(); i++)
 				{
 					result &= entries[i].exportContents(destinationStream);
 				}
 				result &= destinationStream.good();
 			}
+			return result;
+		}
+
+		bool brsarInfoGroupHeader::writeGroupEntryRefVec(std::ostream& destinationStream) const
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				lava::writeRawDataToStream(destinationStream, unsigned long(entries.size()));
+				for (std::size_t i = 0; i < entries.size(); i++)
+				{
+					lava::writeRawDataToStream(destinationStream, unsigned long(0x01000000));
+					// Offset into section is gonna be:
+					// The stuct's pRO + the child's pRO - 0x08 to uncount the INFO Block's Tag and Size Field
+					lava::writeRawDataToStream(destinationStream, (parentRelativeOffset + entries[i].parentRelativeOffset) - 0x08);
+				}
+				result = destinationStream.good();
+			}
+
 			return result;
 		}
 		void brsarInfoGroupHeader::updateGroupEntryOffsetValues()
@@ -1686,8 +1707,15 @@ namespace lava
 			relativeOffset += sizeof(headerLength);
 			relativeOffset += sizeof(dataAddress);
 			relativeOffset += sizeof(dataLength);
+			// Update the offset stored in listOffset
+			// This needs to point to right after itself, so it'll be:
+			// Offset of this Group Header into the Info Section
+			// + The offset of listOffset into this Group Header
+			// + The size of this reference (so that we point to after it)
+			// - 0x08 (to "uncount" the INFO Section Tag and Size fields' length)
+			listOffset.address = (parentRelativeOffset + relativeOffset + listOffset.size()) - 0x08;
 			relativeOffset += listOffset.size();
-			relativeOffset += entryReferenceList.size();
+			relativeOffset += calcRefVecSize(entries.size()); // Size of the Entry List We'll Be Generating
 			for (int i = 0; i < entries.size(); i++)
 			{
 				entries[i].parentRelativeOffset = relativeOffset;

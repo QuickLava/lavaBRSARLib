@@ -518,13 +518,12 @@ namespace lava
 
 			unsigned long groupID = ULONG_MAX;
 			unsigned long entryNum = ULONG_MAX;
-			brawlReference extFilePathRef = ULLONG_MAX;
+			brawlReference extFilePathRef = ULLONG_MAX; // This is always zero?
 			unsigned long headerAddress = ULONG_MAX;
 			unsigned long headerLength = ULONG_MAX;
 			unsigned long dataAddress = ULONG_MAX;
 			unsigned long dataLength = ULONG_MAX;
 			brawlReference listOffset = ULLONG_MAX;
-			lava::brawl::brawlReferenceVector entryReferenceList;
 			std::vector<brsarInfoGroupEntry> entries;
 
 			unsigned long size() const;
@@ -532,6 +531,7 @@ namespace lava
 			bool populate(const brsarInfoSection& parentIn, lava::byteArray& bodyIn, std::size_t address);
 			bool exportContents(std::ostream& destinationStream);
 
+			bool writeGroupEntryRefVec(std::ostream& destinationStream) const;
 			void updateGroupEntryOffsetValues();
 			unsigned long getSynonymFileID(std::size_t headerLengthIn = SIZE_MAX) const;
 			bool usesFileID(unsigned long fileIDIn = ULONG_MAX) const;
