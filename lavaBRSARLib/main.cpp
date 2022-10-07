@@ -81,7 +81,7 @@ int main()
 	}
 	if (ENABLE_FILE_CLONE_TEST)
 	{
-		testBrsar.cloneFileTest(0x32D, 0x01);
+		testBrsar.cloneFile(0x32D, 0x01);
 	}
 	if (ENABLE_BRSAR_EXPORT_TEST)
 	{

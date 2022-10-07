@@ -453,9 +453,6 @@ namespace lava
 		struct brsarInfoFileHeader; // Info File Header Struct Forward Decl.
 		struct brsarFileFileContents
 		{
-			unsigned long groupInfoIndex = ULONG_MAX;
-			unsigned long groupID = ULONG_MAX;
-			unsigned long fileID = ULONG_MAX;
 			std::vector<unsigned char> header{};
 			std::vector<unsigned char> data{};
 
@@ -520,7 +517,7 @@ namespace lava
 			unsigned long headerLength = ULONG_MAX;
 			unsigned long dataOffset = ULONG_MAX;
 			unsigned long dataLength = ULONG_MAX;
-			unsigned long reserved = ULONG_MAX;
+			unsigned long reserved = 0x00;
 
 			static constexpr unsigned long size();
 			unsigned long getAddress() const;
@@ -615,6 +612,9 @@ namespace lava
 
 			unsigned long virutalFileSectionSize() const;
 			bool updateGroupEntryAddressValues();
+
+			unsigned long addNewFileEntry();
+			bool linkFileEntryToGroup(unsigned long fileID, unsigned long groupInfoIndexToLinkTo);
 
 			brsarInfoGroupHeader* getGroupWithID(unsigned long groupIDIn);
 			brsarInfoGroupHeader* getGroupWithInfoIndex(unsigned long infoIndexIn);
@@ -767,7 +767,7 @@ namespace lava
 			unsigned long getGroupOffset(unsigned long groupIDIn);
 
 			bool overwriteFile(const std::vector<unsigned char>& headerIn, const std::vector<unsigned char>& dataIn, unsigned long fileIDIn);
-			bool cloneFileTest(unsigned long fileIDToClone, unsigned long groupToLink);
+			bool cloneFile(unsigned long fileIDToClone, unsigned long groupToLink);
 
 			bool summarizeSymbStringData(std::ostream& output = std::cout);
 			bool outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output = std::cout);
