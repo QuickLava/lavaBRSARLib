@@ -19,9 +19,9 @@ const std::string testFileOutputPath = testFileName + "_edit" + testFileSuffix;
 // Test which overwrites File 0x06 with itself, shouldn't actually change anything.
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = false;
 // Test which overwrites File 0x06's header and data with zeroed-out 0x20 byte vectors.
-constexpr bool ENABLE_FILE_OVERWRITE_TEST_2 = true;
+constexpr bool ENABLE_FILE_OVERWRITE_TEST_2 = false;
 // Test which clones a specified file, handling all necessary INFO and FILE section changes.
-constexpr bool ENABLE_FILE_CLONE_TEST = false;
+constexpr bool ENABLE_FILE_CLONE_TEST = true;
 // Test which exports the entire .brsar.
 constexpr bool ENABLE_BRSAR_EXPORT_TEST = true;
 // Test which exports the full SYMB section.

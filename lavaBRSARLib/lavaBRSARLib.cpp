@@ -3360,6 +3360,7 @@ namespace lava
 				infoSection.fileHeaders.push_back(std::make_unique<brsarInfoFileHeader>());
 				brsarInfoFileHeader* newFileHeader = infoSection.fileHeaders.back().get();
 				newFileHeader->parent = &infoSection;
+				newFileHeader->fileContents.fileID = infoSection.fileHeaders.size() - 1;
 				newFileHeader->fileContents.header = targetFileHeader->fileContents.header;
 				newFileHeader->fileContents.data = targetFileHeader->fileContents.data;
 				newFileHeader->entries.push_back(brsarInfoFileEntry());
@@ -3368,9 +3369,21 @@ namespace lava
 				newFileEntry->index = 0x00;
 				newFileEntry->groupID = groupToLink;
 
+				brsarInfoGroupHeader* targetGroupHeader = infoSection.getGroupWithInfoIndex(groupToLink);
+				infoSection.fileIDsToGroupInfoIndecesThatUseThem[newFileHeader->fileContents.fileID].push_back(targetGroupHeader->groupID);
+				if (targetGroupHeader != nullptr)
+				{
+					targetGroupHeader->entries.push_back(brsarInfoGroupEntry());
+					brsarInfoGroupEntry* newGroupEntry = &targetGroupHeader->entries.back();
+					newGroupEntry->parent = targetGroupHeader;
+					newGroupEntry->fileID = newFileHeader->fileContents.fileID;
+					newGroupEntry->reserved = 0x00;
+				}
+
 				signalINFOSectionSizeChange();
 				signalVirtualFILESectionSizeChange();
 				infoSection.updateChildStructOffsetValues(brsarInfoSection::infoSectionLandmark::iSL_FileHeaders);
+				infoSection.updateGroupEntryAddressValues();
 			}
 
 			return result;
