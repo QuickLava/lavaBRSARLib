@@ -1408,6 +1408,84 @@ namespace lava
 			return result;
 		}
 
+		// File File Contents Struct Functions - Used in BRSAR INFO Header
+		unsigned long brsarFileFileContents::size() const
+		{
+			return header.size() + data.size();
+		}
+		bool brsarFileFileContents::dumpToStream(std::ostream& output)
+		{
+			bool result = 0;
+
+			if (output.good())
+			{
+				result = dumpHeaderToStream(output);
+				result &= dumpDataToStream(output);
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpHeaderToStream(std::ostream& output)
+		{
+			bool result = 0;
+
+			if (output.good())
+			{
+				output.write((char*)header.data(), header.size());
+				result = output.good();
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpDataToStream(std::ostream& output)
+		{
+			bool result = 0;
+
+			if (output.good())
+			{
+				output.write((char*)data.data(), data.size());
+				result = output.good();
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpToFile(std::string filePath)
+		{
+			bool result = 0;
+
+			std::ofstream output(filePath, std::ios_base::binary | std::ios_base::out);
+			if (output.is_open())
+			{
+				result = dumpToStream(output);
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpHeaderToFile(std::string filePath)
+		{
+			bool result = 0;
+
+			std::ofstream output(filePath, std::ios_base::binary | std::ios_base::out);
+			if (output.is_open())
+			{
+				result = dumpHeaderToStream(output);
+			}
+
+			return result;
+		}
+		bool brsarFileFileContents::dumpDataToFile(std::string filePath)
+		{
+			bool result = 0;
+
+			std::ofstream output(filePath, std::ios_base::binary | std::ios_base::out);
+			if (output.is_open())
+			{
+				result = dumpDataToStream(output);
+			}
+
+			return result;
+		}
+
 		constexpr unsigned long brsarInfoFileEntry::size()
 		{
 			unsigned long result = 0;
@@ -1455,8 +1533,8 @@ namespace lava
 		{
 			unsigned result = 0;
 
-			result += sizeof(headerLength);
-			result += sizeof(dataLength);
+			result += sizeof(unsigned long); // File Header Length Field Size
+			result += sizeof(unsigned long); // File Data Length Field Size
 			result += sizeof(entryNumber);
 			result += stringOffset.size();
 			result += listOffset.size();
@@ -1481,8 +1559,9 @@ namespace lava
 				parent = &parentIn;
 
 				std::size_t cursor = originalAddress;
-				headerLength = bodyIn.getLong(cursor, &cursor);
-				dataLength = bodyIn.getLong(cursor, &cursor);
+				// Store these for use in externalized files, whose header/data lengths we can't determine based on the BRSAR itself
+				originalFileHeaderLength = bodyIn.getLong(cursor, &cursor);
+				originalFileDataLength = bodyIn.getLong(cursor, &cursor);
 				entryNumber = bodyIn.getLong(cursor, &cursor);
 				stringOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
 				listOffset = brawlReference(bodyIn.getLLong(cursor, &cursor));
@@ -1514,8 +1593,20 @@ namespace lava
 			if (destinationStream.good())
 			{
 				result = 1;
-				lava::writeRawDataToStream(destinationStream, headerLength);
-				lava::writeRawDataToStream(destinationStream, dataLength);
+				// If this is a normal, internal file...
+				if (stringContent.empty())
+				{
+					// Use the currently stored fileContents to determine our length values.
+					lava::writeRawDataToStream(destinationStream, fileContents.header.size());
+					lava::writeRawDataToStream(destinationStream, fileContents.data.size());
+				}
+				// But if this is instead an external file...
+				else
+				{
+					// Fall back to the length values we loaded from the BRSAR originally.
+					lava::writeRawDataToStream(destinationStream, originalFileHeaderLength);
+					lava::writeRawDataToStream(destinationStream, originalFileDataLength);
+				}
 				lava::writeRawDataToStream(destinationStream, entryNumber);
 				lava::writeRawDataToStream(destinationStream, stringOffset.getHex());
 				lava::writeRawDataToStream(destinationStream, listOffset.getHex());
@@ -1552,8 +1643,8 @@ namespace lava
 		void brsarInfoFileHeader::updateFileEntryOffsetValues()
 		{
 			unsigned long relativeOffset = 0;
-			relativeOffset += sizeof(headerLength);
-			relativeOffset += sizeof(dataLength);
+			relativeOffset += sizeof(unsigned long); // File Header Length Field Size
+			relativeOffset += sizeof(unsigned long); // File Data Length Field Size
 			relativeOffset += sizeof(entryNumber);
 
 			// If there's actual string content, calculate the new offset address for it
@@ -1953,6 +2044,11 @@ namespace lava
 					groupHeaders[i] = std::make_unique<brsarInfoGroupHeader>();
 					currGroupHeader = groupHeaders[i].get();
 					currGroupHeader->populate(*this, bodyIn, groupsSection.refs[i].getAddress(address + 0x08));
+					for (std::size_t u = 0; u < currGroupHeader->entries.size(); u++)
+					{
+						brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
+						fileIDsToGroupInfoIndecesThatUseThem[currGroupEntry->fileID].push_back(currGroupHeader->groupID);
+					}
 				}
 				
 				std::size_t cursor = footerReference.getAddress(address + 0x08);
@@ -1967,7 +2063,6 @@ namespace lava
 				reserved = bodyIn.getLong(cursor, &cursor);
 
 				updateChildStructOffsetValues();
-
 				parent->signalINFOSectionSizeChange();
 			}
 
@@ -2045,7 +2140,6 @@ namespace lava
 			}
 			return result;
 		}
-
 		
 		bool brsarInfoSection::writeSoundRefVec(std::ostream& destinationStream) const
 		{
@@ -2136,6 +2230,7 @@ namespace lava
 		void brsarInfoSection::updateChildStructOffsetValues(infoSectionLandmark startFrom)
 		{
 			unsigned long relativeOffset = ULONG_MAX;
+			parent->signalINFOSectionSizeChange();
 			if (startFrom <= infoSectionLandmark::iSL_SoundEntries)
 			{
 				if (relativeOffset == ULONG_MAX)
@@ -2221,6 +2316,83 @@ namespace lava
 			}
 		}
 
+		unsigned long brsarInfoSection::virutalFileSectionSize() const
+		{
+			unsigned long result = 0x00;
+			result += 0x20; // Size of the FILE Section Header
+			for (int i = 0; i < groupHeaders.size(); i++)
+			{
+				brsarInfoGroupHeader* currGroupHeader = groupHeaders[i].get();
+				unsigned long groupHeaderStartRelativeOffset = 0x00;
+				for (int u = 0; u < currGroupHeader->entries.size(); u++)
+				{
+					brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
+					result += currGroupEntry->headerLength;
+					result += currGroupEntry->dataLength;
+				}
+			}
+			return result;
+		}
+		bool brsarInfoSection::updateGroupEntryAddressValues()
+		{
+			bool result = 1;
+
+			try
+			{
+				unsigned long fileSectionAddress = parent->getVirtualFILESectionAddress();
+				unsigned long fileSectionRelativeOffset = 0x20;
+				for (int i = 0; i < groupHeaders.size(); i++)
+				{
+					brsarInfoGroupHeader* currGroupHeader = groupHeaders[i].get();
+					currGroupHeader->headerAddress = fileSectionAddress + fileSectionRelativeOffset;
+					unsigned long groupHeaderStartRelativeOffset = 0x00;
+					for (int u = 0; u < currGroupHeader->entries.size(); u++)
+					{
+						brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
+						brsarInfoFileHeader* currFileHeader = getFileHeaderPointer(currGroupEntry->fileID);
+						if (u == 0 || currGroupEntry->headerOffset != 0x00000000)
+						{
+							currGroupEntry->headerOffset = groupHeaderStartRelativeOffset;
+						}
+						else
+						{
+							currGroupEntry->headerOffset = 0x00000000;
+						}
+						currGroupEntry->headerLength = currFileHeader->fileContents.header.size();
+						groupHeaderStartRelativeOffset += currGroupEntry->headerLength;
+					}
+					currGroupHeader->headerLength = groupHeaderStartRelativeOffset;
+					fileSectionRelativeOffset += groupHeaderStartRelativeOffset;
+					currGroupHeader->dataAddress = fileSectionAddress + fileSectionRelativeOffset;
+					unsigned long groupDataStartRelativeOffset = 0x00;
+					for (int u = 0; u < currGroupHeader->entries.size(); u++)
+					{
+						brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
+						brsarInfoFileHeader* currFileHeader = getFileHeaderPointer(currGroupEntry->fileID);
+						if (u == 0 || currGroupEntry->dataOffset != 0x00000000)
+						{
+							currGroupEntry->dataOffset = groupDataStartRelativeOffset;
+						}
+						else
+						{
+							currGroupEntry->dataOffset = 0x00000000;
+						}
+						currGroupEntry->dataLength = currFileHeader->fileContents.data.size();
+						groupDataStartRelativeOffset += currGroupEntry->dataLength;
+					}
+					currGroupHeader->dataLength = groupDataStartRelativeOffset;
+					fileSectionRelativeOffset += groupDataStartRelativeOffset;
+				}
+			}
+			catch (std::exception oopsie)
+			{
+				std::cerr << "Something went wrong updating Group Entry Address Values!\n\tException: " << oopsie.what();
+				result = 0;
+			}
+
+			return result;
+		}
+
 		brsarInfoGroupHeader* brsarInfoSection::getGroupWithID(unsigned long groupIDIn)
 		{
 			brsarInfoGroupHeader* result = nullptr;
@@ -2295,8 +2467,8 @@ namespace lava
 						output << std::string((char*)currHeaderPtr->stringContent.data());
 					}
 					output << "\"\n";
-					output << "\tFile Header Length: " << currHeaderPtr->headerLength << " byte(s)\n";
-					output << "\tFile Data Length: " << currHeaderPtr->dataLength << " byte(s)\n";
+					output << "\tFile Header Length: " << currHeaderPtr->fileContents.header.size() << " byte(s)\n";
+					output << "\tFile Data Length: " << currHeaderPtr->fileContents.data.size() << " byte(s)\n";
 					output << "\tFile Entry Number: " << currHeaderPtr->entryNumber << "\n";
 					output << "\tFile Entries:\n";
 					for (unsigned long u = 0; u < currHeaderPtr->entries.size(); u++)
@@ -2318,232 +2490,6 @@ namespace lava
 
 		/* BRSAR File Section */
 
-		unsigned long brsarFileFileContents::size() const
-		{
-			return header.size() + data.size();
-		}
-		unsigned long brsarFileFileContents::getHeaderAddress() const
-		{
-			return (parent != nullptr) ? parent->getAddress() + parentRelativeHeaderOffset : ULONG_MAX;
-		}
-		unsigned long brsarFileFileContents::getDataAddress() const
-		{
-			return (parent != nullptr) ? parent->getAddress() + parentRelativeDataOffset : ULONG_MAX;
-		}
-		bool brsarFileFileContents::dumpToStream(std::ostream& output)
-		{
-			bool result = 0;
-
-			if (output.good())
-			{
-				result = dumpHeaderToStream(output);
-				result &= dumpDataToStream(output);
-			}
-
-			return result;
-		}
-		bool brsarFileFileContents::dumpHeaderToStream(std::ostream& output)
-		{
-			bool result = 0;
-
-			if (output.good())
-			{
-				output.write((char*)header.data(), header.size());
-				result = output.good();
-			}
-
-			return result;
-		}
-		bool brsarFileFileContents::dumpDataToStream(std::ostream& output)
-		{
-			bool result = 0;
-
-			if (output.good())
-			{
-				output.write((char*)data.data(), data.size());
-				result = output.good();
-			}
-
-			return result;
-		}
-		bool brsarFileFileContents::dumpToFile(std::string filePath)
-		{
-			bool result = 0;
-
-			std::ofstream output(filePath, std::ios_base::binary | std::ios_base::out);
-			if (output.is_open())
-			{
-				result = dumpToStream(output);
-			}
-
-			return result;
-		}
-		bool brsarFileFileContents::dumpHeaderToFile(std::string filePath)
-		{
-			bool result = 0;
-
-			std::ofstream output(filePath, std::ios_base::binary | std::ios_base::out);
-			if (output.is_open())
-			{
-				result = dumpHeaderToStream(output);
-			}
-
-			return result;
-		}
-		bool brsarFileFileContents::dumpDataToFile(std::string filePath)
-		{
-			bool result = 0;
-
-			std::ofstream output(filePath, std::ios_base::binary | std::ios_base::out);
-			if (output.is_open())
-			{
-				result = dumpDataToStream(output);
-			}
-
-			return result;
-		}
-
-		unsigned long brsarFileSection::size() const
-		{
-			unsigned long result = 0;
-
-			result += 0x04; // FILE Tag
-			result += sizeof(unsigned long); // Length
-			result += 0x18; // Padding
-			for (unsigned long i = 0; i < fileContents.size(); i++)
-			{
-				result += fileContents[i].size();
-			}
-
-			return result;
-		}
-		unsigned long brsarFileSection::getAddress() const
-		{
-			return (parent != nullptr) ? parent->getFILESectionAddress() : ULONG_MAX;
-		}
-		bool brsarFileSection::populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn, brsarInfoSection& infoSectionIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_FILE)
-			{
-				result = 1;
-				parent = &parentIn;
-				originalAddress = addressIn;
-
-				//length = bodyIn.getLong(address + 0x04); No longer needed!
-				brsarInfoGroupHeader* currHeader = nullptr;
-				brsarInfoGroupEntry* currEntry = nullptr;
-				for (std::size_t i = 0; i < infoSectionIn.groupHeaders.size(); i++)
-				{
-					currHeader = infoSectionIn.groupHeaders[i].get();
-					for (std::size_t u = 0; u < currHeader->entries.size(); u++)
-					{
-						currEntry = &currHeader->entries[u];
-						fileContents.push_back(brsarFileFileContents());
-						fileContents.back().fileID = currEntry->fileID;
-						fileContents.back().groupInfoIndex = i;
-						fileContents.back().groupID = currHeader->groupID;
-						fileContents.back().originalHeaderAddress = currHeader->headerAddress + currEntry->headerOffset;
-						fileContents.back().header = bodyIn.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset);
-						fileContents.back().originalDataAddress = currHeader->dataAddress + currEntry->dataOffset;
-						fileContents.back().data = bodyIn.getBytes(currEntry->dataLength, currHeader->dataAddress + currEntry->dataOffset);
-
-						fileContents.back().parent = this;
-						fileContents.back().parentRelativeHeaderOffset = fileContents.back().originalHeaderAddress - getAddress();
-						fileContents.back().parentRelativeDataOffset = fileContents.back().originalDataAddress - getAddress();
-
-						fileIDToIndex[currEntry->fileID].push_back(fileContents.size() - 1);
-					}
-				}
-
-				parent->signalFILESectionSizeChange();
-			}
-
-			return result;
-		}
-		bool brsarFileSection::exportContents(std::ostream& destinationStream)
-		{
-			bool result = 0;
-
-			if (destinationStream.good())
-			{
-				byteArray tempArray(size(), 0x00);
-				tempArray.setLong(brsarHexTags::bht_FILE, 0x00);
-				tempArray.setLong(size(), 0x04);
-				for (unsigned long i = 0; i < fileContents.size(); i++)
-				{
-					brsarFileFileContents* currFilePtr = &fileContents[i];
-					if (currFilePtr->getHeaderAddress() > getAddress())
-					{
-						tempArray.setBytes(currFilePtr->header, currFilePtr->getHeaderAddress() - getAddress());
-					}
-					else
-					{
-						std::cerr << "Invalid header address!\n";
-					}
-					if (currFilePtr->getDataAddress() > getAddress())
-					{
-						tempArray.setBytes(currFilePtr->data, currFilePtr->getDataAddress() - getAddress());
-					}
-					else
-					{
-						std::cerr << "Invalid data address!\n";
-					}
-				}
-				tempArray.dumpToStream(destinationStream);
-				result = destinationStream.good();
-			}
-
-			return result;
-		}
-		std::vector<brsarFileFileContents*> brsarFileSection::getFileContentsPointerVector(unsigned long fileID)
-		{
-			std::vector<brsarFileFileContents*> result{};
-
-			auto findRes = fileIDToIndex.find(fileID);
-			if (findRes != fileIDToIndex.end())
-			{
-				std::vector<std::size_t>* indexVecPtr = &findRes->second;
-				for (unsigned long i = 0; i < indexVecPtr->size(); i++)
-				{
-					brsarFileFileContents* currFileContentsPtr = &fileContents[(*indexVecPtr)[i]];
-					result.push_back(currFileContentsPtr);
-				}
-			}
-
-			return result;
-		}
-		brsarFileFileContents* brsarFileSection::getFileContentsPointer(unsigned long fileID, unsigned long groupID)
-		{
-			brsarFileFileContents* result = nullptr;
-
-			std::vector<brsarFileFileContents*> pointerVec = getFileContentsPointerVector(fileID);
-			unsigned long i = 0;
-			while (result == nullptr && i < pointerVec.size())
-			{
-				if (groupID == ULONG_MAX || pointerVec[i]->groupID == groupID)
-				{
-					result = pointerVec[i];
-				}
-				i++;
-			}
-
-			return result;
-		}
-		bool brsarFileSection::propogateFileLengthChange(signed long changeAmount, unsigned long pastThisAddress)
-		{
-			bool result = 1;
-
-			for (unsigned long i = 0; i < fileContents.size(); i++)
-			{
-				brsarFileFileContents* currFile = &fileContents[i];
-				adjustOffset(getAddress(), currFile->parentRelativeHeaderOffset, changeAmount, pastThisAddress);
-				adjustOffset(getAddress(), currFile->parentRelativeDataOffset, changeAmount, pastThisAddress);
-			}
-
-			return result;
-		}
 		
 
 		/* RWSD */
@@ -3179,7 +3125,7 @@ namespace lava
 
 		unsigned long brsar::size()
 		{
-			return headerLength + getSYMBSectionSize() + getINFOSectionSize() + getFILESectionSize();
+			return headerLength + getSYMBSectionSize() + getINFOSectionSize() + getVirtualFILESectionSize();
 		}
 		bool brsar::init(std::string filePathIn)
 		{
@@ -3203,12 +3149,69 @@ namespace lava
 
 					result &= symbSection.populate(*this, contents, contents.getLong(0x10));
 					result &= infoSection.populate(*this, contents, contents.getLong(0x18));
-					result &= fileSection.populate(*this, contents, contents.getLong(0x20), infoSection);
-
-					updateInfoSectionFileOffsets();
+					// Populate INFO Section's brsarInfoFileHeader structs with their respective raw File Contents
+					if (contents.populated() && contents.getLong(getVirtualFILESectionAddress()) == brsarHexTags::bht_FILE)
+					{
+						brsarInfoGroupHeader* currHeader = nullptr;
+						brsarInfoGroupEntry* currEntry = nullptr;
+						for (std::size_t i = 0; i < infoSection.groupHeaders.size(); i++)
+						{
+							currHeader = infoSection.groupHeaders[i].get();
+							for (std::size_t u = 0; u < currHeader->entries.size(); u++)
+							{
+								currEntry = &currHeader->entries[u];
+								brsarInfoFileHeader* targetFileHeader = infoSection.getFileHeaderPointer(currEntry->fileID);
+								if (targetFileHeader != nullptr)
+								{
+									targetFileHeader->fileContents.groupInfoIndex = i;
+									targetFileHeader->fileContents.groupID = currHeader->groupID;
+									targetFileHeader->fileContents.header = contents.getBytes(currEntry->headerLength, currHeader->headerAddress + currEntry->headerOffset);
+									targetFileHeader->fileContents.data = contents.getBytes(currEntry->dataLength, currHeader->dataAddress + currEntry->dataOffset);
+								}
+							}
+						}
+					}
+					// Recalculate the referenced addresses and offsets used in the INFO Section's brsarInfoGroupHeader/Entry structs
+					signalVirtualFILESectionSizeChange();
+					infoSection.updateGroupEntryAddressValues();
 				}
 			}
 			return result;
+		}
+		bool brsar::exportVirtualFileSection(std::ostream& destinationStream)
+		{
+			unsigned long fileLengthTotal = 0x20;
+			unsigned long preFileDumpStreamPos = destinationStream.tellp();
+			destinationStream.write(std::vector<char>(0x20, 0x00).data(), 0x20);
+			for (int i = 0; i < infoSection.groupHeaders.size(); i++)
+			{
+				brsarInfoGroupHeader* currGroupHeader = infoSection.groupHeaders[i].get();
+				for (int u = 0; u < currGroupHeader->entries.size(); u++)
+				{
+					brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
+					brsarInfoFileHeader* currFileHeader = infoSection.getFileHeaderPointer(currGroupEntry->fileID);
+					if (currFileHeader != nullptr)
+					{
+						fileLengthTotal += currFileHeader->fileContents.header.size();
+						destinationStream.write((char*)currFileHeader->fileContents.header.data(), currFileHeader->fileContents.header.size());
+					}
+				}
+				for (int u = 0; u < currGroupHeader->entries.size(); u++)
+				{
+					brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
+					brsarInfoFileHeader* currFileHeader = infoSection.getFileHeaderPointer(currGroupEntry->fileID);
+					if (currFileHeader != nullptr)
+					{
+						fileLengthTotal += currFileHeader->fileContents.data.size();
+						destinationStream.write((char*)currFileHeader->fileContents.data.data(), currFileHeader->fileContents.data.size());
+					}
+				}
+			}
+			destinationStream.seekp(preFileDumpStreamPos);
+			writeRawDataToStream(destinationStream, unsigned long(brsarHexTags::bht_FILE));
+			writeRawDataToStream(destinationStream, fileLengthTotal);
+			destinationStream.write(std::vector<char>(0x18, 0x00).data(), 0x18);
+			return 1;
 		}
 		bool brsar::exportContents(std::ostream& destinationStream)
 		{
@@ -3224,8 +3227,8 @@ namespace lava
 			writeRawDataToStream(destinationStream, symbSection.paddedSize());
 			writeRawDataToStream(destinationStream, getINFOSectionAddress());
 			writeRawDataToStream(destinationStream, infoSection.paddedSize());
-			writeRawDataToStream(destinationStream, getFILESectionAddress());
-			writeRawDataToStream(destinationStream, fileSection.size());
+			writeRawDataToStream(destinationStream, getVirtualFILESectionAddress());
+			writeRawDataToStream(destinationStream, getVirtualFILESectionSize());
 			if (headerLength > destinationStream.tellp())
 			{
 				std::vector<char> padding(headerLength - destinationStream.tellp(), 0x00);
@@ -3233,8 +3236,8 @@ namespace lava
 			}
 			result &= symbSection.exportContents(destinationStream);
 			result &= infoSection.exportContents(destinationStream);
-			result &= fileSection.exportContents(destinationStream);
-
+			result &= exportVirtualFileSection(destinationStream);
+			
 			return result;
 		}
 		bool brsar::exportContents(std::string outputFilename)
@@ -3258,9 +3261,9 @@ namespace lava
 		{
 			infoSectionCachedSize = ULONG_MAX;
 		}
-		void brsar::signalFILESectionSizeChange()
+		void brsar::signalVirtualFILESectionSizeChange()
 		{
-			fileSectionCachedSize = ULONG_MAX;
+			virtualFileSectionCachedSize = ULONG_MAX;
 		}
 
 		unsigned long brsar::getSYMBSectionSize()
@@ -3279,13 +3282,13 @@ namespace lava
 			}
 			return infoSectionCachedSize;
 		}
-		unsigned long brsar::getFILESectionSize()
+		unsigned long brsar::getVirtualFILESectionSize()
 		{
-			if (fileSectionCachedSize == ULONG_MAX)
+			if (virtualFileSectionCachedSize == ULONG_MAX)
 			{
-				fileSectionCachedSize = fileSection.size();
+				virtualFileSectionCachedSize = infoSection.virutalFileSectionSize();
 			}
-			return fileSectionCachedSize;
+			return virtualFileSectionCachedSize;
 		}
 
 		unsigned long brsar::getSYMBSectionAddress()
@@ -3296,7 +3299,7 @@ namespace lava
 		{
 			return headerLength + getSYMBSectionSize();
 		}
-		unsigned long brsar::getFILESectionAddress()
+		unsigned long brsar::getVirtualFILESectionAddress()
 		{
 			return headerLength + getSYMBSectionSize() + getINFOSectionSize();
 		}
@@ -3330,121 +3333,19 @@ namespace lava
 			return result;
 		}
 
-		bool brsar::updateInfoSectionFileOffsets()
-		{
-			bool result = 1;
-			// Update each groupHeader and its entries with current file location info
-			for (unsigned long i = 0; i < infoSection.groupHeaders.size(); i++)
-			{
-				// Grab a pointer to a given header
-				brsarInfoGroupHeader* currGroupHeader = infoSection.groupHeaders[i].get();
-				// Reset its lengths to 0, because we'll be using this and building it as we go.
-				currGroupHeader->headerLength = 0x00;
-				currGroupHeader->dataLength = 0x00;
-				// If there are entries to iterate through...
-				if (!currGroupHeader->entries.empty())
-				{
-					// Iterate through each of this headers entries, and update its info.
-					for (unsigned long u = 0; u < currGroupHeader->entries.size(); u++)
-					{
-						// Grab a pointer to the entry
-						brsarInfoGroupEntry* currGroupEntry = &currGroupHeader->entries[u];
-						// Grab a pointer to the relevant fileContents entry
-						brsarFileFileContents* currFileContents = fileSection.getFileContentsPointer(currGroupEntry->fileID, currGroupHeader->groupID);
-						// If we grabbed the pointer successfully (this shouldn't ever fail, though)
-						if (currFileContents != nullptr)
-						{
-							// If this is the first entry...
-							if (u == 0)
-							{
-								// ... update the header and data address values to point to the right spots.
-								currGroupHeader->headerAddress = currFileContents->getHeaderAddress();
-								currGroupHeader->dataAddress = currFileContents->getDataAddress();
-							}
-							// Additionally, we'll always update the offset values if we're on the first entry.
-							if (u == 0)
-							{
-								// Update the offset values.
-								// These are tied to the current groupHeader's length values, which we update every run of this loop.
-								// As a result, each offset points to right after the previous item.
-								currGroupEntry->headerOffset = currGroupHeader->headerLength;
-								currGroupEntry->dataOffset = currGroupHeader->dataLength;
-							}
-							// We won't, however, always update them otherwise.
-							else
-							{
-								// In some instances, an entry after the first will have offsets of 0x00.
-								// We need to maintain this in the modified file, so we only update the offsets otherwise.
-								if (currGroupEntry->headerOffset != 0x00000000)
-								{
-									currGroupEntry->headerOffset = currGroupHeader->headerLength;
-								}
-								if (currGroupEntry->dataOffset != 0x00000000)
-								{
-									currGroupEntry->dataOffset = currGroupHeader->dataLength;
-								}
-							}
-							// Update the length values. Self explanatory.
-							currGroupEntry->headerLength = currFileContents->header.size();
-							currGroupEntry->dataLength = currFileContents->data.size();
-							// Update the groupHeader's length values. See above explanation.
-							currGroupHeader->headerLength += currGroupEntry->headerLength;
-							currGroupHeader->dataLength += currGroupEntry->dataLength;
-
-						}
-						else
-						{
-							result = 0;
-						}
-					}
-				}
-				else
-				{
-					// Otherwise, just point the header and data address fields to just after the previous data section.
-					// I don't expect that this actually has any practical effect, since I don't expect the addresses of an empty group to ever be called.
-					// However, vBrawl handles it this way, so that's how we'll do it as well.
-					if (i > 0)
-					{
-						brsarInfoGroupHeader* prevGroupHeader = infoSection.groupHeaders[i - 1].get();
-						currGroupHeader->headerAddress = prevGroupHeader->dataAddress + prevGroupHeader->dataLength;
-						currGroupHeader->dataAddress = currGroupHeader->headerAddress;
-					}
-				}
-			}
-			return result;
-		}
 		bool brsar::overwriteFile(const std::vector<unsigned char>& headerIn, const std::vector<unsigned char>& dataIn, unsigned long fileIDIn)
 		{
 			bool result = 0;
 
-			std::vector<brsarFileFileContents*> fileOccurences = fileSection.getFileContentsPointerVector(fileIDIn);
-			if (!fileOccurences.empty())
+			brsarInfoFileHeader* fileHeaderPtr = infoSection.getFileHeaderPointer(fileIDIn);
+			if (fileHeaderPtr != nullptr)
 			{
-				brsarInfoFileHeader* fileHeaderPtr = infoSection.getFileHeaderPointer(fileIDIn);
-				if (fileHeaderPtr != nullptr)
-				{
-					result = 1;
-					// Handle File Section Adjustments
-					for (unsigned long i = 0; i < fileOccurences.size(); i++)
-					{
-						// Replace the header and data
-						brsarFileFileContents* currOccurence = fileOccurences[i];
-						signed long headerLengthChange = signed long(headerIn.size()) - signed long(currOccurence->header.size());
-						signed long dataLengthChange = signed long(dataIn.size()) - signed long(currOccurence->data.size());
-						currOccurence->header = headerIn;
-						currOccurence->data = dataIn;
-						// Propogate the changes in size across the fileSection
-						// Note that this needs to be done in two steps, because the dataAddress will likely change after the first step.
-						result &= fileSection.propogateFileLengthChange(headerLengthChange, currOccurence->getHeaderAddress());
-						result &= fileSection.propogateFileLengthChange(dataLengthChange, currOccurence->getDataAddress());
-						// Note that the above propogation functions will update the FILE section's length.
-					}
-					// Update this file's fileHeader (it's the only one that needs its length updated)
-					fileHeaderPtr->headerLength = headerIn.size();
-					fileHeaderPtr->dataLength = dataIn.size();
-					// Update the rest of the infoSection to correct the changes to file locations
-					result &= updateInfoSectionFileOffsets();
-				}
+				result = 1;
+				// Replace File Contents
+				fileHeaderPtr->fileContents.header = headerIn;
+				fileHeaderPtr->fileContents.data = dataIn;
+				// Update the rest of the infoSection to correct the changes to file locations
+				result &= infoSection.updateGroupEntryAddressValues();
 			}
 
 			return result;
@@ -3456,39 +3357,20 @@ namespace lava
 			brsarInfoFileHeader* targetFileHeader = infoSection.getFileHeaderPointer(fileIDToClone);
 			if (targetFileHeader != nullptr)
 			{
-				if (!fileSection.getFileContentsPointerVector(fileIDToClone).empty())
-				{
-					fileSection.fileContents.push_back(brsarFileFileContents());
-					brsarFileFileContents* sourceFileContents = fileSection.getFileContentsPointerVector(fileIDToClone).front();
-					brsarFileFileContents* newFileContents = &fileSection.fileContents.back();
-					newFileContents->parent = &fileSection;
-					newFileContents->originalHeaderAddress = bac_NOT_IN_FILE;
-					newFileContents->originalDataAddress = bac_NOT_IN_FILE;
-					newFileContents->header = sourceFileContents->header;
-					newFileContents->data = sourceFileContents->data;
-					newFileContents->fileID = infoSection.fileHeaders.size();
-					newFileContents->groupID = groupToLink;
-					newFileContents->parentRelativeHeaderOffset = getFILESectionSize();
-					newFileContents->parentRelativeDataOffset = getFILESectionSize() + newFileContents->header.size();
-					fileSection.fileIDToIndex[newFileContents->fileID] = std::vector<std::size_t>{ fileSection.fileContents.size() - 1 };
+				infoSection.fileHeaders.push_back(std::make_unique<brsarInfoFileHeader>());
+				brsarInfoFileHeader* newFileHeader = infoSection.fileHeaders.back().get();
+				newFileHeader->parent = &infoSection;
+				newFileHeader->fileContents.header = targetFileHeader->fileContents.header;
+				newFileHeader->fileContents.data = targetFileHeader->fileContents.data;
+				newFileHeader->entries.push_back(brsarInfoFileEntry());
+				brsarInfoFileEntry* newFileEntry = &newFileHeader->entries.back();
+				newFileEntry->parent = newFileHeader;
+				newFileEntry->index = 0x00;
+				newFileEntry->groupID = groupToLink;
 
-					infoSection.fileHeaders.push_back(std::make_unique<brsarInfoFileHeader>());
-					brsarInfoFileHeader* newFileHeader = infoSection.fileHeaders.back().get();
-					newFileHeader->parent = &infoSection;
-					newFileHeader->headerLength = newFileContents->header.size();
-					newFileHeader->dataLength = newFileContents->data.size();
-					newFileHeader->entries.push_back(brsarInfoFileEntry());
-					brsarInfoFileEntry* newFileEntry = &newFileHeader->entries.back();
-					newFileEntry->parent = newFileHeader;
-					newFileEntry->index = 0x00;
-					newFileEntry->groupID = groupToLink;
-
-					signalINFOSectionSizeChange();
-					signalFILESectionSizeChange();
-
-					infoSection.updateChildStructOffsetValues(brsarInfoSection::infoSectionLandmark::iSL_FileHeaders);
-					updateInfoSectionFileOffsets();
-				}
+				signalINFOSectionSizeChange();
+				signalVirtualFILESectionSizeChange();
+				infoSection.updateChildStructOffsetValues(brsarInfoSection::infoSectionLandmark::iSL_FileHeaders);
 			}
 
 			return result;
@@ -3523,7 +3405,7 @@ namespace lava
 			brsarInfoGroupHeader* currHeader = nullptr;
 			brsarInfoGroupEntry* currEntry = nullptr;
 			std::ofstream metadataOutput(dumpRootFolder + "summary.txt");
-			metadataOutput << "lavaBRSARLib " << version << "\n\n";
+			metadataOutput << "lavaBRSARLib " << lava::brawl::version << "\n\n";
 			metadataOutput << "BRSAR File Dump Summary:\n";
 			MD5 md5Object;
 			for (std::size_t i = 0; i < infoSection.groupHeaders.size(); i++)
@@ -3542,52 +3424,56 @@ namespace lava
 				for (std::size_t u = 0; u < currHeader->entries.size(); u++)
 				{
 					currEntry = &currHeader->entries[u];
-					std::vector<std::size_t>* idToIndexVecPtr = &fileSection.fileIDToIndex[currEntry->fileID];
-					std::string fileBaseName = numToDecStringWithPadding(currEntry->fileID, 0x03) + "_(0x" + numToHexStringWithPadding(currEntry->fileID, 0x03) + ")";
-					bool entryExported = 0;
-					std::size_t y = 0;
-					while(!entryExported)
+					brsarInfoFileHeader* relevantFileHeader = infoSection.getFileHeaderPointer(currEntry->fileID);
+					if (relevantFileHeader != nullptr)
 					{
-						brsarFileFileContents* fileContentsPtr = &fileSection.fileContents[(*idToIndexVecPtr)[y]];
-						if (fileContentsPtr->groupID == currHeader->groupID)
-						{
-							metadataOutput << "\tFile " << numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << numToHexStringWithPadding(fileContentsPtr->getHeaderAddress(), 0x08) << "\n";
-							metadataOutput << "\t\tFile Type: ";
-							if (fileContentsPtr->header.size() >= 0x04)
-							{
-								metadataOutput << fileContentsPtr->header[0] << fileContentsPtr->header[1] << fileContentsPtr->header[2] << fileContentsPtr->header[3] << "\n";
-							}
-							else
-							{
-								metadataOutput << "----\n";
-							}
-							metadataOutput << "\t\tHeader Size: " << fileContentsPtr->header.size() << " byte(s) (" << bytesToFileSizeString(fileContentsPtr->header.size()) << ")\n";
-							metadataOutput << "\t\tData Size: " << fileContentsPtr->data.size() << " byte(s) (" << bytesToFileSizeString(fileContentsPtr->data.size()) << ")\n";
-							metadataOutput << "\t\tTotal Size: " << fileContentsPtr->header.size() + fileContentsPtr->data.size() << " byte(s) (" << bytesToFileSizeString(fileContentsPtr->header.size() + fileContentsPtr->data.size()) << ")\n";
-							metadataOutput << "\t\tNumber Times File Occurs in BRSAR: " << idToIndexVecPtr->size() << "\n";
-							metadataOutput << "\t\tNumber of Current Occurence: " << numberToOrdinal(y + 1) << " (Suffixed with \"_" << std::string(1, 'A' + y) << "\")\n";
-							metadataOutput << "\t\tHeader MD5 Hash: " << md5Object((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size()) << "\n";
-							metadataOutput << "\t\tData MD5 Hash: " << md5Object((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size()) << "\n";
+						std::string fileBaseName = numToDecStringWithPadding(currEntry->fileID, 0x03) + "_(0x" + numToHexStringWithPadding(currEntry->fileID, 0x03) + ")";
+						bool entryExported = 0;
 
-							std::string headerFilename = "";
-							std::string dataFilename = "";
-							headerFilename += "_" + std::string(1, 'A' + y);
-							dataFilename += "_" + std::string(1, 'A' + y);
-							if (joinHeaderAndData)
+						if (infoSection.fileIDsToGroupInfoIndecesThatUseThem.find(currEntry->fileID) != infoSection.fileIDsToGroupInfoIndecesThatUseThem.end())
+						{
+							std::vector<std::size_t> groupsThisFileOccursIn = infoSection.fileIDsToGroupInfoIndecesThatUseThem[currEntry->fileID];
+							for (std::size_t t = 0; !entryExported && t < groupsThisFileOccursIn.size(); t++)
 							{
-								headerFilename += "_joined.dat";
-								fileContentsPtr->dumpToFile(headerFilename);
+								if (groupsThisFileOccursIn[t] == currHeader->groupID)
+								{
+									brsarFileFileContents* fileContentsPtr = &relevantFileHeader->fileContents;
+									metadataOutput << "\tFile " << numToDecStringWithPadding(currEntry->fileID, 0x03) << " (0x" << numToHexStringWithPadding(currEntry->fileID, 0x03) << ") @ 0x" << numToHexStringWithPadding(currHeader->headerAddress + currEntry->headerOffset, 0x08) << "\n";
+									metadataOutput << "\t\tFile Type: ";
+									if (fileContentsPtr->header.size() >= 0x04)
+									{
+										metadataOutput << fileContentsPtr->header[0] << fileContentsPtr->header[1] << fileContentsPtr->header[2] << fileContentsPtr->header[3] << "\n";
+									}
+									else
+									{
+										metadataOutput << "----\n";
+									}
+									metadataOutput << "\t\tHeader Size: " << fileContentsPtr->header.size() << " byte(s) (" << bytesToFileSizeString(fileContentsPtr->header.size()) << ")\n";
+									metadataOutput << "\t\tData Size: " << fileContentsPtr->data.size() << " byte(s) (" << bytesToFileSizeString(fileContentsPtr->data.size()) << ")\n";
+									metadataOutput << "\t\tTotal Size: " << fileContentsPtr->header.size() + fileContentsPtr->data.size() << " byte(s) (" << bytesToFileSizeString(fileContentsPtr->header.size() + fileContentsPtr->data.size()) << ")\n";
+									metadataOutput << "\t\tNumber Times File Occurs in BRSAR: " << groupsThisFileOccursIn.size() << "\n";
+									metadataOutput << "\t\tNumber of Current Occurrence: " << numberToOrdinal(t + 1) << " (Suffixed with \"_" << std::string(1, 'A' + t) << "\")\n";
+									metadataOutput << "\t\tHeader MD5 Hash: " << md5Object((char*)fileContentsPtr->header.data(), fileContentsPtr->header.size()) << "\n";
+									metadataOutput << "\t\tData MD5 Hash: " << md5Object((char*)fileContentsPtr->data.data(), fileContentsPtr->data.size()) << "\n";
+
+									std::string headerFilename = fileBaseName + "_" + std::string(1, 'A' + t);
+									std::string dataFilename = fileBaseName + "_" + std::string(1, 'A' + t);
+									if (joinHeaderAndData)
+									{
+										headerFilename += "_joined.dat";
+										fileContentsPtr->dumpToFile(groupFolder + headerFilename);
+									}
+									else
+									{
+										headerFilename += "_header.dat";
+										dataFilename += "_data.dat";
+										fileContentsPtr->dumpHeaderToFile(groupFolder + headerFilename);
+										fileContentsPtr->dumpDataToFile(groupFolder + dataFilename);
+									}
+									entryExported = 1;
+								}
 							}
-							else
-							{
-								headerFilename += "_header.dat";
-								dataFilename += "_data.dat";
-								fileContentsPtr->dumpHeaderToFile(headerFilename);
-								fileContentsPtr->dumpDataToFile(dataFilename);
-							}
-							entryExported = 1;
 						}
-						y++;
 					}
 				}
 			}
