@@ -641,6 +641,9 @@ namespace lava
 			bool hasExclusiveWave(unsigned long dataSectionIndex);
 			bool isFirstToUseWave(unsigned long dataSectionIndex);
 
+			unsigned long size() const;
+			unsigned long paddedSize(unsigned long padTo = 0x10) const;
+
 			bool populate(const lava::byteArray& bodyIn, std::size_t address);
 			bool exportContents(std::ostream& destinationStream);
 		};
@@ -657,6 +660,8 @@ namespace lava
 			void waveEntryPushFront(const waveInfo& sourceWave);
 
 			unsigned long sumWavePacketLengths();
+			unsigned long size() const;
+			unsigned long paddedSize(unsigned long padTo = 0x20) const;
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};

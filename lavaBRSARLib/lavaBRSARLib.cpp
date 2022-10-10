@@ -74,7 +74,7 @@ namespace lava
 		}
 		int padLengthTo(unsigned long lengthIn, unsigned long padTo)
 		{
-			unsigned long padLength = padTo - (lengthIn % 0x10);
+			unsigned long padLength = (lengthIn % 0x10 != 0x00) ? padTo - (lengthIn % 0x10) : 0x00;
 			return lengthIn + padLength;
 		}
 
@@ -769,7 +769,7 @@ namespace lava
 					lava::writeRawDataToStream(destinationStream, trieOffsets[i]);
 				}*/
 
-				lava::writeRawDataToStream(destinationStream, stringEntryOffsets.size());
+				lava::writeRawDataToStream(destinationStream, unsigned long(stringEntryOffsets.size()));
 				for (std::size_t i = 0; i < stringEntryOffsets.size(); i++)
 				{
 					lava::writeRawDataToStream(destinationStream, stringEntryOffsets[i]);
@@ -1597,8 +1597,8 @@ namespace lava
 				if (stringContent.empty())
 				{
 					// Use the currently stored fileContents to determine our length values.
-					lava::writeRawDataToStream(destinationStream, fileContents.header.size());
-					lava::writeRawDataToStream(destinationStream, fileContents.data.size());
+					lava::writeRawDataToStream(destinationStream, unsigned long(fileContents.header.size()));
+					lava::writeRawDataToStream(destinationStream, unsigned long(fileContents.data.size()));
 				}
 				// But if this is instead an external file...
 				else
@@ -2592,6 +2592,24 @@ namespace lava
 			length += 0x04 + sourceWave.size();
 		}
 
+		unsigned long rwsdWaveSection::size() const
+		{
+			unsigned long result = 0x00;
+			result += sizeof(unsigned long); // Size of TAG Field
+			result += sizeof(unsigned long); // Size of Length Field
+			result += sizeof(unsigned long); // Size of Entry Count
+			result += sizeof(unsigned long) * entries.size(); // Length of Entry Offset List
+			for (unsigned long i = 0x0; i < entries.size(); i++)
+			{
+				result += entries[i].size();
+			}
+			return result;
+		}
+		unsigned long rwsdWaveSection::paddedSize(unsigned long padTo) const
+		{
+			return padLengthTo(size(), padTo);
+		}
+
 		bool rwsdWaveSection::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -2621,13 +2639,14 @@ namespace lava
 		bool rwsdWaveSection::exportContents(std::ostream& destinationStream)
 		{
 			bool result = 0;
+			unsigned long paddedSizeRes = paddedSize();
 			if (destinationStream.good())
 			{
 				unsigned long initialStreamPos = destinationStream.tellp();
 
 				destinationStream << "WAVE";
 				lava::writeRawDataToStream(destinationStream, length);
-				lava::writeRawDataToStream<unsigned long>(destinationStream, entries.size());
+				lava::writeRawDataToStream(destinationStream, unsigned long(entries.size()));
 
 				for (unsigned long i = 0x0; i < entryOffsets.size(); i++)
 				{
@@ -2692,6 +2711,24 @@ namespace lava
 			}
 			return result;
 		}
+		unsigned long rwsdDataSection::size() const
+		{
+			unsigned long result = 0x00;
+
+			result += sizeof(unsigned long); // Size of DATA Tag
+			result += sizeof(unsigned long); // Size of Length Field
+			result += calcRefVecSize(entries.size()); // Length of the Entries Ref Vec
+			for (int i = 0; i < entries.size(); i++) 
+			{
+				result += entries[i].size(); // Size of Each Entry
+			}
+
+			return result;
+		}
+		unsigned long rwsdDataSection::paddedSize(unsigned long padTo) const
+		{
+			return padLengthTo(size(), padTo);
+		}
 		bool rwsdDataSection::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -2726,6 +2763,7 @@ namespace lava
 		bool rwsdDataSection::exportContents(std::ostream& destinationStream)
 		{
 			bool result = 0;
+			unsigned long paddedSizeRes = paddedSize();
 			if (destinationStream.good())
 			{
 				unsigned long initialStreamPos = destinationStream.tellp();

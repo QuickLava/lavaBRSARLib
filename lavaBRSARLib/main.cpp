@@ -21,7 +21,7 @@ constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = false;
 // Test which overwrites File 0x06's header and data with zeroed-out 0x20 byte vectors.
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_2 = false;
 // Test which clones a specified file, handling all necessary INFO and FILE section changes.
-constexpr bool ENABLE_FILE_CLONE_TEST = true;
+constexpr bool ENABLE_FILE_CLONE_TEST = false;
 // Test which exports the entire .brsar.
 constexpr bool ENABLE_BRSAR_EXPORT_TEST = true;
 // Test which exports the full SYMB section.
@@ -31,13 +31,15 @@ constexpr bool ENABLE_INFO_SECTION_EXPORT_TEST	= false;
 // Test which exports the full FILE section.
 constexpr bool ENABLE_FILE_SECTION_EXPORT_TEST	= false;
 // Test which summarizes and dumps every file in the .brsar, grouped by group.
-constexpr bool ENABLE_FILE_DUMP_TEST = true;
+constexpr bool ENABLE_FILE_DUMP_TEST = false;
 // Test which dumps all the strings in the SYMB section.
 constexpr bool ENABLE_STRING_DUMP_TEST = false;
 // Test which summarizes data for every brsarInfoFileHeader in the .brsar.
 constexpr bool ENABLE_FILE_INFO_SUMMARY_TEST = true;
 // Tests the .spt to .dsp header conversion system (see "lavaDSP.h").
 constexpr bool ENABLE_SPT_TO_DSP_HEADER_TEST = false;
+// Tests summarizing and exporting an RWSD's data.
+constexpr bool ENABLE_RWSD_SUMMARIZE_TEST = true;
 // Tests exporting an RWSD Wave Info entry into a DSP.
 constexpr bool ENABLE_WAVE_INFO_TO_DSP_TEST = false;
 // Tests importing a DSP into an RWSD Wave Info entry.
@@ -151,6 +153,22 @@ int main()
 				dspFileOut << testSPD.rdbuf();
 			}
 			dspFileOut.close();
+		}
+	}
+	if (ENABLE_RWSD_SUMMARIZE_TEST)
+	{
+		lava::brawl::rwsd testExportRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
+		{
+			if (testExportRWSD.populate(relevantFileHeader->fileContents))
+			{
+				std::string baseName = targetBrsarName + "_" + lava::numToHexStringWithPadding(dspTestTargetFileID, 0x03) + "_RWSD";
+				std::ofstream fileDumpOut(baseName + ".dat", std::ios_base::out | std::ios_base::binary);
+				std::ofstream summaryOut(baseName + ".txt", std::ios_base::out | std::ios_base::binary);
+				testExportRWSD.exportFileSection(fileDumpOut);
+				testExportRWSD.summarize(summaryOut);
+			}
 		}
 	}
 	if (ENABLE_WAVE_INFO_TO_DSP_TEST)
