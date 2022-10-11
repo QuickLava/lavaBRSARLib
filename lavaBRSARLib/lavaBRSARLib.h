@@ -457,6 +457,7 @@ namespace lava
 			std::vector<unsigned char> data{};
 
 			unsigned long size() const;
+			unsigned long getFileType() const;
 			bool dumpToStream(std::ostream& output);
 			bool dumpHeaderToStream(std::ostream& output);
 			bool dumpDataToStream(std::ostream& output);
@@ -597,7 +598,7 @@ namespace lava
 			// Footer
 
 			unsigned long size(infoSectionLandmark tallyUpTo = infoSectionLandmark::iSL_Footer) const;
-			unsigned long paddedSize(unsigned long padTo = 0x10) const;
+			unsigned long paddedSize(unsigned long padTo = 0x20) const;
 			unsigned long getAddress() const;
 			bool populate(brsar& parentIn, lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
@@ -633,7 +634,7 @@ namespace lava
 		{
 			unsigned long address = ULONG_MAX;
 
-			unsigned long length = ULONG_MAX;
+			unsigned long originalLength = ULONG_MAX;
 
 			brawlReferenceVector entryReferences;
 			std::vector<dataInfo> entries{};
@@ -642,7 +643,7 @@ namespace lava
 			bool isFirstToUseWave(unsigned long dataSectionIndex);
 
 			unsigned long size() const;
-			unsigned long paddedSize(unsigned long padTo = 0x10) const;
+			unsigned long paddedSize(unsigned long padTo = 0x20) const;
 
 			bool populate(const lava::byteArray& bodyIn, std::size_t address);
 			bool exportContents(std::ostream& destinationStream);
@@ -651,7 +652,7 @@ namespace lava
 		{
 			unsigned long address = ULONG_MAX;
 
-			unsigned long length = ULONG_MAX;
+			unsigned long originalLength = ULONG_MAX;
 
 			std::vector<unsigned long> entryOffsets{};
 			std::vector<waveInfo> entries{};
@@ -660,6 +661,7 @@ namespace lava
 			void waveEntryPushFront(const waveInfo& sourceWave);
 
 			unsigned long sumWavePacketLengths();
+
 			unsigned long size() const;
 			unsigned long paddedSize(unsigned long padTo = 0x20) const;
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);

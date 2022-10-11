@@ -74,7 +74,11 @@ namespace lava
 		}
 		int padLengthTo(unsigned long lengthIn, unsigned long padTo)
 		{
-			unsigned long padLength = (lengthIn % 0x10 != 0x00) ? padTo - (lengthIn % 0x10) : 0x00;
+			unsigned long padLength = padTo - (lengthIn % padTo);
+			if (padLength == padTo)
+			{
+				padLength = 0x00;
+			}
 			return lengthIn + padLength;
 		}
 
@@ -270,12 +274,16 @@ namespace lava
 					channelInfoEntries.push_back(channelInfo());
 					unsigned long infoAddress = address + channelInfoTable.back();
 					channelInfoEntries.back().populate(bodyIn, infoAddress);
-					if (encoding == 2)
+				}
+				if (encoding == 2)
+				{
+					for (unsigned long i = 0; i < channelInfoEntries.size(); i++)
 					{
 						adpcmInfoEntries.push_back(adpcmInfo());
-						adpcmInfoEntries.back().populate(bodyIn, infoAddress + 0x1C);
+						adpcmInfoEntries.back().populate(bodyIn, address + channelInfoEntries[i].adpcmInfoOffset);
 					}
 				}
+
 				result = 1;
 			}
 
@@ -306,7 +314,10 @@ namespace lava
 				for (unsigned long i = 0x0; i < channelInfoEntries.size(); i++)
 				{
 					channelInfoEntries[i].exportContents(destinationStream);
-					if (encoding == 2)
+				}
+				if (encoding == 2)
+				{
+					for (unsigned long i = 0x0; i < channelInfoEntries.size(); i++)
 					{
 						adpcmInfoEntries[i].exportContents(destinationStream);
 					}
@@ -1412,6 +1423,17 @@ namespace lava
 		unsigned long brsarFileFileContents::size() const
 		{
 			return header.size() + data.size();
+		}
+		unsigned long brsarFileFileContents::getFileType() const
+		{
+			unsigned long result = ULONG_MAX;
+
+			if (header.size() >= 0x04)
+			{
+				result = lava::bytesToFundamental<unsigned long>(header.data());
+			}
+
+			return result;
 		}
 		bool brsarFileFileContents::dumpToStream(std::ostream& output)
 		{
@@ -2568,8 +2590,6 @@ namespace lava
 			}
 
 			entries.push_back(sourceWave);
-
-			length += 0x04 + sourceWave.size();
 		}
 		void rwsdWaveSection::waveEntryPushFront(const waveInfo& sourceWave)
 		{
@@ -2588,8 +2608,6 @@ namespace lava
 			}
 
 			entries.insert(entries.begin(), sourceWave);
-
-			length += 0x04 + sourceWave.size();
 		}
 
 		unsigned long rwsdWaveSection::size() const
@@ -2618,7 +2636,7 @@ namespace lava
 			{
 				address = addressIn;
 
-				length = bodyIn.getLong(addressIn + 0x04);
+				originalLength = bodyIn.getLong(addressIn + 0x04); // We no longer need this, we calculate lengths ourselves
 				unsigned long entryCount = bodyIn.getLong(addressIn + 0x08);
 
 				entryOffsets.clear();
@@ -2639,13 +2657,23 @@ namespace lava
 		bool rwsdWaveSection::exportContents(std::ostream& destinationStream)
 		{
 			bool result = 0;
-			unsigned long paddedSizeRes = paddedSize();
 			if (destinationStream.good())
 			{
 				unsigned long initialStreamPos = destinationStream.tellp();
+				unsigned long expectedLength = paddedSize();
+				if (expectedLength != originalLength)
+				{
+					unsigned long calculatedRawSize = size();
+					std::cerr << "\t[WARNING] Calculated Wave Section Size != Original Size\n";
+					std::cerr << "\t\tActual Wave Section Size: 0x" << numToHexStringWithPadding(calculatedRawSize, 0x04) << " \n";
+					std::cerr << "\t\tExpected Padded Size: 0x" << numToHexStringWithPadding(expectedLength, 0x04) << " \n";
+					std::cerr << "\t\tOriginal Size: 0x" << numToHexStringWithPadding(originalLength, 0x04) << " \n";
+					std::cerr << "\t\tDisparity length: 0x" <<
+						numToHexStringWithPadding(abs(signed long(originalLength) - signed long(expectedLength)), 0x04) << "\n";
+				}
 
 				destinationStream << "WAVE";
-				lava::writeRawDataToStream(destinationStream, length);
+				lava::writeRawDataToStream(destinationStream, expectedLength);
 				lava::writeRawDataToStream(destinationStream, unsigned long(entries.size()));
 
 				for (unsigned long i = 0x0; i < entryOffsets.size(); i++)
@@ -2659,12 +2687,11 @@ namespace lava
 
 				unsigned long finalStreamPos = destinationStream.tellp();
 				unsigned long lengthOfExport = finalStreamPos - initialStreamPos;
-				if (lengthOfExport != length)
+				if (lengthOfExport != expectedLength)
 				{
-					if (lengthOfExport < length)
+					if (lengthOfExport < expectedLength)
 					{
-						std::vector<char> padding{};
-						padding.resize(length - lengthOfExport, 0x00);
+						std::vector<char> padding(expectedLength - lengthOfExport, 0x00);
 						destinationStream.write(padding.data(), padding.size());
 					}
 				}
@@ -2736,7 +2763,7 @@ namespace lava
 			if (bodyIn.populated())
 			{
 				address = addressIn;
-				length = bodyIn.getLong(addressIn + 0x04);
+				originalLength = bodyIn.getLong(addressIn + 0x04); // We no longer need this either, this will be calculated as needed
 				entryReferences.populate(bodyIn, addressIn + 0x08);
 				std::vector<brawlReference>* refVecPtr = &entryReferences.refs;
 				std::size_t entryCount = refVecPtr->size();
@@ -2763,12 +2790,23 @@ namespace lava
 		bool rwsdDataSection::exportContents(std::ostream& destinationStream)
 		{
 			bool result = 0;
-			unsigned long paddedSizeRes = paddedSize();
 			if (destinationStream.good())
 			{
 				unsigned long initialStreamPos = destinationStream.tellp();
+				unsigned long expectedLength = paddedSize();
+				if (expectedLength != originalLength)
+				{
+					unsigned long calculatedRawSize = size();
+					std::cerr << "[WARNING] Calculated Data Section Size != Original Size\n";
+					std::cerr << "\tActual Data Section Size: 0x" << numToHexStringWithPadding(calculatedRawSize, 0x04) << " \n";
+					std::cerr << "\tExpected Padded Size: 0x" << numToHexStringWithPadding(expectedLength, 0x04) << " \n";
+					std::cerr << "\tOriginal Size: 0x" << numToHexStringWithPadding(originalLength, 0x04) << " \n";
+					std::cerr << "\tDisparity length: 0x" <<
+						numToHexStringWithPadding(abs(signed long(originalLength) - signed long(expectedLength)), 0x04) << "\n";
+				}
+
 				destinationStream << "DATA";
-				lava::writeRawDataToStream(destinationStream, length);
+				lava::writeRawDataToStream(destinationStream, expectedLength);
 				entryReferences.exportContents(destinationStream);
 				for (std::size_t i = 0; i < entries.size(); i++)
 				{
@@ -2776,12 +2814,11 @@ namespace lava
 				}
 				unsigned long finalStreamPos = destinationStream.tellp();
 				unsigned long lengthOfExport = finalStreamPos - initialStreamPos;
-				if (lengthOfExport != length)
+				if (lengthOfExport != expectedLength)
 				{
-					if (lengthOfExport < length)
+					if (lengthOfExport < expectedLength)
 					{
-						std::vector<char> padding{};
-						padding.resize(length - lengthOfExport, 0x00);
+						std::vector<char> padding(expectedLength - lengthOfExport, 0x00);
 						destinationStream.write(padding.data(), padding.size());
 					}
 				}

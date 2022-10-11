@@ -35,11 +35,13 @@ constexpr bool ENABLE_FILE_DUMP_TEST = false;
 // Test which dumps all the strings in the SYMB section.
 constexpr bool ENABLE_STRING_DUMP_TEST = false;
 // Test which summarizes data for every brsarInfoFileHeader in the .brsar.
-constexpr bool ENABLE_FILE_INFO_SUMMARY_TEST = true;
+constexpr bool ENABLE_FILE_INFO_SUMMARY_TEST = false;
 // Tests the .spt to .dsp header conversion system (see "lavaDSP.h").
 constexpr bool ENABLE_SPT_TO_DSP_HEADER_TEST = false;
 // Tests summarizing and exporting an RWSD's data.
-constexpr bool ENABLE_RWSD_SUMMARIZE_TEST = true;
+constexpr bool ENABLE_RWSD_SUMMARIZE_TEST = false;
+// Tests taking apart and reconstructing every RWSD in the BRSAR.
+constexpr bool ENABLE_RWSD_RECONSTRUCTION_TEST = true;
 // Tests exporting an RWSD Wave Info entry into a DSP.
 constexpr bool ENABLE_WAVE_INFO_TO_DSP_TEST = false;
 // Tests importing a DSP into an RWSD Wave Info entry.
@@ -161,15 +163,42 @@ int main()
 		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
 		if (relevantFileHeader != nullptr)
 		{
-			if (testExportRWSD.populate(relevantFileHeader->fileContents))
+			if (relevantFileHeader->fileContents.getFileType() == lava::brawl::brsarHexTags::bht_RWSD)
 			{
-				std::string baseName = targetBrsarName + "_" + lava::numToHexStringWithPadding(dspTestTargetFileID, 0x03) + "_RWSD";
-				std::ofstream fileDumpOut(baseName + ".dat", std::ios_base::out | std::ios_base::binary);
-				std::ofstream summaryOut(baseName + ".txt", std::ios_base::out | std::ios_base::binary);
-				testExportRWSD.exportFileSection(fileDumpOut);
-				testExportRWSD.summarize(summaryOut);
+				if (testExportRWSD.populate(relevantFileHeader->fileContents))
+				{
+					std::string baseName = targetBrsarName + "_" + lava::numToHexStringWithPadding(dspTestTargetFileID, 0x03) + "_RWSD";
+					std::ofstream fileDumpOut(baseName + ".dat", std::ios_base::out | std::ios_base::binary);
+					std::ofstream summaryOut(baseName + ".txt", std::ios_base::out | std::ios_base::binary);
+					testExportRWSD.exportFileSection(fileDumpOut);
+					testExportRWSD.summarize(summaryOut);
+				}
 			}
 		}
+	}
+	if (ENABLE_RWSD_RECONSTRUCTION_TEST)
+	{
+		MD5 md5Object;
+		for (int i = 0; i < testBrsar.infoSection.fileHeaders.size(); i++)
+		{
+			lava::brawl::brsarInfoFileHeader* currHeader = testBrsar.infoSection.fileHeaders[i].get();
+			if (currHeader != nullptr && currHeader->fileContents.getFileType() == lava::brawl::brsarHexTags::bht_RWSD)
+			{
+				std::string originalHeaderHash = md5Object((char*)currHeader->fileContents.header.data(), currHeader->fileContents.header.size());
+
+				lava::brawl::rwsd testRWSD;
+				if (testRWSD.populate(currHeader->fileContents))
+				{
+					testBrsar.overwriteFile(testRWSD.fileSectionToVec(), testRWSD.rawDataSectionToVec(), i);
+					std::string newHeaderHash = md5Object((char*)currHeader->fileContents.header.data(), currHeader->fileContents.header.size());
+					if (originalHeaderHash != newHeaderHash)
+					{
+						std::cerr << "File ID 0x" << lava::numToHexStringWithPadding(i, 0x03) << ": RWSD parsing error, input and output don't match!\n";
+					}
+				}
+			}
+		}
+		testBrsar.exportContents(targetBrsarName + "_RWSD_rebuild.brsar");
 	}
 	if (ENABLE_WAVE_INFO_TO_DSP_TEST)
 	{
