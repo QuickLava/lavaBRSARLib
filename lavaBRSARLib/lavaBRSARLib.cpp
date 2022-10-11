@@ -32,9 +32,15 @@ namespace lava
 				case brsarHexTags::bht_RWSD:
 				case brsarHexTags::bht_RBNK:
 				case brsarHexTags::bht_RSEQ:
-				case brsarHexTags::bht_RWAR:
 				{
 					result = brsarHexTagType::bhtt_FILE_SECTION;
+					break;
+				}
+				case brsarHexTags::bht_RWSD_DATA:
+				case brsarHexTags::bht_RWSD_WAVE:
+				case brsarHexTags::bht_RWSD_RWAR:
+				{
+					result = brsarHexTagType::bhtt_RWSD_SUBSECTION;
 					break;
 				}
 			}
@@ -2661,18 +2667,8 @@ namespace lava
 			{
 				unsigned long initialStreamPos = destinationStream.tellp();
 				unsigned long expectedLength = paddedSize();
-				if (expectedLength != originalLength)
-				{
-					unsigned long calculatedRawSize = size();
-					std::cerr << "\t[WARNING] Calculated Wave Section Size != Original Size\n";
-					std::cerr << "\t\tActual Wave Section Size: 0x" << numToHexStringWithPadding(calculatedRawSize, 0x04) << " \n";
-					std::cerr << "\t\tExpected Padded Size: 0x" << numToHexStringWithPadding(expectedLength, 0x04) << " \n";
-					std::cerr << "\t\tOriginal Size: 0x" << numToHexStringWithPadding(originalLength, 0x04) << " \n";
-					std::cerr << "\t\tDisparity length: 0x" <<
-						numToHexStringWithPadding(abs(signed long(originalLength) - signed long(expectedLength)), 0x04) << "\n";
-				}
 
-				destinationStream << "WAVE";
+				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_RWSD_WAVE);
 				lava::writeRawDataToStream(destinationStream, expectedLength);
 				lava::writeRawDataToStream(destinationStream, unsigned long(entries.size()));
 
@@ -2794,18 +2790,8 @@ namespace lava
 			{
 				unsigned long initialStreamPos = destinationStream.tellp();
 				unsigned long expectedLength = paddedSize();
-				if (expectedLength != originalLength)
-				{
-					unsigned long calculatedRawSize = size();
-					std::cerr << "[WARNING] Calculated Data Section Size != Original Size\n";
-					std::cerr << "\tActual Data Section Size: 0x" << numToHexStringWithPadding(calculatedRawSize, 0x04) << " \n";
-					std::cerr << "\tExpected Padded Size: 0x" << numToHexStringWithPadding(expectedLength, 0x04) << " \n";
-					std::cerr << "\tOriginal Size: 0x" << numToHexStringWithPadding(originalLength, 0x04) << " \n";
-					std::cerr << "\tDisparity length: 0x" <<
-						numToHexStringWithPadding(abs(signed long(originalLength) - signed long(expectedLength)), 0x04) << "\n";
-				}
 
-				destinationStream << "DATA";
+				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_RWSD_DATA);
 				lava::writeRawDataToStream(destinationStream, expectedLength);
 				entryReferences.exportContents(destinationStream);
 				for (std::size_t i = 0; i < entries.size(); i++)

@@ -45,12 +45,16 @@ namespace lava
 			bht_RWSD = 0x52575344,
 			bht_RBNK = 0x52424E4B,
 			bht_RSEQ = 0x52534551,
-			bht_RWAR = 0x52574152,
+			// RWSD Subsections
+			bht_RWSD_DATA = 0x44415441,
+			bht_RWSD_WAVE = 0x57415645,
+			bht_RWSD_RWAR = 0x52574152,
 		};
 		enum brsarHexTagType
 		{
 			bhtt_RSAR_SECTION = 1,
-			bhtt_FILE_SECTION
+			bhtt_FILE_SECTION, 
+			bhtt_RWSD_SUBSECTION
 		};
 		enum brsarAddressConsts
 		{
