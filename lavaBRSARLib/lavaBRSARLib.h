@@ -26,7 +26,7 @@ namespace lava
 {
 	namespace brawl
 	{
-		const std::string version = "v0.9.5";
+		const std::string version = "v1.1.0";
 		const std::string VGAudioPath = "./VGAudio/";
 		const std::string VGAudioMainExeName = "VGAudioCli.exe";
 		const std::string VGAudioMainExePath = VGAudioPath + VGAudioMainExeName;
