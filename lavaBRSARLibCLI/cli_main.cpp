@@ -44,7 +44,7 @@ int main(int argc, char** argv)
 		{
 			if (strcmp("dumpRSAR", argv[1]) == 0 && argc >= 3)
 			{
-				std::cout << "Dumping RSAR...\n";
+				std::cout << "Operation: Dump BRSAR\n";
 				bool result = 1;
 				lava::brawl::brsar sourceBrsar;
 				std::string targetBRSARPath = argv[2];
@@ -83,16 +83,27 @@ int main(int argc, char** argv)
 				}
 				if (std::filesystem::exists(targetBRSARPath))
 				{
-					std::filesystem::path temppath = targetBRSARPath;
-					targetFolder += temppath.filename().string() +"/";
-					if (!std::filesystem::exists(targetFolder))
+					if (folderArgumentProvided)
 					{
-						if (folderArgumentProvided)
+						if (targetFolder.back() != '/' && targetFolder.back() != '\\')
 						{
-							std::cerr << "[ERROR] Specified dump path was invalid (\"" << targetFolder << "\").\n";
-							result = 0;
+							targetFolder += "/";
 						}
-						else
+						std::filesystem::path temppath = targetFolder;
+						if (!std::filesystem::exists(temppath))
+						{
+							if (folderArgumentProvided)
+							{
+								std::cerr << "[ERROR] Specified dump path doesn't exist (\"" << temppath << "\").\n";
+								result = 0;
+							}
+						}
+					}
+					else
+					{
+						std::filesystem::path temppath = targetBRSARPath;
+						targetFolder += lava::pruneFileExtension(temppath.filename().string()) + "/";
+						if (!std::filesystem::exists(targetFolder))
 						{
 							std::filesystem::create_directories(targetFolder);
 							if (!std::filesystem::exists(targetFolder))
@@ -111,8 +122,12 @@ int main(int argc, char** argv)
 				if (result)
 				{
 					lava::brawl::brsar testBrsar;
-					testBrsar.init(targetBRSARPath);
-					testBrsar.doFileDump(targetFolder, joinHeaderAndData, summaryOnly);
+					if (testBrsar.init(targetBRSARPath))
+					{
+						std::cout << "Success!\n";
+						std::cout << "Dumping to \"" << targetFolder << "\"...\n";
+						testBrsar.doFileDump(targetFolder, joinHeaderAndData, summaryOnly);
+					}
 				}
 				return 0;
 			}
