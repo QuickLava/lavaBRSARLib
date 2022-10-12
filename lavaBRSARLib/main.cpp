@@ -322,7 +322,7 @@ int main()
 			{
 				tempRWSD.summarize("tempRWSDSummary.txt");
 				relevantFileHeader->fileContents.dumpToFile("tempRWSDDump.dat");
-				if (tempRWSD.grantDataEntryUniqueWave(1, tempRWSD.waveSection.entries[1]))
+				if (tempRWSD.grantDataEntryUniqueWave(0, tempRWSD.waveSection.entries[1]))
 				{
 					//tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
 					tempRWSD.summarize("tempRWSDSummary_edit.txt");
