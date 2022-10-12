@@ -3688,7 +3688,30 @@ namespace lava
 									{
 										if (joinHeaderAndData)
 										{
-											headerFilename += "_joined.dat";
+											unsigned long fileType = fileContentsPtr->getFileType();
+											switch (fileType)
+											{
+												case brsarHexTags::bht_RWSD:
+												{
+													headerFilename += ".brwsd";
+													break;
+												}
+												case brsarHexTags::bht_RBNK:
+												{
+													headerFilename += ".brbnk";
+													break;
+												}
+												case brsarHexTags::bht_RSEQ:
+												{
+													headerFilename += ".brseq";
+													break;
+												}
+												default:
+												{
+													headerFilename += ".dat";
+													break;
+												}
+											}
 											fileContentsPtr->dumpToFile(groupFolder + headerFilename);
 										}
 										else
