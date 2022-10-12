@@ -800,7 +800,7 @@ namespace lava
 
 			bool summarizeSymbStringData(std::ostream& output = std::cout);
 			bool outputConsecutiveSoundEntryStringsWithSameFileID(unsigned long startingIndex, std::ostream& output = std::cout);
-			bool doFileDump(std::string dumpRootFolder, bool joinHeaderAndData = 0);
+			bool doFileDump(std::string dumpRootFolder, bool joinHeaderAndData = 0, bool doSummaryOnly = 0);
 		};
 
 		/* BRSAR */

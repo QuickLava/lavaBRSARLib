@@ -3614,7 +3614,7 @@ namespace lava
 
 			return result;
 		}
-		bool brsar::doFileDump(std::string dumpRootFolder, bool joinHeaderAndData)
+		bool brsar::doFileDump(std::string dumpRootFolder, bool joinHeaderAndData, bool doSummaryOnly)
 		{
 			bool result = 0;
 
@@ -3634,7 +3634,10 @@ namespace lava
 					groupName = "[NAMELESS]";
 				}
 				std::string groupFolder = dumpRootFolder + groupName + "/";
-				std::filesystem::create_directory(groupFolder);
+				if (!doSummaryOnly)
+				{
+					std::filesystem::create_directory(groupFolder);
+				}
 				metadataOutput << "File(s) in \"" << groupName << "\" (Raw ID: " 
 					<< numToDecStringWithPadding(currHeader->groupID, 0x03) << " / 0x" << numToHexStringWithPadding(currHeader->groupID, 0x03) << 
 					", Info Index: " << numToDecStringWithPadding(i, 0x03) << " / 0x" << numToHexStringWithPadding(i, 0x03) << ")...\n";
@@ -3681,17 +3684,20 @@ namespace lava
 
 									std::string headerFilename = fileBaseName + "_" + std::string(1, 'A' + t);
 									std::string dataFilename = fileBaseName + "_" + std::string(1, 'A' + t);
-									if (joinHeaderAndData)
+									if (!doSummaryOnly)
 									{
-										headerFilename += "_joined.dat";
-										fileContentsPtr->dumpToFile(groupFolder + headerFilename);
-									}
-									else
-									{
-										headerFilename += "_header.dat";
-										dataFilename += "_data.dat";
-										fileContentsPtr->dumpHeaderToFile(groupFolder + headerFilename);
-										fileContentsPtr->dumpDataToFile(groupFolder + dataFilename);
+										if (joinHeaderAndData)
+										{
+											headerFilename += "_joined.dat";
+											fileContentsPtr->dumpToFile(groupFolder + headerFilename);
+										}
+										else
+										{
+											headerFilename += "_header.dat";
+											dataFilename += "_data.dat";
+											fileContentsPtr->dumpHeaderToFile(groupFolder + headerFilename);
+											fileContentsPtr->dumpDataToFile(groupFolder + dataFilename);
+										}
 									}
 									entryExported = 1;
 								}
