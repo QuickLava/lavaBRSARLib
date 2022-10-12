@@ -2465,14 +2465,14 @@ namespace lava
 					targetFileHeader->entries.push_back(brsarInfoFileEntry());
 					brsarInfoFileEntry* newFileEntry = &targetFileHeader->entries.back();
 					newFileEntry->parent = targetFileHeader;
-					newFileEntry->originalAddress = bac_NOT_IN_FILE;
+					newFileEntry->originalAddress = brsarAddressConsts::bac_NOT_IN_FILE;
 					newFileEntry->groupID = groupInfoIndexToLinkTo;
 					newFileEntry->index = targetGroupHeader->entries.size();
 
 					targetGroupHeader->entries.push_back(brsarInfoGroupEntry());
 					brsarInfoGroupEntry* newGroupEntry = &targetGroupHeader->entries.back();
 					newGroupEntry->parent = targetGroupHeader;
-					newGroupEntry->originalAddress = bac_NOT_IN_FILE;;
+					newGroupEntry->originalAddress = brsarAddressConsts::bac_NOT_IN_FILE;;
 					newGroupEntry->fileID = fileID;
 
 					fileIDsToGroupInfoIndecesThatUseThem[fileID].push_back(targetGroupHeader->groupID);
@@ -2590,12 +2590,13 @@ namespace lava
 		void rwsdWaveSection::waveEntryPushBack(const waveInfo& sourceWave)
 		{
 			entries.push_back(sourceWave);
+			entries.front().address = brsarAddressConsts::bac_NOT_IN_FILE;
 		}
 		void rwsdWaveSection::waveEntryPushFront(const waveInfo& sourceWave)
 		{
 			entries.insert(entries.begin(), sourceWave);
+			entries.front().address = brsarAddressConsts::bac_NOT_IN_FILE;
 		}
-
 		unsigned long rwsdWaveSection::size() const
 		{
 			unsigned long result = 0x00;
@@ -2632,7 +2633,6 @@ namespace lava
 		{
 			return padLengthTo(size(), padTo);
 		}
-
 		bool rwsdWaveSection::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
@@ -2914,7 +2914,7 @@ namespace lava
 		}
 		unsigned long rwsd::getWAVESectionOffset()
 		{
-			return 0x20 + getDATASectionSize();
+			return getDATASectionOffset() + getDATASectionSize();
 		}
 
 		bool rwsd::populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long rawDataAddressIn, unsigned long specificDataEndAddressIn)
@@ -3161,14 +3161,19 @@ namespace lava
 
 			if (output.good() && address != UINT_MAX)
 			{
-				output << "\tAddress:\t0x" << lava::numToHexStringWithPadding(address, 0x08) << "\n";
-				output << "\tTotal Length/End:\t0x" << lava::numToHexStringWithPadding(size(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(size() + address, 0x08) << "\n";
-				output << "\tData Section Offset/Address:\t0x" << lava::numToHexStringWithPadding(getDATASectionOffset(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(dataSection.address, 0x08) << "\n";
-				output << "\tData Section Length/End:\t0x" << lava::numToHexStringWithPadding(getDATASectionSize(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(dataSection.address + getDATASectionSize(), 0x08) << "\n";
+				output << "RWSD Content Summary - lavaBRSARLib " << version << "\n";
+				output << "\nNote: In the following summarization, all addresses are relative to the start of the described RWSD file.\n";
+				output << "Additionally, any absolute Wave Content Address values assume the wave content block directly follows the WAVE section.\n";
+				output << "While this is always true of individual RWSD files produced with this library, it *is not guaranteed* in any other case!\n";
+				output << "\nStructure Overview:\n";
+				output << "\tTotal Length/End:\t0x" << lava::numToHexStringWithPadding(size(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(size(), 0x08) << "\n";
+				output << "\tData Section Offset:\t0x" << lava::numToHexStringWithPadding(getDATASectionOffset(), 0x08) << "\n";
+				output << "\tData Section Length/End:\t0x" << lava::numToHexStringWithPadding(getDATASectionSize(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(getDATASectionOffset() + getDATASectionSize(), 0x08) << "\n";
 				output << "\tData Entry Count:\t\t0x" << lava::numToHexStringWithPadding(dataSection.entries.size(), 0x04) << "\n";
-				output << "\tWave Section Offset/Address:\t0x" << lava::numToHexStringWithPadding(getWAVESectionOffset(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveSection.address, 0x08) << "\n";
-				output << "\tWave Section Length/End:\t0x" << lava::numToHexStringWithPadding(getWAVESectionSize(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveSection.address + getWAVESectionSize(), 0x08) << "\n";
+				output << "\tWave Section Offset:\t0x" << lava::numToHexStringWithPadding(getWAVESectionOffset(), 0x08) << "\n";
+				output << "\tWave Section Length/End:\t0x" << lava::numToHexStringWithPadding(getWAVESectionSize(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(getWAVESectionOffset() + getWAVESectionSize(), 0x08) << "\n";
 				output << "\tWave Entry Count:\t\t0x" << lava::numToHexStringWithPadding(waveSection.entries.size(), 0x04) << "\n";
+				output << "\nEntry Summary:\n";
 
 				std::unordered_map<unsigned long, std::vector<unsigned long>> waveIndecesToReferrerDataIndeces{};
 
@@ -3177,16 +3182,13 @@ namespace lava
 				brawlReferenceVector* dataRefVecPtr = &dataSection.entryReferences;
 				std::vector<unsigned long> waveOffVec = waveSection.calculateOffsetVector();
 
-				output << "Note: In the following summarization, absolute Wave Content Addresses assume wave contents directly follow the WAVE section.\n";
-				output << "\tWhile this is true of individual RWSD files produced with this library, it *is not guaranteed* to always be the case.\n";
-
 				unsigned long waveDataBaseAddress = getWAVESectionOffset() + getWAVESectionSize();
 
 				for (unsigned long u = 0; u < dataVecPtr->size(); u++)
 				{
 					dataInfo* currDataEntry = &(*dataVecPtr)[u];
 					output << "\tData Entry 0x" << lava::numToHexStringWithPadding(u, 0x04) << "\n";
-					output << "\t\tOffset / Address:\t0x" << lava::numToHexStringWithPadding(dataRefVecPtr->refs[u].address, 0x08) << " / 0x" << lava::numToHexStringWithPadding(currDataEntry->address, 0x08) << "\n";
+					output << "\t\tOffset / Address:\t0x" << lava::numToHexStringWithPadding(dataRefVecPtr->refs[u].address, 0x08) << " / 0x" << lava::numToHexStringWithPadding(getDATASectionOffset() + dataRefVecPtr->refs[u].address, 0x08) << "\n";
 					output << "\t\tAssociated Wave ID:\t0x" << lava::numToHexStringWithPadding(currDataEntry->ntWaveIndex, 0x04) << "\n";
 					if (currDataEntry->ntWaveIndex != ULONG_MAX)
 					{
@@ -3194,7 +3196,7 @@ namespace lava
 						if (emplaceResult.second)
 						{
 							waveInfo* currWaveEntry = &(*waveVecPtr)[currDataEntry->ntWaveIndex];
-							output << "\t\tWave Entry Offset / Address:\t0x" << lava::numToHexStringWithPadding(waveOffVec[currDataEntry->ntWaveIndex], 0x08) << " / 0x" << lava::numToHexStringWithPadding(currWaveEntry->address, 0x08) << "\n";
+							output << "\t\tWave Entry Offset / Address:\t0x" << lava::numToHexStringWithPadding(waveOffVec[currDataEntry->ntWaveIndex], 0x08) << " / 0x" << lava::numToHexStringWithPadding(getWAVESectionOffset() + waveOffVec[currDataEntry->ntWaveIndex], 0x08) << "\n";
 							output << "\t\tWave Contents Offset / Address:\t0x" << lava::numToHexStringWithPadding(currWaveEntry->dataLocation, 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveDataBaseAddress + currWaveEntry->dataLocation, 0x08) << "\n";
 							output << "\t\tWave Contents Length / End:\t0x" << lava::numToHexStringWithPadding(currWaveEntry->getAudioLengthInBytes(), 0x04) << " / 0x" << lava::numToHexStringWithPadding(waveDataBaseAddress + currWaveEntry->dataLocation + currWaveEntry->getAudioLengthInBytes(), 0x08) << "\n";
 							emplaceResult.first->second.push_back(u);
