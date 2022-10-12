@@ -78,7 +78,7 @@ namespace lava
 		unsigned long validateHexTag(unsigned long tagIn);
 		bool detectHexTags(const byteArray& bodyIn, unsigned long startingAddress = 0x00);
 		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress);
-		int padLengthTo(unsigned long lengthIn, unsigned long padTo);
+		int padLengthTo(unsigned long lengthIn, unsigned long padTo, bool allowZeroPaddingLength = 0);
 
 		/* Misc. */
 
@@ -663,8 +663,6 @@ namespace lava
 
 			void waveEntryPushBack(const waveInfo& sourceWave);
 			void waveEntryPushFront(const waveInfo& sourceWave);
-
-			unsigned long sumWavePacketLengths();
 
 			unsigned long size() const;
 			unsigned long paddedSize(unsigned long padTo = 0x20) const;

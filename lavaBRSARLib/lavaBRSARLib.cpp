@@ -78,10 +78,10 @@ namespace lava
 
 			return result;
 		}
-		int padLengthTo(unsigned long lengthIn, unsigned long padTo)
+		int padLengthTo(unsigned long lengthIn, unsigned long padTo, bool allowZeroPaddingLength)
 		{
 			unsigned long padLength = padTo - (lengthIn % padTo);
-			if (padLength == padTo)
+			if (!allowZeroPaddingLength && padLength == padTo)
 			{
 				padLength = 0x00;
 			}
@@ -1597,7 +1597,17 @@ namespace lava
 				if (stringOffset.getAddress() != 0x00)
 				{
 					std::string measurementString = bodyIn.data() + (stringOffset.getAddress(parent->getAddress() + 0x08));
-					std::size_t sizePrescription = measurementString.size() + (0x04 - (measurementString.size() % 0x04));
+					// Note: the final bool here determines whether allowing 0 padding length is allowed. 9stars allows this, other BRSARs do not?)
+					std::size_t sizePrescription = padLengthTo(measurementString.size(), 0x04, 1);
+					// The following code is for logging whether or not we get the prescribed lengths right when reading in a brsar.
+					// Leaving this in cuz I'll need to come back to it later to ensure compatability with different BRSARs.
+					/*std::cout << "\"" << measurementString << "\" @ 0x" << 
+						numToHexStringWithPadding(stringOffset.getAddress(parent->getAddress() + 0x08), 0x08) << ":\n" << 
+						"\tReal Size = 0x" << numToHexStringWithPadding(measurementString.size(), 0x02) << "\n" <<
+						"\tPrescribed Size = 0x" << numToHexStringWithPadding(sizePrescription, 0x02) << "\n" <<
+						"\tActual Padded Size = 0x" << numToHexStringWithPadding(listOffset.address - stringOffset.address, 0x02) << "\n" <<
+						"\tRegion End = 0x" << numToHexStringWithPadding(stringOffset.getAddress(parent->getAddress() + 0x08) + sizePrescription, 0x08) <<
+						"\n";*/
 					stringContent = bodyIn.getBytes(sizePrescription, stringOffset.getAddress(parent->getAddress() + 0x08));
 					result &= stringContent.size() == sizePrescription;
 				}
