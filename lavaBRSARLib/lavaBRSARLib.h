@@ -657,7 +657,6 @@ namespace lava
 			unsigned long address = ULONG_MAX;
 
 			unsigned long originalLength = ULONG_MAX;
-
 			
 			std::vector<waveInfo> entries{};
 
@@ -670,7 +669,8 @@ namespace lava
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
 		};
-		struct rwsdHeader
+
+		/*struct rwsdHeader
 		{
 			unsigned long address = ULONG_MAX;
 
@@ -687,12 +687,48 @@ namespace lava
 
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);
-		};
+			static constexpr unsigned long size();
+		};*/
+
 		struct rwsd
 		{
-			rwsdHeader header;
+			unsigned long address = ULONG_MAX;
+
+			unsigned short endianType;
+			unsigned short versionNumber;
 			rwsdDataSection dataSection;
 			rwsdWaveSection waveSection;
+
+		private:
+			unsigned long dataSectionCachedSize = ULONG_MAX;
+			unsigned long waveSectionCachedSize = ULONG_MAX;
+		public:
+
+			// Size + Offset Functions
+
+			unsigned long size();
+			void signalDATASectionSizeChange();
+			void signalWAVESectionSizeChange();
+			unsigned long getDATASectionSize();
+			unsigned long getWAVESectionSize();
+			unsigned long getDATASectionOffset();
+			unsigned long getWAVESectionOffset();
+
+			// Populate Funcs
+
+			bool populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long specificDataAddressIn, unsigned long specificDataMaxLengthIn);
+			bool populateWavePackets(const lava::byteArray& bodyIn, unsigned long waveDataAddressIn, unsigned long waveDataLengthIn);
+			bool populate(const byteArray& fileBodyIn, unsigned long fileBodyAddressIn, const byteArray& rawDataIn, unsigned long rawDataAddressIn, unsigned long rawDataLengthIn);
+			bool populate(const brsarFileFileContents& fileContentsIn);
+
+			// Export Funcs
+
+			bool exportFileSection(std::ostream& destinationStream);
+			bool exportRawDataSection(std::ostream& destinationStream);
+			std::vector<unsigned char> fileSectionToVec();
+			std::vector<unsigned char> rawDataSectionToVec();
+			dsp exportWaveRawDataToDSP(unsigned long waveSectionIndex);
+			bool exportWaveRawDataToWAV(unsigned long waveSectionIndex, std::string wavOutputPath);
 
 			// Utility + Maintenance Funcs
 
@@ -714,23 +750,6 @@ namespace lava
 			bool overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::string wavPathIn);
 
 			bool grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront = 0);
-
-			// Populate Funcs
-
-			bool populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long specificDataAddressIn, unsigned long specificDataMaxLengthIn);
-			bool populateWavePackets(const lava::byteArray& bodyIn, unsigned long waveDataAddressIn, unsigned long waveDataLengthIn);
-			bool populate(const byteArray& fileBodyIn, unsigned long fileBodyAddressIn, const byteArray& rawDataIn, unsigned long rawDataAddressIn, unsigned long rawDataLengthIn);
-			bool populate(const brsarFileFileContents& fileContentsIn);
-
-
-			// Export Funcs
-
-			dsp exportWaveRawDataToDSP(unsigned long waveSectionIndex);
-			bool exportWaveRawDataToWAV(unsigned long waveSectionIndex, std::string wavOutputPath);
-			bool exportFileSection(std::ostream& destinationStream);
-			std::vector<unsigned char> fileSectionToVec();
-			bool exportRawDataSection(std::ostream& destinationStream);
-			std::vector<unsigned char> rawDataSectionToVec();
 		};
 
 		/* BRSAR File Section */

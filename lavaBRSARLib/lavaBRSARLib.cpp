@@ -2585,8 +2585,6 @@ namespace lava
 
 		/* BRSAR File Section */
 
-		
-
 		/* RWSD */
 
 		void rwsdWaveSection::waveEntryPushBack(const waveInfo& sourceWave)
@@ -2639,7 +2637,7 @@ namespace lava
 		{
 			bool result = 0;
 
-			if (bodyIn.populated())
+			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_RWSD_WAVE)
 			{
 				address = addressIn;
 
@@ -2758,7 +2756,7 @@ namespace lava
 		{
 			bool result = 0;
 
-			if (bodyIn.populated())
+			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_RWSD_DATA)
 			{
 				address = addressIn;
 				originalLength = bodyIn.getLong(addressIn + 0x04); // We no longer need this either, this will be calculated as needed
@@ -2815,7 +2813,7 @@ namespace lava
 			return result;
 		}
 
-		bool rwsdHeader::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
+		/*bool rwsdHeader::populate(const lava::byteArray& bodyIn, std::size_t addressIn)
 		{
 			bool result = 0;
 
@@ -2857,6 +2855,276 @@ namespace lava
 			}
 			return result;
 		}
+		constexpr unsigned long rwsdHeader::size()
+		{
+			unsigned long result = 0x0;
+
+			result += sizeof(unsigned long); // Length of RWSD Tag
+			result += sizeof(endianType);
+			result += sizeof(version);
+			result += sizeof(headerLength);
+			result += sizeof(entriesOffset);
+			result += sizeof(entriesCount);
+			result += sizeof(dataOffset);
+			result += sizeof(dataLength);
+			result += sizeof(waveOffset);
+			result += sizeof(waveLength);
+
+			return result;
+		}*/
+
+		unsigned long rwsd::size()
+		{
+			unsigned long result = 0x00;
+
+			result =
+				0x20 // Header Length
+				+ getDATASectionSize() // DATA Section Size
+				+ getWAVESectionSize(); // WAVE Section Size
+
+			return result;
+		}
+		void rwsd::signalDATASectionSizeChange()
+		{
+			dataSectionCachedSize = ULONG_MAX;
+		}
+		void rwsd::signalWAVESectionSizeChange()
+		{
+			waveSectionCachedSize = ULONG_MAX;
+		}
+		unsigned long rwsd::getDATASectionSize()
+		{
+			if (dataSectionCachedSize == ULONG_MAX)
+			{
+				dataSectionCachedSize = dataSection.paddedSize();
+			}
+			return dataSectionCachedSize;
+		}
+		unsigned long rwsd::getWAVESectionSize()
+		{
+			if (waveSectionCachedSize == ULONG_MAX)
+			{
+				waveSectionCachedSize = waveSection.paddedSize();
+			}
+			return waveSectionCachedSize;
+		}
+		unsigned long rwsd::getDATASectionOffset()
+		{
+			return 0x20;
+		}
+		unsigned long rwsd::getWAVESectionOffset()
+		{
+			return 0x20 + getDATASectionSize();
+		}
+
+		bool rwsd::populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long rawDataAddressIn, unsigned long specificDataEndAddressIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				waveInfo* currWave = &waveSection.entries[waveIndex];
+				unsigned long length = currWave->getAudioLengthInBytes();
+				unsigned long paddingLength = 0x00;
+				unsigned long currWaveDataEndpoint = rawDataAddressIn + currWave->dataLocation + length;
+				if (currWaveDataEndpoint <= specificDataEndAddressIn)
+				{
+					paddingLength = specificDataEndAddressIn - currWaveDataEndpoint;
+				}
+				else
+				{
+					unsigned long overflowAmount = currWaveDataEndpoint - specificDataEndAddressIn;
+					length -= overflowAmount;
+					currWave->nibbles -= overflowAmount * 2;
+				}
+				result &= currWave->packetContents.populate(bodyIn, rawDataAddressIn + currWave->dataLocation, length, paddingLength);
+			}
+
+			return result;
+		}
+		bool rwsd::populateWavePackets(const lava::byteArray& bodyIn, unsigned long waveDataAddressIn, unsigned long waveDataLengthIn)
+		{
+			bool result = 0;
+
+			if (bodyIn.populated())
+			{
+				result = 1;
+				for (std::size_t i = 0; i < (waveSection.entries.size() - 1); i++)
+				{
+					waveInfo* currWave = &waveSection.entries[i];
+					waveInfo* nextWave = &waveSection.entries[i + 1];
+					result &= populateWavePacket(bodyIn, i, waveDataAddressIn, waveDataAddressIn + nextWave->dataLocation);
+				}
+				waveInfo* finalWave = &waveSection.entries.back();
+				result &= populateWavePacket(bodyIn, waveSection.entries.size() - 1, waveDataAddressIn, waveDataAddressIn + waveDataLengthIn);
+			}
+
+			return result;
+		}
+		bool rwsd::populate(const byteArray& fileBodyIn, unsigned long fileBodyAddressIn, const byteArray& rawDataIn, unsigned long rawDataAddressIn, unsigned long rawDataLengthIn)
+		{
+			bool result = 0;
+
+			if (fileBodyIn.getLong(fileBodyAddressIn) == brsarHexTags::bht_RWSD)
+			{
+				address = fileBodyAddressIn;
+
+				endianType = fileBodyIn.getShort(0x04);
+				versionNumber = fileBodyIn.getShort(0x06);
+				unsigned long dataSectionOffset = fileBodyIn.getLong(0x10);
+				unsigned long waveSectionOffset = fileBodyIn.getLong(0x18);
+
+				result = dataSection.populate(fileBodyIn, fileBodyAddressIn + dataSectionOffset);
+				result &= waveSection.populate(fileBodyIn, fileBodyAddressIn + waveSectionOffset);
+				if (result && rawDataAddressIn != ULONG_MAX && (rawDataAddressIn + rawDataLengthIn) <= rawDataIn.size())
+				{
+					result &= populateWavePackets(rawDataIn, rawDataAddressIn, rawDataLengthIn);
+				}
+			}
+
+			return result;
+		}
+		bool rwsd::populate(const brsarFileFileContents& fileContentsIn)
+		{
+			bool result = 0;
+
+			if (bytesToFundamental<unsigned long>(fileContentsIn.header.data()) == brsarHexTags::bht_RWSD)
+			{
+				byteArray headerArr(fileContentsIn.header.data(), fileContentsIn.header.size());
+				byteArray dataArr(fileContentsIn.data.data(), fileContentsIn.data.size());
+				result = populate(headerArr, 0x00, dataArr, 0x00, dataArr.size());
+			}
+
+			return result;
+		}
+
+		bool rwsd::exportFileSection(std::ostream& destinationStream)
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				result = 1;
+
+				// Write Header Data
+				unsigned long cachedDataSectionSize = dataSection.paddedSize();
+				unsigned long cachedWaveSectionSize = waveSection.paddedSize();
+				writeRawDataToStream(destinationStream, brsarHexTags::bht_RWSD); // Write RWSD Tag
+				writeRawDataToStream(destinationStream, endianType); // Write Big-Endian BOM
+				writeRawDataToStream(destinationStream, versionNumber); // Write Version
+				writeRawDataToStream(destinationStream, size()); // RWSD Length
+				writeRawDataToStream(destinationStream, unsigned short(getDATASectionOffset())); // Offset to first subsection
+				writeRawDataToStream(destinationStream, unsigned short(0x02)); // Write number of subsections
+				writeRawDataToStream(destinationStream, getDATASectionOffset()); // DATA Subsection Offset
+				writeRawDataToStream(destinationStream, getDATASectionSize()); // DATA Subsection Length
+				writeRawDataToStream(destinationStream, getWAVESectionOffset()); // WAVE Subsection Offset
+				writeRawDataToStream(destinationStream, getWAVESectionSize()); // WAVE Subsection Length
+
+				// Write Subsections
+				result &= dataSection.exportContents(destinationStream);
+				result &= waveSection.exportContents(destinationStream);
+			}
+
+			return result;
+		}
+		bool rwsd::exportRawDataSection(std::ostream& destinationStream)
+		{
+			bool result = 0;
+
+			if (destinationStream.good())
+			{
+				for (unsigned long i = 0; i < waveSection.entries.size(); i++)
+				{
+					waveInfo* currWave = &waveSection.entries[i];
+					destinationStream.write((const char*)currWave->packetContents.body.data(), currWave->packetContents.body.size());
+					destinationStream.write((const char*)currWave->packetContents.padding.data(), currWave->packetContents.padding.size());
+				}
+				result = destinationStream.good();
+			}
+
+			return result;
+		}
+		std::vector<unsigned char> rwsd::fileSectionToVec()
+		{
+			std::vector<unsigned char> result;
+
+			std::stringstream tempStream(std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+			if (exportFileSection(tempStream))
+			{
+				result = streamContentsToVec(tempStream);
+			}
+
+			return result;
+		}
+		std::vector<unsigned char> rwsd::rawDataSectionToVec()
+		{
+			std::vector<unsigned char> result;
+
+			std::stringstream tempStream(std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+			if (exportRawDataSection(tempStream))
+			{
+				result = streamContentsToVec(tempStream);
+			}
+
+			return result;
+		}
+		dsp rwsd::exportWaveRawDataToDSP(unsigned long waveSectionIndex)
+		{
+			dsp result;
+
+			if (waveSectionIndex < waveSection.entries.size())
+			{
+				const waveInfo* targetWaveInfo = &waveSection.entries[waveSectionIndex];
+				result.nibbleCount = targetWaveInfo->nibbles;
+				result.sampleCount = nibblesToSamples(result.nibbleCount);
+				result.nibbleCount = samplesToNibbles(result.sampleCount);
+				result.sampleRate = unsigned long(targetWaveInfo->sampleRate24) << 16;
+				result.sampleRate |= targetWaveInfo->sampleRate;
+				result.loops = targetWaveInfo->looped;
+				result.loopStart = targetWaveInfo->loopStartSample;
+				if (result.loops)
+				{
+					result.loopEnd = result.sampleCount - 1;
+				}
+				else
+				{
+					result.loopEnd = 0x00;
+				}
+				result.soundInfo = targetWaveInfo->adpcmInfoEntries.back();
+				result.body = targetWaveInfo->packetContents.body;
+				//result.body.insert(result.body.end(), targetWaveInfo->packetContents.padding.begin(), targetWaveInfo->packetContents.padding.end());
+				unsigned long desiredLength = nibblesToBytes(result.nibbleCount);
+				if (result.body.size() < desiredLength)
+				{
+					result.body.resize(desiredLength);
+				}
+			}
+
+			return result;
+		}
+		bool rwsd::exportWaveRawDataToWAV(unsigned long waveSectionIndex, std::string wavOutputPath)
+		{
+			bool result = 0;
+
+			dsp conversionDSP = exportWaveRawDataToDSP(waveSectionIndex);
+			if (!conversionDSP.body.empty())
+			{
+				std::ofstream convDSPOut(VGAudioTempConvFilename, std::ios_base::out | std::ios_base::binary);
+				if (convDSPOut.is_open())
+				{
+					if (conversionDSP.exportContents(convDSPOut))
+					{
+						convDSPOut.close();
+						system(lava::brawl::generateVGAudioDSPToWavCommand(VGAudioTempConvFilename, wavOutputPath).c_str());
+						result = std::filesystem::is_regular_file(wavOutputPath);
+					}
+					std::filesystem::remove(VGAudioTempConvFilename);
+				}
+			}
+
+			return result;
+		}
 
 		bool rwsd::updateWaveEntryDataLocations()
 		{
@@ -2891,15 +3159,15 @@ namespace lava
 		{
 			bool result = 0;
 
-			if (output.good() && header.address != UINT_MAX)
+			if (output.good() && address != UINT_MAX)
 			{
-				output << "\tAddress:\t0x" << lava::numToHexStringWithPadding(header.address, 0x08) << "\n";
-				output << "\tTotal Length/End:\t0x" << lava::numToHexStringWithPadding(header.headerLength, 0x08) << " / 0x" << lava::numToHexStringWithPadding(header.headerLength + header.address, 0x08) << "\n";
-				output << "\tData Section Offset/Address:\t0x" << lava::numToHexStringWithPadding(header.dataOffset, 0x08) << " / 0x" << lava::numToHexStringWithPadding(dataSection.address, 0x08) << "\n";
-				output << "\tData Section Length/End:\t0x" << lava::numToHexStringWithPadding(header.dataLength, 0x08) << " / 0x" << lava::numToHexStringWithPadding(dataSection.address + header.dataLength, 0x08) << "\n";
+				output << "\tAddress:\t0x" << lava::numToHexStringWithPadding(address, 0x08) << "\n";
+				output << "\tTotal Length/End:\t0x" << lava::numToHexStringWithPadding(size(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(size() + address, 0x08) << "\n";
+				output << "\tData Section Offset/Address:\t0x" << lava::numToHexStringWithPadding(getDATASectionOffset(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(dataSection.address, 0x08) << "\n";
+				output << "\tData Section Length/End:\t0x" << lava::numToHexStringWithPadding(getDATASectionSize(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(dataSection.address + getDATASectionSize(), 0x08) << "\n";
 				output << "\tData Entry Count:\t\t0x" << lava::numToHexStringWithPadding(dataSection.entries.size(), 0x04) << "\n";
-				output << "\tWave Section Offset/Address:\t0x" << lava::numToHexStringWithPadding(header.waveOffset, 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveSection.address, 0x08) << "\n";
-				output << "\tWave Section Length/End:\t0x" << lava::numToHexStringWithPadding(header.waveLength, 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveSection.address + header.waveLength, 0x08) << "\n";
+				output << "\tWave Section Offset/Address:\t0x" << lava::numToHexStringWithPadding(getWAVESectionOffset(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveSection.address, 0x08) << "\n";
+				output << "\tWave Section Length/End:\t0x" << lava::numToHexStringWithPadding(getWAVESectionSize(), 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveSection.address + getWAVESectionSize(), 0x08) << "\n";
 				output << "\tWave Entry Count:\t\t0x" << lava::numToHexStringWithPadding(waveSection.entries.size(), 0x04) << "\n";
 
 				std::unordered_map<unsigned long, std::vector<unsigned long>> waveIndecesToReferrerDataIndeces{};
@@ -2909,7 +3177,10 @@ namespace lava
 				brawlReferenceVector* dataRefVecPtr = &dataSection.entryReferences;
 				std::vector<unsigned long> waveOffVec = waveSection.calculateOffsetVector();
 
-				unsigned long waveDataBaseAddress = header.waveOffset + header.waveLength;
+				output << "Note: In the following summarization, absolute Wave Content Addresses assume wave contents directly follow the WAVE section.\n";
+				output << "\tWhile this is true of individual RWSD files produced with this library, it *is not guaranteed* to always be the case.\n";
+
+				unsigned long waveDataBaseAddress = getWAVESectionOffset() + getWAVESectionSize();
 
 				for (unsigned long u = 0; u < dataVecPtr->size(); u++)
 				{
@@ -3038,199 +3309,9 @@ namespace lava
 			if (updateWaveEntryDataLocations())
 			{
 				dataSection.entries[dataSectionIndex].ntWaveIndex = waveSection.entries.size() - 1;
-				header.headerLength += 0x04 + sourceWave.size();
-				header.waveLength += 0x04 + sourceWave.size();
 			}
 
-			return result;
-		}
-
-		bool rwsd::populateWavePacket(const lava::byteArray& bodyIn, unsigned long waveIndex, unsigned long rawDataAddressIn, unsigned long specificDataEndAddressIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				result = 1;
-				waveInfo* currWave = &waveSection.entries[waveIndex];
-				unsigned long length = currWave->getAudioLengthInBytes();
-				unsigned long paddingLength = 0x00;
-				unsigned long currWaveDataEndpoint = rawDataAddressIn + currWave->dataLocation + length;
-				if (currWaveDataEndpoint <= specificDataEndAddressIn)
-				{
-					paddingLength = specificDataEndAddressIn - currWaveDataEndpoint;
-				}
-				else
-				{
-					unsigned long overflowAmount = currWaveDataEndpoint - specificDataEndAddressIn;
-					length -= overflowAmount;
-					currWave->nibbles -= overflowAmount * 2;
-				}
-				result &= currWave->packetContents.populate(bodyIn, rawDataAddressIn + currWave->dataLocation, length, paddingLength);
-			}
-
-			return result;
-		}
-		bool rwsd::populateWavePackets(const lava::byteArray& bodyIn, unsigned long waveDataAddressIn, unsigned long waveDataLengthIn)
-		{
-			bool result = 0;
-
-			if (bodyIn.populated())
-			{
-				result = 1;
-				for (std::size_t i = 0; i < (waveSection.entries.size() - 1); i++)
-				{
-					waveInfo* currWave = &waveSection.entries[i];
-					waveInfo* nextWave = &waveSection.entries[i + 1];
-					result &= populateWavePacket(bodyIn, i, waveDataAddressIn, waveDataAddressIn + nextWave->dataLocation);
-				}
-				waveInfo* finalWave = &waveSection.entries.back();
-				result &= populateWavePacket(bodyIn, waveSection.entries.size() - 1, waveDataAddressIn, waveDataAddressIn + waveDataLengthIn);
-			}
-
-			return result;
-		}
-		bool rwsd::populate(const byteArray& fileBodyIn, unsigned long fileBodyAddressIn, const byteArray& rawDataIn, unsigned long rawDataAddressIn, unsigned long rawDataLengthIn)
-		{
-			bool result = 0;
-
-			if (fileBodyIn.getLong(fileBodyAddressIn) == brsarHexTags::bht_RWSD)
-			{
-				if (header.populate(fileBodyIn, fileBodyAddressIn))
-				{
-					result = dataSection.populate(fileBodyIn, fileBodyAddressIn + header.dataOffset);
-					result &= waveSection.populate(fileBodyIn, fileBodyAddressIn + header.waveOffset);
-					if (result)
-					{
-						result &= populateWavePackets(rawDataIn, rawDataAddressIn, rawDataLengthIn);
-					}
-				}
-			}
-
-			return result;
-		}
-		bool rwsd::populate(const brsarFileFileContents& fileContentsIn)
-		{
-			bool result = 0;
-
-			if (bytesToFundamental<unsigned long>(fileContentsIn.header.data()) == brsarHexTags::bht_RWSD)
-			{
-				byteArray headerArr(fileContentsIn.header.data(), fileContentsIn.header.size());
-				byteArray dataArr(fileContentsIn.data.data(), fileContentsIn.data.size());
-				result = populate(headerArr, 0x00, dataArr, 0x00, dataArr.size());
-			}
-
-			return result;
-		}
-
-		dsp rwsd::exportWaveRawDataToDSP(unsigned long waveSectionIndex)
-		{
-			dsp result;
-
-			if (waveSectionIndex < waveSection.entries.size())
-			{
-				const waveInfo* targetWaveInfo = &waveSection.entries[waveSectionIndex];
-				result.nibbleCount = targetWaveInfo->nibbles;
-				result.sampleCount = nibblesToSamples(result.nibbleCount);
-				result.nibbleCount = samplesToNibbles(result.sampleCount);
-				result.sampleRate = unsigned long(targetWaveInfo->sampleRate24) << 16;
-				result.sampleRate |= targetWaveInfo->sampleRate;
-				result.loops = targetWaveInfo->looped;
-				result.loopStart = targetWaveInfo->loopStartSample;
-				if (result.loops)
-				{
-					result.loopEnd = result.sampleCount - 1;
-				}
-				else
-				{
-					result.loopEnd = 0x00;
-				}
-				result.soundInfo = targetWaveInfo->adpcmInfoEntries.back();
-				result.body = targetWaveInfo->packetContents.body;
-				//result.body.insert(result.body.end(), targetWaveInfo->packetContents.padding.begin(), targetWaveInfo->packetContents.padding.end());
-				unsigned long desiredLength = nibblesToBytes(result.nibbleCount);
-				if (result.body.size() < desiredLength)
-				{
-					result.body.resize(desiredLength);
-				}
-			}
-
-			return result;
-		}
-		bool rwsd::exportWaveRawDataToWAV(unsigned long waveSectionIndex, std::string wavOutputPath)
-		{
-			bool result = 0;
-
-			dsp conversionDSP = exportWaveRawDataToDSP(waveSectionIndex);
-			if (!conversionDSP.body.empty())
-			{
-				std::ofstream convDSPOut(VGAudioTempConvFilename, std::ios_base::out | std::ios_base::binary);
-				if (convDSPOut.is_open())
-				{
-					if (conversionDSP.exportContents(convDSPOut))
-					{
-						convDSPOut.close();
-						system(lava::brawl::generateVGAudioDSPToWavCommand(VGAudioTempConvFilename, wavOutputPath).c_str());
-						result = std::filesystem::is_regular_file(wavOutputPath);
-					}
-					std::filesystem::remove(VGAudioTempConvFilename);
-				}
-			}
-
-			return result;
-		}
-		bool rwsd::exportFileSection(std::ostream& destinationStream)
-		{
-			bool result = 0;
-
-			if (destinationStream.good())
-			{
-				result = 1;
-				result &= header.exportContents(destinationStream);
-				result &= dataSection.exportContents(destinationStream);
-				result &= waveSection.exportContents(destinationStream);
-			}
-
-			return result;
-		}
-		bool rwsd::exportRawDataSection(std::ostream& destinationStream)
-		{
-			bool result = 0;
-
-			if (destinationStream.good())
-			{
-				for (unsigned long i = 0; i < waveSection.entries.size(); i++)
-				{
-					waveInfo* currWave = &waveSection.entries[i];
-					destinationStream.write((const char*)currWave->packetContents.body.data(), currWave->packetContents.body.size());
-					destinationStream.write((const char*)currWave->packetContents.padding.data(), currWave->packetContents.padding.size());
-				}
-				result = destinationStream.good();
-			}
-
-			return result;
-		}
-		std::vector<unsigned char> rwsd::fileSectionToVec()
-		{
-			std::vector<unsigned char> result;
-
-			std::stringstream tempStream(std::ios_base::in | std::ios_base::out | std::ios_base::binary);
-			if (exportFileSection(tempStream))
-			{
-				result = streamContentsToVec(tempStream);
-			}
-
-			return result;
-		}
-		std::vector<unsigned char> rwsd::rawDataSectionToVec()
-		{
-			std::vector<unsigned char> result;
-
-			std::stringstream tempStream(std::ios_base::in | std::ios_base::out | std::ios_base::binary);
-			if (exportRawDataSection(tempStream))
-			{
-				result = streamContentsToVec(tempStream);
-			}
+			signalWAVESectionSizeChange();
 
 			return result;
 		}
