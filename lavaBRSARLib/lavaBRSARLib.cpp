@@ -2591,38 +2591,10 @@ namespace lava
 
 		void rwsdWaveSection::waveEntryPushBack(const waveInfo& sourceWave)
 		{
-			if (!entryOffsets.empty())
-			{
-				for (unsigned long i = 0; i < entryOffsets.size(); i++)
-				{
-					entryOffsets[i] += 0x04;
-				}
-
-				entryOffsets.push_back(entryOffsets.back() + entries.back().size());
-			}
-			else
-			{
-				entryOffsets.push_back(0x10);
-			}
-
 			entries.push_back(sourceWave);
 		}
 		void rwsdWaveSection::waveEntryPushFront(const waveInfo& sourceWave)
 		{
-			if (!entryOffsets.empty())
-			{
-				unsigned long initialEntryAddress = entryOffsets.front();
-				for (unsigned long i = 0; i < entryOffsets.size(); i++)
-				{
-					entryOffsets[i] += 0x04 + sourceWave.size();
-				}
-				entryOffsets.push_back(initialEntryAddress + 0x04);
-			}
-			else
-			{
-				entryOffsets.push_back(0x10);
-			}
-
 			entries.insert(entries.begin(), sourceWave);
 		}
 
@@ -2637,6 +2609,25 @@ namespace lava
 			{
 				result += entries[i].size();
 			}
+			return result;
+		}
+		std::vector<unsigned long> rwsdWaveSection::calculateOffsetVector() const
+		{
+			std::vector<unsigned long> result{};
+
+			unsigned long calculatedEntryOffset =
+				sizeof(unsigned long) // Length of WAVE Tag
+				+ sizeof(unsigned long) // Length of WAVE Section length field
+				+ sizeof(unsigned long) // Length of entry count field
+				+ entries.size() * sizeof(unsigned long) // Length of entry offset vector
+				;
+
+			for (unsigned long i = 0x0; i < entries.size(); i++)
+			{
+				result.push_back(calculatedEntryOffset);
+				calculatedEntryOffset += entries[i].size();
+			}
+
 			return result;
 		}
 		unsigned long rwsdWaveSection::paddedSize(unsigned long padTo) const
@@ -2655,7 +2646,7 @@ namespace lava
 				originalLength = bodyIn.getLong(addressIn + 0x04); // We no longer need this, we calculate lengths ourselves
 				unsigned long entryCount = bodyIn.getLong(addressIn + 0x08);
 
-				entryOffsets.clear();
+				std::vector<unsigned long> entryOffsets{};
 				entries.clear();
 
 				for (unsigned long cursor = 0x0; cursor < (entryCount * 4); cursor += 0x04)
@@ -2682,9 +2673,10 @@ namespace lava
 				lava::writeRawDataToStream(destinationStream, expectedLength);
 				lava::writeRawDataToStream(destinationStream, unsigned long(entries.size()));
 
-				for (unsigned long i = 0x0; i < entryOffsets.size(); i++)
+				std::vector<unsigned long> calculatedEntryOffsetVec = calculateOffsetVector();
+				for (unsigned long i = 0x0; i < entries.size(); i++)
 				{
-					lava::writeRawDataToStream(destinationStream, entryOffsets[i]);
+					lava::writeRawDataToStream(destinationStream, calculatedEntryOffsetVec[i]);
 				}
 				for (unsigned long i = 0x0; i < entries.size(); i++)
 				{
@@ -2915,7 +2907,7 @@ namespace lava
 				std::vector<dataInfo>* dataVecPtr = &dataSection.entries;
 				std::vector<waveInfo>* waveVecPtr = &waveSection.entries;
 				brawlReferenceVector* dataRefVecPtr = &dataSection.entryReferences;
-				std::vector<unsigned long>* waveOffVecPtr = &waveSection.entryOffsets;
+				std::vector<unsigned long> waveOffVec = waveSection.calculateOffsetVector();
 
 				unsigned long waveDataBaseAddress = header.waveOffset + header.waveLength;
 
@@ -2931,7 +2923,7 @@ namespace lava
 						if (emplaceResult.second)
 						{
 							waveInfo* currWaveEntry = &(*waveVecPtr)[currDataEntry->ntWaveIndex];
-							output << "\t\tWave Entry Offset / Address:\t0x" << lava::numToHexStringWithPadding((*waveOffVecPtr)[currDataEntry->ntWaveIndex], 0x08) << " / 0x" << lava::numToHexStringWithPadding(currWaveEntry->address, 0x08) << "\n";
+							output << "\t\tWave Entry Offset / Address:\t0x" << lava::numToHexStringWithPadding(waveOffVec[currDataEntry->ntWaveIndex], 0x08) << " / 0x" << lava::numToHexStringWithPadding(currWaveEntry->address, 0x08) << "\n";
 							output << "\t\tWave Contents Offset / Address:\t0x" << lava::numToHexStringWithPadding(currWaveEntry->dataLocation, 0x08) << " / 0x" << lava::numToHexStringWithPadding(waveDataBaseAddress + currWaveEntry->dataLocation, 0x08) << "\n";
 							output << "\t\tWave Contents Length / End:\t0x" << lava::numToHexStringWithPadding(currWaveEntry->getAudioLengthInBytes(), 0x04) << " / 0x" << lava::numToHexStringWithPadding(waveDataBaseAddress + currWaveEntry->dataLocation + currWaveEntry->getAudioLengthInBytes(), 0x08) << "\n";
 							emplaceResult.first->second.push_back(u);

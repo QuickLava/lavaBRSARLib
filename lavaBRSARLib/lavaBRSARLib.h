@@ -658,13 +658,14 @@ namespace lava
 
 			unsigned long originalLength = ULONG_MAX;
 
-			std::vector<unsigned long> entryOffsets{};
+			
 			std::vector<waveInfo> entries{};
 
 			void waveEntryPushBack(const waveInfo& sourceWave);
 			void waveEntryPushFront(const waveInfo& sourceWave);
 
 			unsigned long size() const;
+			std::vector<unsigned long> calculateOffsetVector() const;
 			unsigned long paddedSize(unsigned long padTo = 0x20) const;
 			bool populate(const lava::byteArray& bodyIn, std::size_t addressIn);
 			bool exportContents(std::ostream& destinationStream);

@@ -41,7 +41,7 @@ constexpr bool ENABLE_SPT_TO_DSP_HEADER_TEST = false;
 // Tests summarizing and exporting an RWSD's data.
 constexpr bool ENABLE_RWSD_SUMMARIZE_TEST = false;
 // Tests taking apart and reconstructing every RWSD in the BRSAR.
-constexpr bool ENABLE_RWSD_RECONSTRUCTION_TEST = false;
+constexpr bool ENABLE_RWSD_RECONSTRUCTION_TEST = true;
 // Tests exporting an RWSD Wave Info entry into a DSP.
 constexpr bool ENABLE_WAVE_INFO_TO_DSP_TEST = false;
 // Tests importing a DSP into an RWSD Wave Info entry.
