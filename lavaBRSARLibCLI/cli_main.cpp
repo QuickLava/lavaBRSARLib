@@ -1,6 +1,15 @@
 #include "../lavaBRSARLib/lavaByteArray.h"
 #include "../lavaBRSARLib/lavaBRSARLib.h"
 
+// CLI Constants
+const std::string cliVersion = "v0.1.0";
+
+// Default Argument Constants
+const std::string targetBrsarName = "smashbros_sound";
+const std::string brsarDefaultFilename = targetBrsarName + ".brsar";
+const std::string brsarDumpDefaultPath = "./Dump/";
+const std::string nullArgumentString = "-";
+
 int stringToNum(const std::string& stringIn, bool allowNeg, int defaultVal)
 {
 	int result = defaultVal;
@@ -18,22 +27,36 @@ int stringToNum(const std::string& stringIn, bool allowNeg, int defaultVal)
 	}
 	return result;
 }
-
-const std::string targetBrsarName = "smashbros_sound";
-
-// Default Argument Constants
-const std::string brsarDefaultFilename = targetBrsarName + ".brsar";
-const std::string brsarDumpDefaultPath = "./Dump/";
-const std::string nullArgumentString = "-";
 bool isNullArg(const char* argIn)
 {
 	return (argIn != nullptr) ? (strcmp(argIn, nullArgumentString.c_str()) == 0) : 0;
+}
+bool processBoolArgument(const char* argIn)
+{
+	bool result = 0;
+
+	unsigned long value = stringToNum(argIn, 0, ULONG_MAX);
+	if (value != ULONG_MAX)
+	{
+		result = value == 1;
+	}
+	else
+	{
+		std::string argStr = argIn;
+		argStr = lava::stringToUpper(argStr);
+		if (argStr == "T" || "TRUE" || argStr == "Y" || argStr == "YES")
+		{
+			result = 1;
+		}
+	}
+
+	return result;
 }
 
 int main(int argc, char** argv)
 {
 	srand(time(0));
-	std::cout << "lavaBRSARLib " << lava::brawl::version << " CLI\n";
+	std::cout << "lavaBRSARLibCLI (Library " << lava::brawl::version << ", CLI " << cliVersion << ")\n";
 	std::cout << "Written by QuickLava\n";
 	std::cout << "Based directly on work by:\n";
 	std::cout << " - Jaklub and Agoaj, as well as mstaklo, ssbbtailsfan, stickman and VILE (Sawndz, Super Sawndz)\n";
@@ -49,7 +72,7 @@ int main(int argc, char** argv)
 				lava::brawl::brsar sourceBrsar;
 				std::string targetBRSARPath = argv[2];
 				bool folderArgumentProvided = 0;
-				bool joinHeaderAndData = 0;
+				bool splitHeaderAndData = 0;
 				bool summaryOnly = 0;
 				std::string targetFolder = brsarDumpDefaultPath;
 				if (argc >= 4 && !isNullArg(argv[3]))
@@ -59,26 +82,18 @@ int main(int argc, char** argv)
 				}
 				if (argc >= 5 && !isNullArg(argv[4]))
 				{
-					if (strcmp("true", argv[4]) == 0)
+					summaryOnly = processBoolArgument(argv[4]);
+					if (summaryOnly)
 					{
-						summaryOnly = 1;
-					}
-					else
-					{
-						unsigned long value = stringToNum(argv[4], 0, ULONG_MAX);
-						summaryOnly = value == 1;
+						std::cout << "[C.Arg] Skipping file dump, summarizing contents only.\n";
 					}
 				}
 				if (argc >= 6 && !isNullArg(argv[5]))
 				{
-					if (strcmp("true", argv[5]) == 0)
+					splitHeaderAndData = processBoolArgument(argv[5]);
+					if (splitHeaderAndData && !summaryOnly)
 					{
-						joinHeaderAndData = 1;
-					}
-					else
-					{
-						unsigned long value = stringToNum(argv[5], 0, ULONG_MAX);
-						joinHeaderAndData = value == 1;
+						std::cout << "[C.Arg] Exported files will be split into header and data \".dat\" files.\n";
 					}
 				}
 				if (std::filesystem::exists(targetBRSARPath))
@@ -126,7 +141,7 @@ int main(int argc, char** argv)
 					{
 						std::cout << "Success!\n";
 						std::cout << "Dumping to \"" << targetFolder << "\"...\n";
-						testBrsar.doFileDump(targetFolder, joinHeaderAndData, summaryOnly);
+						testBrsar.doFileDump(targetFolder, !splitHeaderAndData, summaryOnly);
 					}
 				}
 				return 0;
@@ -139,9 +154,9 @@ int main(int argc, char** argv)
 		}
 		std::cout << "Please provide one of the following sets of arguments!\n";
 		std::cout << "To dump and summarize the files contained in a brsar file:\n";
-		std::cout << "\tdumpRSAR {BRSAR_PATH} {OUTPATH_PATH, optional} {DO_FILE_SUMMARY_ONLY, optional} {JOIN_HEADERS_AND_DATA, optional}\n";
+		std::cout << "\tdumpRSAR {BRSAR_PATH} {OUTPUT_PATH, optional} {DO_FILE_SUMMARY_ONLY, optional} {SPLIT_HEADERS_AND_DATA, opt}\n";
 		std::cout << "Note: Default OUTPUT_PATH is \"" << brsarDumpDefaultPath << "{BRSAR_NAME}/\"\n";
-		std::cout << "Note: {DO_FILE_SUMMARY_ONLY} {JOIN_HEADERS_AND_DATA} are both set to false by default.\n";
+		std::cout << "Note: DO_FILE_SUMMARY_ONLY and SPLIT_HEADERS_AND_DATA are boolean arguments, both are set to false by default.\n";
 		std::cout << "Note: To explicitly use one of the above defaults, specify \"" << nullArgumentString << "\" for that argument.\n";
 	}
 	catch (std::exception e)
