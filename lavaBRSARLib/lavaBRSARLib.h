@@ -46,15 +46,16 @@ namespace lava
 			bht_RBNK = 0x52424E4B,
 			bht_RSEQ = 0x52534551,
 			// RWSD Subsections
-			bht_RWSD_DATA = 0x44415441,
-			bht_RWSD_WAVE = 0x57415645,
-			bht_RWSD_RWAR = 0x52574152,
+			bht_SUBF_DATA = 0x44415441,
+			bht_SUBF_WAVE = 0x57415645,
+			bht_SUBF_RWAR = 0x52574152,
+			bht_SUBF_LABL = 0x4C41424C,
 		};
 		enum brsarHexTagType
 		{
 			bhtt_RSAR_SECTION = 1,
 			bhtt_FILE_SECTION, 
-			bhtt_RWSD_SUBSECTION
+			bhtt_SUBFILE_SUBSECTION
 		};
 		enum brsarAddressConsts
 		{
@@ -720,6 +721,7 @@ namespace lava
 			bool populateWavePackets(const lava::byteArray& bodyIn, unsigned long waveDataAddressIn, unsigned long waveDataLengthIn);
 			bool populate(const byteArray& fileBodyIn, unsigned long fileBodyAddressIn, const byteArray& rawDataIn, unsigned long rawDataAddressIn, unsigned long rawDataLengthIn);
 			bool populate(const brsarFileFileContents& fileContentsIn);
+			bool populate(std::string filePathIn);
 
 			// Export Funcs
 

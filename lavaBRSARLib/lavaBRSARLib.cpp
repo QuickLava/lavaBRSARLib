@@ -36,11 +36,11 @@ namespace lava
 					result = brsarHexTagType::bhtt_FILE_SECTION;
 					break;
 				}
-				case brsarHexTags::bht_RWSD_DATA:
-				case brsarHexTags::bht_RWSD_WAVE:
-				case brsarHexTags::bht_RWSD_RWAR:
+				case brsarHexTags::bht_SUBF_DATA:
+				case brsarHexTags::bht_SUBF_WAVE:
+				case brsarHexTags::bht_SUBF_RWAR:
 				{
-					result = brsarHexTagType::bhtt_RWSD_SUBSECTION;
+					result = brsarHexTagType::bhtt_SUBFILE_SUBSECTION;
 					break;
 				}
 			}
@@ -2637,7 +2637,7 @@ namespace lava
 		{
 			bool result = 0;
 
-			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_RWSD_WAVE)
+			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_SUBF_WAVE)
 			{
 				address = addressIn;
 
@@ -2667,7 +2667,7 @@ namespace lava
 				unsigned long initialStreamPos = destinationStream.tellp();
 				unsigned long expectedLength = paddedSize();
 
-				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_RWSD_WAVE);
+				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_SUBF_WAVE);
 				lava::writeRawDataToStream(destinationStream, expectedLength);
 				lava::writeRawDataToStream(destinationStream, unsigned long(entries.size()));
 
@@ -2756,7 +2756,7 @@ namespace lava
 		{
 			bool result = 0;
 
-			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_RWSD_DATA)
+			if (bodyIn.populated() && bodyIn.getLong(addressIn) == brsarHexTags::bht_SUBF_DATA)
 			{
 				address = addressIn;
 				originalLength = bodyIn.getLong(addressIn + 0x04); // We no longer need this either, this will be calculated as needed
@@ -2791,7 +2791,7 @@ namespace lava
 				unsigned long initialStreamPos = destinationStream.tellp();
 				unsigned long expectedLength = paddedSize();
 
-				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_RWSD_DATA);
+				lava::writeRawDataToStream(destinationStream, brsarHexTags::bht_SUBF_DATA);
 				lava::writeRawDataToStream(destinationStream, expectedLength);
 				entryReferences.exportContents(destinationStream);
 				for (std::size_t i = 0; i < entries.size(); i++)
@@ -2994,6 +2994,34 @@ namespace lava
 				byteArray headerArr(fileContentsIn.header.data(), fileContentsIn.header.size());
 				byteArray dataArr(fileContentsIn.data.data(), fileContentsIn.data.size());
 				result = populate(headerArr, 0x00, dataArr, 0x00, dataArr.size());
+			}
+
+			return result;
+		}
+
+		bool rwsd::populate(std::string filePathIn)
+		{
+			bool result = 0;
+
+			lava::byteArray fileArray(filePathIn);
+			if (fileArray.populated())
+			{
+				if (fileArray.getLong(0x00) == brsarHexTags::bht_RWSD)
+				{
+					unsigned long headerLength = fileArray.getLong(0x08);
+					if (fileArray.size() >= headerLength)
+					{
+						unsigned long dataAddress = headerLength;
+						if (fileArray.size() > (headerLength + 0x08))
+						{
+							if (fileArray.getLong(headerLength) == brsarHexTags::bht_SUBF_LABL)
+							{
+								dataAddress += fileArray.getLong(headerLength + 0x04);
+							}
+						}
+						result = populate(fileArray, 0x00, fileArray, dataAddress, fileArray.size() - dataAddress);
+					}
+				}
 			}
 
 			return result;
