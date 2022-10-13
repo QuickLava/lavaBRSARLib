@@ -14,17 +14,25 @@ namespace lava
 	{
 		populate(dataIn, lengthIn);
 	}
-	byteArray::byteArray(std::vector<char>& sourceVec)
+	byteArray::byteArray(const std::vector<char>& sourceVec)
 	{
 		populate(sourceVec);
 	}
-	byteArray::byteArray(std::vector<unsigned char>& sourceVec)
+	byteArray::byteArray(const std::vector<unsigned char>& sourceVec)
 	{
 		populate(sourceVec);
+	}
+	byteArray::byteArray(const byteArray& sourceArray, std::size_t startIndex, std::size_t endIndex)
+	{
+		populate(sourceArray, startIndex, endIndex);
 	}
 	byteArray::byteArray(std::istream& sourceStream)
 	{
 		populate(sourceStream);
+	}
+	byteArray::byteArray(std::string sourceFilePath)
+	{
+		populate(sourceFilePath);
 	}
 
 	void byteArray::populate(std::size_t lengthIn, char defaultChar)
@@ -48,14 +56,27 @@ namespace lava
 	{
 		populate((const char*)sourceData, lengthIn);
 	}
-	void byteArray::populate(std::vector<char>& sourceVec)
-	{
-		_populated = 1;
-		body = sourceVec;
-	}
-	void byteArray::populate(std::vector<unsigned char>& sourceVec)
+	void byteArray::populate(const std::vector<char>& sourceVec)
 	{
 		populate(sourceVec.data(), sourceVec.size());
+	}
+	void byteArray::populate(const std::vector<unsigned char>& sourceVec)
+	{
+		populate((const char*)sourceVec.data(), sourceVec.size());
+	}
+	void byteArray::populate(const byteArray& sourceArray, std::size_t startIndex, std::size_t endIndex)
+	{
+		if (sourceArray.populated() && sourceArray.size() > startIndex)
+		{
+			if (endIndex >= startIndex)
+			{
+				if (endIndex > body.size())
+				{
+					endIndex = body.size();
+				}
+				populate(sourceArray.data(), endIndex - startIndex);
+			}
+		}
 	}
 	void byteArray::populate(std::istream& sourceStream)
 	{
@@ -69,6 +90,14 @@ namespace lava
 		sourceStream.seekg(0, sourceStream.beg);
 		body.resize(sourceSize);
 		sourceStream.read(body.data(), sourceSize);
+	}
+	void byteArray::populate(std::string sourceFilePath)
+	{
+		if (std::filesystem::is_regular_file(sourceFilePath))
+		{
+			std::ifstream fileStreamIn(sourceFilePath, std::ios_base::in | std::ios_base::binary);
+			populate(fileStreamIn);
+		}
 	}
 	bool byteArray::populated() const
 	{
