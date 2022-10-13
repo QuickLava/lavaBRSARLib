@@ -3621,7 +3621,8 @@ namespace lava
 			std::filesystem::create_directories(dumpRootFolder);
 			brsarInfoGroupHeader* currHeader = nullptr;
 			brsarInfoGroupEntry* currEntry = nullptr;
-			std::ofstream metadataOutput(dumpRootFolder + "summary.txt");
+			std::ofstream metadataOutput(dumpRootFolder + "_dumpSummary.txt");
+			std::unordered_map<unsigned long, std::vector<std::string>> fileTypeTodumpedFiles{};
 			metadataOutput << "lavaBRSARLib " << lava::brawl::version << "\n\n";
 			metadataOutput << "BRSAR File Dump Summary:\n";
 			MD5 md5Object;
@@ -3686,9 +3687,9 @@ namespace lava
 									std::string dataFilename = fileBaseName + "_" + std::string(1, 'A' + t);
 									if (!doSummaryOnly)
 									{
+										unsigned long fileType = fileContentsPtr->getFileType();
 										if (joinHeaderAndData)
 										{
-											unsigned long fileType = fileContentsPtr->getFileType();
 											switch (fileType)
 											{
 												case brsarHexTags::bht_RWSD:
@@ -3713,13 +3714,43 @@ namespace lava
 												}
 											}
 											fileContentsPtr->dumpToFile(groupFolder + headerFilename);
+											fileTypeTodumpedFiles[fileType].push_back(groupFolder + headerFilename);
 										}
 										else
 										{
+											switch (fileType)
+											{
+												case brsarHexTags::bht_RWSD:
+												{
+													headerFilename += "_rwsd";
+													dataFilename += "_rwsd";
+													break;
+												}
+												case brsarHexTags::bht_RBNK:
+												{
+													headerFilename += "_rbnk";
+													dataFilename += "_rbnk";
+													break;
+												}
+												case brsarHexTags::bht_RSEQ:
+												{
+													headerFilename += "_rseq";
+													dataFilename += "_rseq";
+													break;
+												}
+												default:
+												{
+													headerFilename += "_unkn";
+													dataFilename += "_unkn";
+													break;
+												}
+											}
 											headerFilename += "_header.dat";
 											dataFilename += "_data.dat";
 											fileContentsPtr->dumpHeaderToFile(groupFolder + headerFilename);
 											fileContentsPtr->dumpDataToFile(groupFolder + dataFilename);
+											fileTypeTodumpedFiles[fileType].push_back(groupFolder + headerFilename);
+											fileTypeTodumpedFiles[fileType].push_back(groupFolder + dataFilename);
 										}
 									}
 									entryExported = 1;
@@ -3729,6 +3760,51 @@ namespace lava
 					}
 				}
 			}
+
+			if (!fileTypeTodumpedFiles.empty())
+			{
+				std::ofstream atlasOutput(dumpRootFolder + "_dumpAtlas.txt");
+				atlasOutput << "lavaBRSARLib " << lava::brawl::version << "\n\n";
+				unsigned totalFileCount = 0x00;
+				for (std::pair<unsigned long, std::vector<std::string>> fileTypeList : fileTypeTodumpedFiles)
+				{
+					totalFileCount += fileTypeList.second.size();
+				}
+				atlasOutput << "BRSAR File Dump Atlas (" << totalFileCount << " file(s) total):\n";
+				for (std::pair<unsigned long, std::vector<std::string>> fileTypeList : fileTypeTodumpedFiles)
+				{
+					atlasOutput << "File(s) of Type ";
+					switch (fileTypeList.first)
+					{
+						case brsarHexTags::bht_RWSD:
+						{
+							atlasOutput << "\"RWSD\"";
+							break;
+						}
+						case brsarHexTags::bht_RBNK:
+						{
+							atlasOutput << "\"RBNK\"";
+							break;
+						}
+						case brsarHexTags::bht_RSEQ:
+						{
+							atlasOutput << "\"RSEQ\"";
+							break;
+						}
+						default:
+						{
+							atlasOutput << "[Unknown]";
+							break;
+						}
+					}
+					atlasOutput << " (" << numToDecStringWithPadding(fileTypeList.second.size(), 0) << " file(s))...\n";
+					for (unsigned long i = 0; i < fileTypeList.second.size(); i++)
+					{
+						atlasOutput << "\t\"" << fileTypeList.second[i] << "\"\n";
+					}
+				}
+			}
+			
 
 			return result = 1;
 		}
