@@ -10,6 +10,7 @@ const std::string brsarDefaultFilename = targetBrsarName + ".brsar";
 const std::string brsarDumpDefaultPath = "./Dump/";
 const std::string nullArgumentString = "-";
 
+
 int stringToNum(const std::string& stringIn, bool allowNeg, int defaultVal)
 {
 	int result = defaultVal;
@@ -51,6 +52,42 @@ bool processBoolArgument(const char* argIn)
 	}
 
 	return result;
+}
+const std::string commentChars = "/\\#";
+bool lineIsCommented(std::string lineIn)
+{
+	bool result = 1;
+
+	if (!lineIn.empty())
+	{
+		result = commentChars.find(lineIn.front()) != std::string::npos;
+	}
+
+	return result;
+}
+std::string scrubPathString(std::string stringIn)
+{
+	std::string manipStr = "";
+	manipStr.reserve(stringIn.size());
+	bool inQuote = 0;
+	bool doEscapeChar = 0;
+	for (std::size_t i = 0; i < stringIn.size(); i++)
+	{
+		if (stringIn[i] == '\"' && !doEscapeChar)
+		{
+			inQuote = !inQuote;
+		}
+		else if (stringIn[i] == '\\')
+		{
+			doEscapeChar = 1;
+		}
+		else if (inQuote || !std::isspace(stringIn[i]))
+		{
+			doEscapeChar = 0;
+			manipStr += stringIn[i];
+		}
+	}
+	return manipStr;
 }
 
 int main(int argc, char** argv)
@@ -109,7 +146,7 @@ int main(int argc, char** argv)
 						{
 							if (folderArgumentProvided)
 							{
-								std::cerr << "[ERROR] Specified dump path doesn't exist (\"" << temppath << "\").\n";
+								std::cerr << "[ERROR] Specified dump folder doesn't exist (\"" << temppath << "\").\n";
 								result = 0;
 							}
 						}
@@ -146,6 +183,95 @@ int main(int argc, char** argv)
 				}
 				return 0;
 			}
+			if (strcmp("summarizeRWSDs", argv[1]) == 0 && argc >= 3)
+			{
+				std::cout << "Operation: Summarize RWSDs\n";
+				bool result = 1;
+				std::string rwsdListPath = argv[2];
+				bool folderArgumentProvided = 0;
+				std::string targetFolder = "";
+				if (argc >= 4 && !isNullArg(argv[3]))
+				{
+					targetFolder = argv[3];
+					std::cout << "[C.Arg] Produced summaries will be written to folder \"" << targetFolder << "\".\n";
+					folderArgumentProvided = 1;
+				}
+				if (std::filesystem::is_regular_file(rwsdListPath))
+				{
+					if (folderArgumentProvided)
+					{
+						if (targetFolder.back() != '/' && targetFolder.back() != '\\')
+						{
+							targetFolder += "/";
+						}
+						std::filesystem::path temppath = targetFolder;
+						if (!std::filesystem::is_directory(temppath))
+						{
+							if (folderArgumentProvided)
+							{
+								std::cerr << "[ERROR] Specified output folder doesn't exist (\"" << temppath << "\").\n";
+								result = 0;
+							}
+						}
+					}
+				}
+				else
+				{
+					std::cerr << "[ERROR] Specified RWSD Path List document (\"" << rwsdListPath << "\") does not exist.\n";
+					result = 0;
+				}
+				if (result)
+				{
+					std::vector<std::filesystem::path> collectedPaths{};
+					std::ifstream pathsIn(rwsdListPath, std::ios_base::in);
+					std::string currentLine = "";
+					while (std::getline(pathsIn, currentLine))
+					{
+						if (!currentLine.empty() && !lineIsCommented(currentLine))
+						{
+							std::filesystem::path linePath = scrubPathString(currentLine);
+							if (std::filesystem::is_regular_file(linePath))
+							{
+								collectedPaths.push_back(linePath);
+							}
+							else
+							{
+								std::cout << "[WARNING] Skipping file \"" << linePath.string() << "\". It doesn't appear to exist.\n";
+							}
+						}
+					}
+					for (unsigned long i = 0; i < collectedPaths.size(); i++)
+					{
+						lava::brawl::rwsd tempRWSD;
+						if (tempRWSD.populate(collectedPaths[i].string()))
+						{
+							std::filesystem::path summaryPath;
+							if (folderArgumentProvided)
+							{
+								summaryPath = targetFolder + lava::pruneFileExtension(collectedPaths[i].filename().string()) + "_meta.txt";
+							}
+							else
+							{
+								summaryPath = lava::pruneFileExtension(collectedPaths[i].string()) + "_meta.txt";
+							}
+							std::cout << "Parsed \"" << collectedPaths[i].string() << "\", writing summary...\n";
+							if (tempRWSD.summarize(summaryPath.string()))
+							{
+								std::cout << "\t[SUCCESS] Summary written to \"" << summaryPath.string() << "\".\n";
+							}
+							else
+							{
+								std::cerr << "\t[ERROR] Failure! Unable to write to \"" << summaryPath.string() << "\".\n";
+							}
+						}
+						else
+						{
+							std::cerr << "[ERROR] Unable to parse file \"" << collectedPaths[i].string() << "\", It doesn't appear to be a valid RWSD file.\n";
+						}
+					}
+				}
+				return 0;
+			}
 		}
 		std::cout << "Invalid operation argument set supplied:\n";
 		for (unsigned long i = 0; i < argc; i++)
@@ -154,9 +280,14 @@ int main(int argc, char** argv)
 		}
 		std::cout << "Please provide one of the following sets of arguments!\n";
 		std::cout << "To dump and summarize the files contained in a brsar file:\n";
-		std::cout << "\tdumpRSAR {BRSAR_PATH} {OUTPUT_PATH, optional} {DO_FILE_SUMMARY_ONLY, optional} {SPLIT_HEADERS_AND_DATA, opt}\n";
-		std::cout << "Note: Default OUTPUT_PATH is \"" << brsarDumpDefaultPath << "{BRSAR_NAME}/\"\n";
-		std::cout << "Note: DO_FILE_SUMMARY_ONLY and SPLIT_HEADERS_AND_DATA are boolean arguments, both are set to false by default.\n";
+		std::cout << "\tdumpRSAR {BRSAR_PATH} {OUTPUT_DIR, optional} {DO_FILE_SUMMARY_ONLY, optional} {SPLIT_HEADERS_AND_DATA, opt}\n";
+		std::cout << "\tNote: Default OUTPUT_DIRECTORY is \"" << brsarDumpDefaultPath << "{BRSAR_NAME}/\"\n";
+		std::cout << "\tNote: DO_FILE_SUMMARY_ONLY and SPLIT_HEADERS_AND_DATA are boolean arguments, both are set to false by default.\n";
+		std::cout << "To summarize the contents of dumped RWSD files:\n";
+		std::cout << "\tsummarizeRWSDs {RWSD_PATHS_LIST_PATH} {OUTPUT_DIRECTORY, optional}\n";
+		std::cout << "\tNote: RWSD paths list file should contain a list of paths to the RWSDs to summarize.\n";
+		std::cout << "\tNote: By default, summaries will be placed in the same folder as their source file, wherever they are.\n";
+		std::cout << "\t  Specifying your own output directory will instead force all summaries to be placed in the specified folder.\n";
 		std::cout << "Note: To explicitly use one of the above defaults, specify \"" << nullArgumentString << "\" for that argument.\n";
 	}
 	catch (std::exception e)
