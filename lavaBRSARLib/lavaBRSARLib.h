@@ -752,6 +752,7 @@ namespace lava
 			bool overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::string wavPathIn);
 
 			bool createNewWaveEntry(const waveInfo& sourceWave, bool pushFront = 0);
+			bool createNewWaveEntries(const waveInfo sourceWave, unsigned char cloneCount, bool pushFront = 0);
 			bool grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront = 0);
 		};
 

@@ -3350,6 +3350,25 @@ namespace lava
 
 			return result;
 		}
+		bool rwsd::createNewWaveEntries(const waveInfo sourceWave, unsigned char cloneCount, bool pushFront)
+		{
+			bool result = 1;
+
+			// Just makes sure that we're not having to repeatedly reallocate space for the vector as we add entries.
+			// Also, note that we can't take sourceWave as a reference, because if we take in an element from the vector as ref,
+			// then reallocate the vector, we'll invalidate our reference.
+			std::size_t endSize = waveSection.entries.size() + cloneCount;
+			if (waveSection.entries.capacity() <= endSize)
+			{
+				waveSection.entries.reserve(endSize);
+			}
+			for (unsigned char i = 0; i < cloneCount; i++)
+			{
+				result &= createNewWaveEntry(sourceWave, pushFront);
+			}
+
+			return result;
+		}
 		bool rwsd::grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront)
 		{
 			bool result = 0;

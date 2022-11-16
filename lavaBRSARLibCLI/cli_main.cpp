@@ -5,8 +5,6 @@
 const std::string cliVersion = "v0.1.0";
 
 // Default Argument Constants
-const std::string targetBrsarName = "smashbros_sound";
-const std::string brsarDefaultFilename = targetBrsarName + ".brsar";
 const std::string brsarDumpDefaultPath = "./Dump/";
 const std::string nullArgumentString = "-";
 
@@ -28,9 +26,16 @@ int stringToNum(const std::string& stringIn, bool allowNeg, int defaultVal)
 	}
 	return result;
 }
+
+int _globalArgC = INT_MAX;
+char** _globalArgV = nullptr;
 bool isNullArg(const char* argIn)
 {
 	return (argIn != nullptr) ? (strcmp(argIn, nullArgumentString.c_str()) == 0) : 0;
+}
+bool argProvided(unsigned int argIndex)
+{
+	return _globalArgC > (argIndex) && !isNullArg(_globalArgV[argIndex]);
 }
 bool processBoolArgument(const char* argIn)
 {
@@ -53,6 +58,7 @@ bool processBoolArgument(const char* argIn)
 
 	return result;
 }
+
 const std::string commentChars = "/\\#";
 bool lineIsCommented(std::string lineIn)
 {
@@ -92,6 +98,9 @@ std::string scrubPathString(std::string stringIn)
 
 int main(int argc, char** argv)
 {
+	_globalArgC = argc;
+	_globalArgV = argv;
+
 	srand(time(0));
 	std::cout << "lavaBRSARLibCLI (Library " << lava::brawl::version << ", CLI " << cliVersion << ")\n";
 	std::cout << "Written by QuickLava\n";
@@ -183,7 +192,7 @@ int main(int argc, char** argv)
 				}
 				return 0;
 			}
-			if (strcmp("summarizeRWSDs", argv[1]) == 0 && argc >= 3)
+			else if (strcmp("summarizeRWSDs", argv[1]) == 0 && argc >= 3)
 			{
 				std::cout << "Operation: Summarize RWSDs\n";
 				bool result = 1;
@@ -272,6 +281,89 @@ int main(int argc, char** argv)
 				}
 				return 0;
 			}
+			else if (strcmp("cloneWAVEs", argv[1]) == 0 && argc >= 5)
+			{
+				std::cout << "Operation: Clone WAVEs in RWSD\n";
+				bool result = 1;
+				lava::brawl::brsar sourceBrsar;
+				std::string targetBRSARPath = argv[2];
+
+				unsigned long targetFileID = stringToNum(argv[3], 0, ULONG_MAX);
+				unsigned char cloneCount = (unsigned char)stringToNum(argv[4], 0, UCHAR_MAX);
+
+				unsigned long sourceWaveID = 0;
+				if (argProvided(5))
+				{
+					sourceWaveID = stringToNum(argv[5], 0, ULONG_MAX);
+				}
+
+				if (std::filesystem::exists(targetBRSARPath))
+				{
+					sourceBrsar.init(targetBRSARPath);
+					lava::brawl::rwsd tempRWSD;
+					lava::brawl::brsarInfoFileHeader* relevantFileHeader = sourceBrsar.infoSection.getFileHeaderPointer(targetFileID);
+					if (relevantFileHeader != nullptr)
+					{
+						if (tempRWSD.populate(relevantFileHeader->fileContents))
+						{
+							if (tempRWSD.waveSection.entries.size() > sourceWaveID)
+							{
+								if (tempRWSD.createNewWaveEntries(tempRWSD.waveSection.entries[sourceWaveID], cloneCount, 0))
+								{
+									if (sourceBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), targetFileID))
+									{
+										std::filesystem::path tempPath(targetBRSARPath); // We use this to decompose the passed in path arg.
+										std::string exportDirectory = tempPath.parent_path().string();
+										std::string exportFilename = tempPath.stem().string() + "_edit.brsar";
+										if (sourceBrsar.exportContents(exportDirectory + exportFilename))
+										{
+											std::cout << "[SUCCESS] Exporting modified BRSAR to \"" 
+												<< exportDirectory << exportFilename << "\"!\n";
+										}
+										else
+										{
+											std::cerr << "[ERROR] Failed to export edited BRSAR to \"" 
+												<< exportDirectory << exportFilename << "\"!\n";
+										}
+									}
+									else
+									{
+										std::cerr << "[ERROR] Failed while writing edited RWSD back into BRSAR!\n";
+									}
+								}
+								else
+								{
+									std::cerr << "[ERROR] Failed while cloning WAVE entry!\n";
+								}
+							}
+							else
+							{
+								std::cerr << "[ERROR] Specified RWSD has no WAVE with ID " <<
+									lava::numToDecStringWithPadding(sourceWaveID, 0) << 
+									" (0x" << lava::numToHexStringWithPadding(sourceWaveID, 2) << ")!\n";
+								std::cerr << "\tHighest WAVE ID in the file is " <<
+									lava::numToDecStringWithPadding(tempRWSD.waveSection.entries.size(), 0) << 
+									" (0x" << lava::numToHexStringWithPadding(tempRWSD.waveSection.entries.size(), 2) << ")!\n";
+							}
+						}
+						else
+						{
+							std::cerr << "[ERROR] Specified File ID does not belong to a valid RWSD!\n";
+						}
+					}
+					else
+					{
+						std::cerr << "[ERROR] Invalid File ID Specified!\n";
+					}
+				}
+				else
+				{
+					std::cerr << "[ERROR] Specified BRSAR (\"" << targetBRSARPath << "\") does not exist.\n";
+					result = 0;
+				}
+				return 0;
+			}
+
 		}
 		std::cout << "Invalid operation argument set supplied:\n";
 		for (unsigned long i = 0; i < argc; i++)
@@ -279,15 +371,27 @@ int main(int argc, char** argv)
 			std::cout << "\tArgv[" << i << "]: " << argv[i] << "\n";
 		}
 		std::cout << "Please provide one of the following sets of arguments!\n";
-		std::cout << "To dump and summarize the files contained in a brsar file:\n";
-		std::cout << "\tdumpRSAR {BRSAR_PATH} {OUTPUT_DIR, optional} {DO_FILE_SUMMARY_ONLY, optional} {SPLIT_HEADERS_AND_DATA, opt}\n";
-		std::cout << "\tNote: Default OUTPUT_DIRECTORY is \"" << brsarDumpDefaultPath << "{BRSAR_NAME}/\"\n";
-		std::cout << "\tNote: DO_FILE_SUMMARY_ONLY and SPLIT_HEADERS_AND_DATA are boolean arguments, both are set to false by default.\n";
-		std::cout << "To summarize the contents of dumped RWSD files:\n";
-		std::cout << "\tsummarizeRWSDs {RWSD_PATHS_LIST_PATH} {OUTPUT_DIRECTORY, optional}\n";
-		std::cout << "\tNote: RWSD paths list file should contain a list of paths to the RWSDs to summarize.\n";
-		std::cout << "\tNote: By default, summaries will be placed in the same folder as their source file, wherever they are.\n";
-		std::cout << "\t  Specifying your own output directory will instead force all summaries to be placed in the specified folder.\n";
+		// DumpRSAR Info
+		{
+			std::cout << "To dump and summarize the files contained in a brsar file:\n";
+			std::cout << "\tdumpRSAR {BRSAR_PATH} {OUTPUT_DIR, optional} {DO_FILE_SUMMARY_ONLY, optional} {SPLIT_HEADERS_AND_DATA, opt}\n";
+			std::cout << "\tNote: Default OUTPUT_DIRECTORY is \"" << brsarDumpDefaultPath << "{BRSAR_NAME}/\"\n";
+			std::cout << "\tNote: DO_FILE_SUMMARY_ONLY and SPLIT_HEADERS_AND_DATA are boolean arguments, both are set to false by default.\n";
+		}
+		// SummarizeRWSDs Info
+		{
+			std::cout << "To summarize the contents of dumped RWSD files:\n";
+			std::cout << "\tsummarizeRWSDs {RWSD_PATHS_LIST_PATH} {OUTPUT_DIRECTORY, optional}\n";
+			std::cout << "\tNote: RWSD paths list file should contain a list of paths to the RWSDs to summarize.\n";
+			std::cout << "\tNote: By default, summaries will be placed in the same folder as their source file, wherever they are.\n";
+			std::cout << "\t  Specifying your own output directory will instead force all summaries to be placed in the specified folder.\n";
+		}
+		// CloneWAVEs Info
+		{
+			std::cout << "To make copies of a WAVE entry within an RWSD:\n";
+			std::cout << "\tcloneWAVEs {BRSAR_PATH} {FILE_ID} {COPY_COUNT} {SOURCE_WAVE_ID, optional}\n";
+		}
+		
 		std::cout << "Note: To explicitly use one of the above defaults, specify \"" << nullArgumentString << "\" for that argument.\n";
 	}
 	catch (std::exception e)
