@@ -191,7 +191,7 @@ namespace lava
 			unsigned long ttReserved = ULONG_MAX;
 
 			// "Note Table" Data
-			brawlReferenceVector ntReferenceList;
+			brawlReferenceVector ntReferenceList; // Appears to always have one entry that points to the below info
 			unsigned long ntWaveIndex = ULONG_MAX;
 			unsigned char ntAttack = UCHAR_MAX;
 			unsigned char ntDecay = UCHAR_MAX;
@@ -751,6 +751,7 @@ namespace lava
 			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, std::string dspPathIn);
 			bool overwriteWaveRawDataWithWAV(unsigned long waveSectionIndex, std::string wavPathIn);
 
+			bool createNewWaveEntry(const waveInfo& sourceWave, bool pushFront = 0);
 			bool grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront = 0);
 		};
 

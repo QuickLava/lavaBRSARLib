@@ -3324,7 +3324,7 @@ namespace lava
 			return result;
 		}
 
-		bool rwsd::grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront)
+		bool rwsd::createNewWaveEntry(const waveInfo& sourceWave, bool pushFront)
 		{
 			bool result = 1;
 
@@ -3332,31 +3332,40 @@ namespace lava
 			{
 				// Add entry to front of WAVE entry vec.
 				waveSection.waveEntryPushFront(sourceWave);
-				// Since we've added the entry to the front, the indeces for every other sound have been shifted up by 1
+				// Since we've added the entry to the front, the indices for every other sound have been shifted up by 1
 				// So we need to iterate through all the DATA entries and shift their indeces.
 				for (unsigned long i = 0; i < dataSection.entries.size(); i++)
 				{
 					dataSection.entries[i].ntWaveIndex++;
-				}
-				// Recalculate WAVE entry data locations.
-				if (updateWaveEntryDataLocations())
-				{
-					// Point the targeted DATA entry to the WAVE entry we just inserted.
-					dataSection.entries[dataSectionIndex].ntWaveIndex = 0;
 				}
 			}
 			else
 			{
 				// Add entry to back of WAVE entry vec.
 				waveSection.waveEntryPushBack(sourceWave);
-				// Recalculate WAVE entry data locations.
-				if (updateWaveEntryDataLocations())
+			}
+			// Recalculate WAVE entry data locations.
+			updateWaveEntryDataLocations();
+			signalWAVESectionSizeChange();
+
+			return result;
+		}
+		bool rwsd::grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront)
+		{
+			bool result = 0;
+
+			if (createNewWaveEntry(sourceWave, pushFront))
+			{
+				if (pushFront)
+				{
+					dataSection.entries[dataSectionIndex].ntWaveIndex = 0;
+				}
+				else
 				{
 					dataSection.entries[dataSectionIndex].ntWaveIndex = waveSection.entries.size() - 1;
 				}
+				result = 1;
 			}
-
-			signalWAVESectionSizeChange();
 
 			return result;
 		}

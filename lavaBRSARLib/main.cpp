@@ -4,12 +4,13 @@
 const std::string targetBrsarName = "smashbros_sound";
 const std::string tempFileDumpBaseFolder = "./Junk/" + targetBrsarName + "/";
 const unsigned long fileOverwriteTestTargetFile = 0x50;
-const unsigned long dspTestTargetFileID = 0x32D;
+const unsigned long dspTestTargetFileID = 0x31F;
 const std::string dspTestFileName = "sawnd000";
 const unsigned long dspTestExportWaveIndex = 0x01;
 const unsigned long dspTestImportWaveIndex = 0x00;
 const unsigned long multiWaveExportTestInitialGroupID = 7;
 const unsigned long multiWaveExportTestGroupsCound = 3;
+const unsigned long multiRWSDPushWAVCount = 0x58;
 const std::string multiWaveExportOutputDIrectory = "./WAVE_TEST/";
 const std::string testFileName = "testFile";
 const std::string testFileSuffix = ".dat";
@@ -52,8 +53,10 @@ constexpr bool ENABLE_WAVE_INFO_TO_WAV_TEST = false;
 constexpr bool ENABLE_MULTI_WAVE_INFO_TO_WAV_TEST = false;
 // Tests importing a WAV into an RWSD Wave Info entry.
 constexpr bool ENABLE_WAV_TO_WAVE_INFO_TEST = false;
-// Tests addign new WAV entries to an RWSD
-constexpr bool ENABLE_PUSH_RWSD_WAV_ENTRY_TEST = true;
+// Tests adding new WAV entries to an RWSD
+constexpr bool ENABLE_PUSH_RWSD_WAV_ENTRY_TEST = false;
+// Pushes multiple WAVE Entries to the specified RWSD
+constexpr bool ENABLE_MULTI_PUSH_RWSD_WAV_ENTRY_TEST = true;
 // Tests lossiness of the dsp-to-wav conversion process
 constexpr bool ENABLE_CONV_LOSS_TEST = false;
 // Tests lavaByteArray's Operations for errors.
@@ -322,7 +325,7 @@ int main()
 			{
 				tempRWSD.summarize("tempRWSDSummary.txt");
 				relevantFileHeader->fileContents.dumpToFile("tempRWSDDump.dat");
-				if (tempRWSD.grantDataEntryUniqueWave(1, tempRWSD.waveSection.entries[1]))
+				if (tempRWSD.grantDataEntryUniqueWave(0x25, tempRWSD.waveSection.entries[0x24]))
 				{
 					//tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
 					tempRWSD.summarize("tempRWSDSummary_edit.txt");
@@ -331,6 +334,30 @@ int main()
 						relevantFileHeader->fileContents.dumpToFile("tempRWSDDump_edit.dat");
 						testBrsar.exportContents(targetBrsarName + "_newwav.brsar");
 					}
+				}
+			}
+		}
+	}
+	if (ENABLE_MULTI_PUSH_RWSD_WAV_ENTRY_TEST)
+	{
+		lava::brawl::rwsd tempRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
+		{
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
+			{
+				tempRWSD.summarize("tempMRWSDSummary.txt");
+				relevantFileHeader->fileContents.dumpToFile("tempMRWSDDump.dat");
+				for (unsigned long i = 0; i < multiRWSDPushWAVCount; i++)
+				{
+					tempRWSD.createNewWaveEntry(tempRWSD.waveSection.entries[0x00]);
+				}
+				//tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
+				tempRWSD.summarize("tempMRWSDSummary_edit.txt");
+				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+				{
+					relevantFileHeader->fileContents.dumpToFile("tempMRWSDDump_edit.dat");
+					testBrsar.exportContents(targetBrsarName + "_mnewwav.brsar");
 				}
 			}
 		}
