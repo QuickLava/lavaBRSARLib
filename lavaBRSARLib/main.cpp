@@ -348,10 +348,7 @@ int main()
 			{
 				tempRWSD.summarize("tempMRWSDSummary.txt");
 				relevantFileHeader->fileContents.dumpToFile("tempMRWSDDump.dat");
-				for (unsigned long i = 0; i < multiRWSDPushWAVCount; i++)
-				{
-					tempRWSD.createNewWaveEntry(tempRWSD.waveSection.entries[0x00]);
-				}
+				tempRWSD.createNewWaveEntries(tempRWSD.waveSection.entries[0x00], multiRWSDPushWAVCount, 0);
 				//tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
 				tempRWSD.summarize("tempMRWSDSummary_edit.txt");
 				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
