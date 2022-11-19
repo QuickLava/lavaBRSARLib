@@ -10,7 +10,7 @@ const unsigned long dspTestExportWaveIndex = 0x01;
 const unsigned long dspTestImportWaveIndex = 0x00;
 const unsigned long multiWaveExportTestInitialGroupID = 7;
 const unsigned long multiWaveExportTestGroupsCound = 3;
-const unsigned long multiRWSDPushWAVCount = 0x13;
+const unsigned long multiRWSDPushWAVCount = 0x7F;
 const std::string multiWaveExportOutputDIrectory = "./WAVE_TEST/";
 const std::string testFileName = "testFile";
 const std::string testFileSuffix = ".dat";
@@ -57,6 +57,8 @@ constexpr bool ENABLE_WAV_TO_WAVE_INFO_TEST = false;
 constexpr bool ENABLE_PUSH_RWSD_WAV_ENTRY_TEST = false;
 // Pushes multiple WAVE Entries to the specified RWSD
 constexpr bool ENABLE_MULTI_PUSH_RWSD_WAV_ENTRY_TEST = true;
+// Fills all WAVE entries with a given WAV
+constexpr bool ENABLE_FILL_RWSD_WITH_WAV_TEST = true;
 // Tests lossiness of the dsp-to-wav conversion process
 constexpr bool ENABLE_CONV_LOSS_TEST = false;
 // Tests lavaByteArray's Operations for errors.
@@ -355,6 +357,27 @@ int main()
 				{
 					relevantFileHeader->fileContents.dumpToFile("tempMRWSDDump_edit.dat");
 					testBrsar.exportContents(targetBrsarName + "_mnewwav.brsar");
+				}
+			}
+		}
+	}
+	if (ENABLE_FILL_RWSD_WITH_WAV_TEST)
+	{
+		lava::brawl::rwsd tempRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
+		{
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
+			{
+				tempRWSD.summarize("tempORWSDSummary.txt");
+				relevantFileHeader->fileContents.dumpToFile("tempORWSDDump.dat");
+				tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
+				tempRWSD.overwriteAllWaves(tempRWSD.waveSection.entries[0]);
+				tempRWSD.summarize("tempORWSDSummary_edit.txt");
+				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+				{
+					relevantFileHeader->fileContents.dumpToFile("tempORWSDDump_edit.dat");
+					testBrsar.exportContents(targetBrsarName + "_overwrite.brsar");
 				}
 			}
 		}

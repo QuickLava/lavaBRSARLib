@@ -3254,6 +3254,30 @@ namespace lava
 			return result;
 		}
 
+		bool rwsd::overwriteWave(unsigned long waveSectionIndex, const waveInfo& waveInfoIn)
+		{
+			bool result = 0;
+
+			if (waveSectionIndex < waveSection.entries.size())
+			{
+				waveSection.entries[waveSectionIndex] = waveInfoIn;
+				result = updateWaveEntryDataLocations();
+			}
+
+			return result;
+		}
+		bool rwsd::overwriteAllWaves(const waveInfo waveInfoIn)
+		{
+			bool result = 0;
+
+			for (std::size_t i = 0; i < waveSection.entries.size(); i++)
+			{
+				waveSection.entries[i] = waveInfoIn;
+			}
+			result = updateWaveEntryDataLocations();
+
+			return result;
+		}
 		bool rwsd::overwriteWaveRawData(unsigned long waveSectionIndex, const std::vector<unsigned char>& rawDataIn)
 		{
 			bool result = 0;

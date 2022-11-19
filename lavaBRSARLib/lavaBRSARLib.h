@@ -746,6 +746,7 @@ namespace lava
 			bool overwriteDataTrackInfo(unsigned long dataSectionIndex, const dataInfo& dataInfoIn);
 			bool overwriteDataNoteInfo(unsigned long dataSectionIndex, const dataInfo& dataInfoIn);
 			bool overwriteWave(unsigned long waveSectionIndex, const waveInfo& waveInfoIn);
+			bool overwriteAllWaves(const waveInfo waveInfoIn);
 			bool overwriteWaveRawData(unsigned long waveSectionIndex, const std::vector<unsigned char>& rawDataIn);
 			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, const dsp& dspIn);
 			bool overwriteWaveRawDataWithDSP(unsigned long waveSectionIndex, std::string dspPathIn);
