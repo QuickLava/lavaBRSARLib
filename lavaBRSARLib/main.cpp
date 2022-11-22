@@ -4,7 +4,7 @@
 const std::string targetBrsarName = "smashbros_sound";
 const std::string tempFileDumpBaseFolder = "./Junk/" + targetBrsarName + "/";
 const unsigned long fileOverwriteTestTargetFile = 0x50;
-const unsigned long dspTestTargetFileID = 0x31F;
+const unsigned long dspTestTargetFileID = 0x2C0;
 const std::string dspTestFileName = "sawnd000";
 const unsigned long dspTestExportWaveIndex = 0x01;
 const unsigned long dspTestImportWaveIndex = 0x00;
@@ -56,9 +56,11 @@ constexpr bool ENABLE_WAV_TO_WAVE_INFO_TEST = false;
 // Tests adding new WAV entries to an RWSD
 constexpr bool ENABLE_PUSH_RWSD_WAV_ENTRY_TEST = false;
 // Pushes multiple WAVE Entries to the specified RWSD
-constexpr bool ENABLE_MULTI_PUSH_RWSD_WAV_ENTRY_TEST = true;
+constexpr bool ENABLE_MULTI_PUSH_RWSD_WAV_ENTRY_TEST = false;
 // Fills all WAVE entries with a given WAV
-constexpr bool ENABLE_FILL_RWSD_WITH_WAV_TEST = true;
+constexpr bool ENABLE_FILL_RWSD_WITH_WAV_TEST = false;
+// Fills all WAVE entries with a given WAV
+constexpr bool ENABLE_CUT_DOWN_RWSD_TEST = true;
 // Tests lossiness of the dsp-to-wav conversion process
 constexpr bool ENABLE_CONV_LOSS_TEST = false;
 // Tests lavaByteArray's Operations for errors.
@@ -378,6 +380,26 @@ int main()
 				{
 					relevantFileHeader->fileContents.dumpToFile("tempORWSDDump_edit.dat");
 					testBrsar.exportContents(targetBrsarName + "_overwrite.brsar");
+				}
+			}
+		}
+	}
+	if (ENABLE_CUT_DOWN_RWSD_TEST)
+	{
+		lava::brawl::rwsd tempRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
+		{
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
+			{
+				tempRWSD.summarize("tempShrRWSDSummary.txt");
+				relevantFileHeader->fileContents.dumpToFile("tempShrRWSDDump.dat");
+				tempRWSD.cutDownWaveSection();
+				tempRWSD.summarize("tempShrRWSDSummary_edit.txt");
+				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+				{
+					relevantFileHeader->fileContents.dumpToFile("tempShrRWSDDump_edit.dat");
+					testBrsar.exportContents(targetBrsarName + "_shr.brsar");
 				}
 			}
 		}

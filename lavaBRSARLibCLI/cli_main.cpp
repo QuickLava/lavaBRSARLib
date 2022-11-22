@@ -363,7 +363,95 @@ int main(int argc, char** argv)
 				}
 				return 0;
 			}
+			else if (strcmp("zeroOutRWSD", argv[1]) == 0 && argc >= 4)
+			{
+				std::cout << "Operation: Zero Out WAVE Data in RWSD\n";
+				bool result = 1;
+				lava::brawl::brsar sourceBrsar;
+				std::string targetBRSARPath = argv[2];
 
+				unsigned long targetFileID = stringToNum(argv[3], 0, ULONG_MAX);
+
+				unsigned long remainingWAVEEntries = 1;
+				if (argProvided(4))
+				{
+					remainingWAVEEntries = stringToNum(argv[4], 0, ULONG_MAX);
+				}
+
+				bool zeroOutRemainingEntries = 1;
+				if (argProvided(5))
+				{
+					zeroOutRemainingEntries = processBoolArgument(argv[5]);
+				}
+
+				if (std::filesystem::exists(targetBRSARPath))
+				{
+					sourceBrsar.init(targetBRSARPath);
+					lava::brawl::rwsd tempRWSD;
+					lava::brawl::brsarInfoFileHeader* relevantFileHeader = sourceBrsar.infoSection.getFileHeaderPointer(targetFileID);
+					if (relevantFileHeader != nullptr)
+					{
+						if (tempRWSD.populate(relevantFileHeader->fileContents))
+						{
+							if (remainingWAVEEntries == 0)
+							{
+								remainingWAVEEntries = tempRWSD.waveSection.entries.size();
+							}
+							if (remainingWAVEEntries <= tempRWSD.waveSection.entries.size())
+							{
+								if (tempRWSD.cutDownWaveSection(remainingWAVEEntries, zeroOutRemainingEntries))
+								{
+									if (sourceBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), targetFileID))
+									{
+										std::filesystem::path tempPath(targetBRSARPath); // We use this to decompose the passed in path arg.
+										std::string exportDirectory = tempPath.parent_path().string();
+										std::string exportFilename = tempPath.stem().string() + "_edit.brsar";
+										if (sourceBrsar.exportContents(exportDirectory + exportFilename))
+										{
+											std::cout << "[SUCCESS] Exporting modified BRSAR to \""
+												<< exportDirectory << exportFilename << "\"!\n";
+										}
+										else
+										{
+											std::cerr << "[ERROR] Failed to export edited BRSAR to \""
+												<< exportDirectory << exportFilename << "\"!\n";
+										}
+									}
+									else
+									{
+										std::cerr << "[ERROR] Failed while writing edited RWSD back into BRSAR!\n";
+									}
+								}
+								else
+								{
+									std::cerr << "[ERROR] Failed while cutting down RWSD!\n";
+								}
+							}
+							else
+							{
+								std::cerr << "[ERROR] Unable to reduce RWSD down to " 
+									<< lava::numToDecStringWithPadding(remainingWAVEEntries, 0) << " WAVE entries:\n";
+								std::cerr << "\tThere are only "
+									<< lava::numToDecStringWithPadding(tempRWSD.waveSection.entries.size(), 0) << " entries in the RWSD.\n";
+							}
+						}
+						else
+						{
+							std::cerr << "[ERROR] Specified File ID does not belong to a valid RWSD!\n";
+						}
+					}
+					else
+					{
+						std::cerr << "[ERROR] Invalid File ID Specified!\n";
+					}
+				}
+				else
+				{
+					std::cerr << "[ERROR] Specified BRSAR (\"" << targetBRSARPath << "\") does not exist.\n";
+					result = 0;
+				}
+				return 0;
+			}
 		}
 		std::cout << "Invalid operation argument set supplied:\n";
 		for (unsigned long i = 0; i < argc; i++)
@@ -390,6 +478,15 @@ int main(int argc, char** argv)
 		{
 			std::cout << "To make copies of a WAVE entry within an RWSD:\n";
 			std::cout << "\tcloneWAVEs {BRSAR_PATH} {FILE_ID} {COPY_COUNT} {SOURCE_WAVE_ID, optional}\n";
+		}
+		// zeroOutRWSD
+		{
+			std::cout << "To minimize the size of an RWSD by removing or zeroing out WAVE entries:\n";
+			std::cout << "\tzeroOutRWSD {BRSAR_PATH} {FILE_ID} {REMAINING_WAVES, optional} {ZERO_OUT_WAVES, opt}\n";
+			std::cout << "\tNote: REMAINING_WAVES is the number WAVE entries to leave in the RWSD.\n";
+			std::cout << "\t  Default value is 1. Specify 0 to avoid removing any WAVE entries, maintaining the original count.\n";
+			std::cout << "\tNote: ZERO_OUT_WAVES is a boolean argument, decides wether to zero out the audio data for remaining entries.\n";
+			std::cout << "\t  This is a boolean argument, default vaule is true.\n";
 		}
 		
 		std::cout << "Note: To explicitly use one of the above defaults, specify \"" << nullArgumentString << "\" for that argument.\n";

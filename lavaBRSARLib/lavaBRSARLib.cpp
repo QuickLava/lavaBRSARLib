@@ -3413,6 +3413,44 @@ namespace lava
 			return result;
 		}
 
+		bool rwsd::cutDownWaveSection(unsigned long remainingWaveCount, bool zeroOutWaveContent)
+		{
+			bool result = 0;
+
+			if (remainingWaveCount > 0)
+			{
+				if (waveSection.entries.size() > remainingWaveCount)
+				{
+					waveSection.entries.resize(remainingWaveCount);
+				}
+				for (std::size_t i = 0; i < dataSection.entries.size(); i++)
+				{
+					if (dataSection.entries[i].ntWaveIndex >= remainingWaveCount)
+					{
+						dataSection.entries[i].ntWaveIndex = 0;
+					}
+				}
+				if (zeroOutWaveContent)
+				{
+					for (std::size_t i = 0; i < waveSection.entries.size(); i++)
+					{
+						waveInfo* currWaveEntry = &waveSection.entries[i];
+						currWaveEntry->packetContents.body = std::vector<unsigned char>(_EMPTY_SOUND_SOUND_LENGTH, 0);
+						currWaveEntry->packetContents.padding = std::vector<unsigned char>(_EMPTY_SOUND_PADDING_LENGTH, 0);
+						currWaveEntry->nibbles = currWaveEntry->packetContents.body.size() * 2;
+						currWaveEntry->loopStartSample = 0;
+						currWaveEntry->sampleRate24 = 0;
+						currWaveEntry->sampleRate = 2000;
+					}
+				}
+				result = updateWaveEntryDataLocations();
+				signalDATASectionSizeChange();
+				signalWAVESectionSizeChange();
+			}
+
+			return result;
+		}
+
 		/* RWSD */
 
 		/* BRSAR File Section */

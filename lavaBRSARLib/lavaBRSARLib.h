@@ -71,8 +71,10 @@ namespace lava
 			sit_STREAM,
 			sit_WAVE,
 		};
-		const unsigned long _EMPTY_SOUND_SOUND_LENGTH = 0x02;
-		const unsigned long _EMPTY_SOUND_TOTAL_LENGTH = 0x20;
+
+		constexpr unsigned long _EMPTY_SOUND_TOTAL_LENGTH = 0x20;
+		constexpr unsigned long _EMPTY_SOUND_SOUND_LENGTH = 0x02;
+		constexpr unsigned long _EMPTY_SOUND_PADDING_LENGTH = _EMPTY_SOUND_TOTAL_LENGTH - _EMPTY_SOUND_SOUND_LENGTH;
 
 		/* Misc. */
 
@@ -755,6 +757,8 @@ namespace lava
 			bool createNewWaveEntry(const waveInfo& sourceWave, bool pushFront = 0);
 			bool createNewWaveEntries(const waveInfo sourceWave, unsigned char cloneCount, bool pushFront = 0);
 			bool grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront = 0);
+
+			bool cutDownWaveSection(unsigned long remainingWaveCount = 1, bool zeroOutWaveContent = 1);
 		};
 
 		/* BRSAR File Section */
