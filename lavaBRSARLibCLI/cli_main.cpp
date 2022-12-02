@@ -175,7 +175,7 @@ std::vector<unsigned long> handleLiteralNumvsNumListPathOverload(char* argument)
 	return result;
 }
 
-bool doCloneWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fileIDList, unsigned long cloneCount, unsigned long sourceWAVEID)
+bool doCreateWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fileIDList, unsigned long cloneCount, unsigned long sourceWAVEID)
 {
 	bool result = 0;
 
@@ -214,7 +214,7 @@ bool doCloneWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fi
 						if (targetBRSAR.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), fileIDList[i]))
 						{
 							result = 1;
-							std::cout << "[SUCCESS] Modified and reimported RWSD 0x" << lava::numToHexStringWithPadding(fileIDList[i], 3) << "!\n";
+							std::cout << "[SUCCESS] Modified and reimported RWSD!\n";
 						}
 						else
 						{
@@ -234,6 +234,63 @@ bool doCloneWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fi
 					std::cerr << "\tHighest WAVE ID in the file is " <<
 						lava::numToDecStringWithPadding(tempRWSD.waveSection.entries.size(), 0) <<
 						" (0x" << lava::numToHexStringWithPadding(tempRWSD.waveSection.entries.size(), 2) << ")!\n";
+				}
+			}
+			else
+			{
+				std::cerr << "[ERROR] Specified File ID does not belong to a valid RWSD!\n";
+			}
+		}
+		else
+		{
+			std::cerr << "[ERROR] Invalid File ID Specified!\n";
+		}
+	}
+
+	return result;
+}
+bool doDeleteWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fileIDList, unsigned long remainingWAVEEntries, bool zeroOutRemainingEntries)
+{
+	bool result = 0;
+
+	for (std::size_t i = 0; i < fileIDList.size(); i++)
+	{
+		std::cout << "Removing from: RWSD 0x" << lava::numToHexStringWithPadding(fileIDList[i], 0x03) << "...\n";
+		lava::brawl::rwsd tempRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = targetBRSAR.infoSection.getFileHeaderPointer(fileIDList[i]);
+		if (relevantFileHeader != nullptr)
+		{
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
+			{
+				if (remainingWAVEEntries == 0)
+				{
+					remainingWAVEEntries = tempRWSD.waveSection.entries.size();
+				}
+				if (remainingWAVEEntries <= tempRWSD.waveSection.entries.size())
+				{
+					if (tempRWSD.cutDownWaveSection(remainingWAVEEntries, zeroOutRemainingEntries))
+					{
+						if (targetBRSAR.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), fileIDList[i]))
+						{
+							result = 1;
+							std::cout << "[SUCCESS] Modified and reimported RWSD!\n";
+						}
+						else
+						{
+							std::cerr << "[ERROR] Failed while writing edited RWSD back into BRSAR!\n";
+						}
+					}
+					else
+					{
+						std::cerr << "[ERROR] Failed while removing from RWSD!\n";
+					}
+				}
+				else
+				{
+					std::cerr << "[ERROR] Unable to reduce RWSD down to "
+						<< lava::numToDecStringWithPadding(remainingWAVEEntries, 0) << " WAVE entries:\n";
+					std::cerr << "\tThere are only "
+						<< lava::numToDecStringWithPadding(tempRWSD.waveSection.entries.size(), 0) << " entries in the RWSD.\n";
 				}
 			}
 			else
@@ -457,7 +514,7 @@ int main(int argc, char** argv)
 				if (std::filesystem::exists(targetBRSARPath))
 				{
 					sourceBrsar.init(targetBRSARPath);
-					if (doCloneWAVEs(sourceBrsar, fileIDList, cloneCount, sourceWaveID))
+					if (doCreateWAVEs(sourceBrsar, fileIDList, cloneCount, sourceWaveID))
 					{
 						std::string exportPath = suffixFilename(targetBRSARPath, "_edit");
 						if (sourceBrsar.exportContents(exportPath))
@@ -481,14 +538,14 @@ int main(int argc, char** argv)
 				}
 				return 0;
 			}
-			else if (strcmp("zeroOutRWSD", argv[1]) == 0 && argc >= 4)
+			else if (strcmp("deleteWAVEs", argv[1]) == 0 && argc >= 4)
 			{
-				std::cout << "Operation: Zero Out WAVE Data in RWSD\n";
+				std::cout << "Operation: Delete WAVE Entries\n";
 				bool result = 1;
 				lava::brawl::brsar sourceBrsar;
 				std::string targetBRSARPath = argv[2];
 
-				unsigned long targetFileID = stringToNum(argv[3], 0, ULONG_MAX);
+				std::vector<unsigned long> fileIDList = handleLiteralNumvsNumListPathOverload(argv[3]);
 
 				unsigned long remainingWAVEEntries = 1;
 				if (argProvided(4))
@@ -504,63 +561,28 @@ int main(int argc, char** argv)
 
 				if (std::filesystem::exists(targetBRSARPath))
 				{
-					sourceBrsar.init(targetBRSARPath);
-					lava::brawl::rwsd tempRWSD;
-					lava::brawl::brsarInfoFileHeader* relevantFileHeader = sourceBrsar.infoSection.getFileHeaderPointer(targetFileID);
-					if (relevantFileHeader != nullptr)
+					if (sourceBrsar.init(targetBRSARPath))
 					{
-						if (tempRWSD.populate(relevantFileHeader->fileContents))
+						if (doDeleteWAVEs(sourceBrsar, fileIDList, remainingWAVEEntries, zeroOutRemainingEntries))
 						{
-							if (remainingWAVEEntries == 0)
+							std::string exportPath = suffixFilename(targetBRSARPath, "_edit");
+							if (sourceBrsar.exportContents(exportPath))
 							{
-								remainingWAVEEntries = tempRWSD.waveSection.entries.size();
-							}
-							if (remainingWAVEEntries <= tempRWSD.waveSection.entries.size())
-							{
-								if (tempRWSD.cutDownWaveSection(remainingWAVEEntries, zeroOutRemainingEntries))
-								{
-									if (sourceBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), targetFileID))
-									{
-										std::filesystem::path tempPath(targetBRSARPath); // We use this to decompose the passed in path arg.
-										std::string exportDirectory = tempPath.parent_path().string();
-										std::string exportFilename = tempPath.stem().string() + "_edit.brsar";
-										if (sourceBrsar.exportContents(exportDirectory + exportFilename))
-										{
-											std::cout << "[SUCCESS] Exporting modified BRSAR to \""
-												<< exportDirectory << exportFilename << "\"!\n";
-										}
-										else
-										{
-											std::cerr << "[ERROR] Failed to export edited BRSAR to \""
-												<< exportDirectory << exportFilename << "\"!\n";
-										}
-									}
-									else
-									{
-										std::cerr << "[ERROR] Failed while writing edited RWSD back into BRSAR!\n";
-									}
-								}
-								else
-								{
-									std::cerr << "[ERROR] Failed while cutting down RWSD!\n";
-								}
+								std::cout << "[SUCCESS] Exported modified BRSAR to \"" << exportPath << "\"!\n";
 							}
 							else
 							{
-								std::cerr << "[ERROR] Unable to reduce RWSD down to " 
-									<< lava::numToDecStringWithPadding(remainingWAVEEntries, 0) << " WAVE entries:\n";
-								std::cerr << "\tThere are only "
-									<< lava::numToDecStringWithPadding(tempRWSD.waveSection.entries.size(), 0) << " entries in the RWSD.\n";
+								std::cerr << "[ERROR] Failed to export modified BRSAR to \"" << exportPath << "\"!\n";
 							}
 						}
 						else
 						{
-							std::cerr << "[ERROR] Specified File ID does not belong to a valid RWSD!\n";
+							std::cerr << "[ERROR] Failed to delete WAVEs!\n";
 						}
 					}
 					else
 					{
-						std::cerr << "[ERROR] Invalid File ID Specified!\n";
+						std::cerr << "Failed to initialize BRSAR!\n";
 					}
 				}
 				else
@@ -596,19 +618,20 @@ int main(int argc, char** argv)
 		{
 			std::cout << "To add WAVE entries to an RWSD:\n";
 			std::cout << "\tcreateWAVEs {BRSAR_PATH} {FILE_ID} {COPY_COUNT} {SOURCE_WAVE_ID, optional}, OR\n";
-			std::cout << "\tcreateWAVEs {BRSAR_PATH} {FILE_ID_LIST_PATH} {COPY_COUNT} {SOURCE_WAVE_ID, optional}\n";
-			std::cout << "\tNote: FILE_ID_LIST_PATH should point to a file which lists the IDs of RWSDs to add to.\n";
+			std::cout << "\tcreateWAVEs {BRSAR_PATH} {FILE_ID_LIST_PATH} {COPY_COUNT} {SOURCE_WAVE_ID, opt}\n";
 		}
-		// zeroOutRWSD
+		// DeleteWAVEs Info
 		{
 			std::cout << "To minimize the size of an RWSD by removing or zeroing out WAVE entries:\n";
-			std::cout << "\tzeroOutRWSD {BRSAR_PATH} {FILE_ID} {REMAINING_WAVES, optional} {ZERO_OUT_WAVES, opt}\n";
-			std::cout << "\tNote: REMAINING_WAVES is the number WAVE entries to leave in the RWSD.\n";
+			std::cout << "\tdeleteWAVEs {BRSAR_PATH} {FILE_ID} {REMAINING_WAVES, optional} {ZERO_OUT_WAVES, opt}, OR\n";
+			std::cout << "\tdeleteWAVEs {BRSAR_PATH} {FILE_ID_LIST_PATH} {REMAINING_WAVES, opt} {ZERO_OUT_WAVES, opt}, OR\n";
+			std::cout << "\tNote: REMAINING_WAVES is the number of WAVE entries to leave in the RWSD.\n";
 			std::cout << "\t  Default value is 1. Specify 0 to avoid removing any WAVE entries, maintaining the original count.\n";
 			std::cout << "\tNote: ZERO_OUT_WAVES is a boolean argument, decides wether to zero out the audio data for remaining entries.\n";
 			std::cout << "\t  This is a boolean argument, default vaule is true.\n";
 		}
-		
+
+		std::cout << "\tNote: In any command, FILE_ID_LIST_PATH should point to a file which lists the IDs of every file to be affected.\n";
 		std::cout << "Note: To explicitly use one of the above defaults, specify \"" << nullArgumentString << "\" for that argument.\n";
 	}
 	catch (std::exception e)
