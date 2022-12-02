@@ -156,6 +156,7 @@ namespace lava
 			unsigned long getAudioLengthInBytes() const;
 
 			void copyOverWaveInfoProperties(const waveInfo& sourceInfo);
+			void hollowOut();
 
 			bool populate(const lava::byteArray& bodyIn, unsigned long addressIn);
 			bool exportContents(std::ostream& destinationStream);
@@ -758,6 +759,7 @@ namespace lava
 			bool createNewWaveEntries(const waveInfo sourceWave, unsigned char cloneCount, bool pushFront = 0);
 			bool grantDataEntryUniqueWave(unsigned long dataSectionIndex, const waveInfo& sourceWave, bool pushFront = 0);
 
+			bool hollowOutWAVEEntry(unsigned long waveID);
 			bool cutDownWaveSection(unsigned long remainingWaveCount = 1, bool zeroOutWaveContent = 1);
 		};
 

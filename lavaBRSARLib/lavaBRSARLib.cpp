@@ -363,6 +363,16 @@ namespace lava
 			adpcmInfoEntries = sourceInfo.adpcmInfoEntries;
 		}
 
+		void waveInfo::hollowOut()
+		{
+			packetContents.body = std::vector<unsigned char>(_EMPTY_SOUND_SOUND_LENGTH, 0);
+			packetContents.padding = std::vector<unsigned char>(_EMPTY_SOUND_PADDING_LENGTH, 0);
+			nibbles = packetContents.body.size() * 2;
+			loopStartSample = 0;
+			sampleRate24 = 0;
+			sampleRate = 2000;
+		}
+
 		unsigned long dataInfo::size() const
 		{
 			unsigned long result = 0;
@@ -3413,6 +3423,18 @@ namespace lava
 			return result;
 		}
 
+		bool rwsd::hollowOutWAVEEntry(unsigned long waveID)
+		{
+			bool result = 0;
+
+			if (waveSection.entries.size() > waveID)
+			{
+				result = 1;
+				waveSection.entries[waveID].hollowOut();
+			}
+
+			return result;
+		}
 		bool rwsd::cutDownWaveSection(unsigned long remainingWaveCount, bool zeroOutWaveContent)
 		{
 			bool result = 0;
@@ -3434,13 +3456,7 @@ namespace lava
 				{
 					for (std::size_t i = 0; i < waveSection.entries.size(); i++)
 					{
-						waveInfo* currWaveEntry = &waveSection.entries[i];
-						currWaveEntry->packetContents.body = std::vector<unsigned char>(_EMPTY_SOUND_SOUND_LENGTH, 0);
-						currWaveEntry->packetContents.padding = std::vector<unsigned char>(_EMPTY_SOUND_PADDING_LENGTH, 0);
-						currWaveEntry->nibbles = currWaveEntry->packetContents.body.size() * 2;
-						currWaveEntry->loopStartSample = 0;
-						currWaveEntry->sampleRate24 = 0;
-						currWaveEntry->sampleRate = 2000;
+						hollowOutWAVEEntry(i);
 					}
 				}
 				result = updateWaveEntryDataLocations();

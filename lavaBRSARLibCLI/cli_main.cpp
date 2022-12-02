@@ -19,27 +19,6 @@ bool argProvided(unsigned int argIndex)
 {
 	return _globalArgC > (argIndex) && !isNullArg(_globalArgV[argIndex]);
 }
-bool processBoolArgument(const char* argIn)
-{
-	bool result = 0;
-
-	unsigned long value = stringToNum(argIn, 0, ULONG_MAX);
-	if (value != ULONG_MAX)
-	{
-		result = value == 1;
-	}
-	else
-	{
-		std::string argStr = argIn;
-		argStr = lava::stringToUpper(argStr);
-		if (argStr == "T" || "TRUE" || argStr == "Y" || argStr == "YES")
-		{
-			result = 1;
-		}
-	}
-
-	return result;
-}
 int stringToNum(const std::string& stringIn, bool allowNeg, int defaultVal)
 {
 	int result = defaultVal;
@@ -69,6 +48,28 @@ int stringToNum(const std::string& stringIn, bool allowNeg, int defaultVal)
 
 	return result;
 }
+bool processBoolArgument(const char* argIn)
+{
+	bool result = 0;
+
+	unsigned long value = stringToNum(argIn, 0, ULONG_MAX);
+	if (value != ULONG_MAX)
+	{
+		result = value == 1;
+	}
+	else
+	{
+		std::string argStr = argIn;
+		argStr = lava::stringToUpper(argStr);
+		if (argStr == "T" || "TRUE" || argStr == "Y" || argStr == "YES")
+		{
+			result = 1;
+		}
+	}
+
+	return result;
+}
+
 
 const std::string commentChars = "/\\#";
 bool lineIsCommented(std::string lineIn)
@@ -106,6 +107,14 @@ std::string scrubPathString(std::string stringIn)
 	}
 	return manipStr;
 }
+std::string suffixFilename(std::string filepathIn, std::string suffixIn)
+{
+	std::filesystem::path tempPath(filepathIn); // We use this to decompose the passed in path arg.
+	std::string finalDirectory = tempPath.parent_path().string();
+	std::string finalFilename = tempPath.stem().string() + suffixIn + tempPath.extension().string();
+
+	return finalDirectory + finalFilename;
+}
 std::vector<unsigned long> parseIDListDocument(std::string documentPath)
 {
 	std::vector<unsigned long> result{};
@@ -141,6 +150,100 @@ std::vector<unsigned long> parseIDListDocument(std::string documentPath)
 					}
 				}
 			}
+		}
+	}
+
+	return result;
+}
+std::vector<unsigned long> handleLiteralNumvsNumListPathOverload(char* argument)
+{
+	std::vector<unsigned long> result{};
+
+	unsigned long literalNum = stringToNum(argument, 0, ULONG_MAX);
+	if (literalNum != ULONG_MAX)
+	{
+		result.push_back(literalNum);
+	}
+	else
+	{
+		if (std::filesystem::is_regular_file(argument))
+		{
+			result = parseIDListDocument(argument);
+		}
+	}
+
+	return result;
+}
+
+bool doCloneWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fileIDList, unsigned long cloneCount, unsigned long sourceWAVEID)
+{
+	bool result = 0;
+
+	for (unsigned long i = 0; i < fileIDList.size(); i++)
+	{
+		std::cout << "Adding to: RWSD 0x" << lava::numToHexStringWithPadding(fileIDList[i], 0x03) << "...\n";
+		lava::brawl::rwsd tempRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = targetBRSAR.infoSection.getFileHeaderPointer(fileIDList[i]);
+		if (relevantFileHeader != nullptr)
+		{
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
+			{
+				bool invalidSource = 0;
+				lava::brawl::waveInfo sourceWAVEObj;
+				if (sourceWAVEID != ULONG_MAX)
+				{
+					if (sourceWAVEID < tempRWSD.waveSection.entries.size())
+					{
+						sourceWAVEObj = tempRWSD.waveSection.entries[sourceWAVEID];
+					}
+					else
+					{
+						invalidSource = 1;
+					}
+				}
+				else
+				{
+					sourceWAVEObj = tempRWSD.waveSection.entries[0];
+					sourceWAVEObj.hollowOut();
+				}
+
+				if (!invalidSource)
+				{
+					if (tempRWSD.createNewWaveEntries(sourceWAVEObj, cloneCount, 0))
+					{
+						if (targetBRSAR.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), fileIDList[i]))
+						{
+							result = 1;
+							std::cout << "[SUCCESS] Modified and reimported RWSD 0x" << lava::numToHexStringWithPadding(fileIDList[i], 3) << "!\n";
+						}
+						else
+						{
+							std::cerr << "[ERROR] Failed while writing edited RWSD back into BRSAR!\n";
+						}
+					}
+					else
+					{
+						std::cerr << "[ERROR] Failed while cloning WAVE entry!\n";
+					}
+				}
+				else
+				{
+					std::cerr << "[ERROR] Specified RWSD has no WAVE with ID " <<
+						lava::numToDecStringWithPadding(sourceWAVEID, 0) <<
+						" (0x" << lava::numToHexStringWithPadding(sourceWAVEID, 2) << ")!\n";
+					std::cerr << "\tHighest WAVE ID in the file is " <<
+						lava::numToDecStringWithPadding(tempRWSD.waveSection.entries.size(), 0) <<
+						" (0x" << lava::numToHexStringWithPadding(tempRWSD.waveSection.entries.size(), 2) << ")!\n";
+				}
+			}
+			else
+			{
+				std::cerr << "[ERROR] Specified File ID does not belong to a valid RWSD!\n";
+			}
+		}
+		else
+		{
+			std::cerr << "[ERROR] Invalid File ID Specified!\n";
 		}
 	}
 
@@ -334,17 +437,18 @@ int main(int argc, char** argv)
 				}
 				return 0;
 			}
-			else if (strcmp("cloneWAVEs", argv[1]) == 0 && argc >= 5)
+			else if (strcmp("createWAVEs", argv[1]) == 0 && argc >= 5)
 			{
-				std::cout << "Operation: Clone WAVEs in RWSD\n";
+				std::cout << "Operation: Create New WAVE Entries\n";
 				bool result = 1;
 				lava::brawl::brsar sourceBrsar;
 				std::string targetBRSARPath = argv[2];
 
-				unsigned long targetFileID = stringToNum(argv[3], 0, ULONG_MAX);
+				std::vector<unsigned long> fileIDList = handleLiteralNumvsNumListPathOverload(argv[3]);
+
 				unsigned char cloneCount = (unsigned char)stringToNum(argv[4], 0, UCHAR_MAX);
 
-				unsigned long sourceWaveID = 0;
+				unsigned long sourceWaveID = ULONG_MAX;
 				if (argProvided(5))
 				{
 					sourceWaveID = stringToNum(argv[5], 0, ULONG_MAX);
@@ -353,60 +457,21 @@ int main(int argc, char** argv)
 				if (std::filesystem::exists(targetBRSARPath))
 				{
 					sourceBrsar.init(targetBRSARPath);
-					lava::brawl::rwsd tempRWSD;
-					lava::brawl::brsarInfoFileHeader* relevantFileHeader = sourceBrsar.infoSection.getFileHeaderPointer(targetFileID);
-					if (relevantFileHeader != nullptr)
+					if (doCloneWAVEs(sourceBrsar, fileIDList, cloneCount, sourceWaveID))
 					{
-						if (tempRWSD.populate(relevantFileHeader->fileContents))
+						std::string exportPath = suffixFilename(targetBRSARPath, "_edit");
+						if (sourceBrsar.exportContents(exportPath))
 						{
-							if (tempRWSD.waveSection.entries.size() > sourceWaveID)
-							{
-								if (tempRWSD.createNewWaveEntries(tempRWSD.waveSection.entries[sourceWaveID], cloneCount, 0))
-								{
-									if (sourceBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), targetFileID))
-									{
-										std::filesystem::path tempPath(targetBRSARPath); // We use this to decompose the passed in path arg.
-										std::string exportDirectory = tempPath.parent_path().string();
-										std::string exportFilename = tempPath.stem().string() + "_edit.brsar";
-										if (sourceBrsar.exportContents(exportDirectory + exportFilename))
-										{
-											std::cout << "[SUCCESS] Exporting modified BRSAR to \"" 
-												<< exportDirectory << exportFilename << "\"!\n";
-										}
-										else
-										{
-											std::cerr << "[ERROR] Failed to export edited BRSAR to \"" 
-												<< exportDirectory << exportFilename << "\"!\n";
-										}
-									}
-									else
-									{
-										std::cerr << "[ERROR] Failed while writing edited RWSD back into BRSAR!\n";
-									}
-								}
-								else
-								{
-									std::cerr << "[ERROR] Failed while cloning WAVE entry!\n";
-								}
-							}
-							else
-							{
-								std::cerr << "[ERROR] Specified RWSD has no WAVE with ID " <<
-									lava::numToDecStringWithPadding(sourceWaveID, 0) << 
-									" (0x" << lava::numToHexStringWithPadding(sourceWaveID, 2) << ")!\n";
-								std::cerr << "\tHighest WAVE ID in the file is " <<
-									lava::numToDecStringWithPadding(tempRWSD.waveSection.entries.size(), 0) << 
-									" (0x" << lava::numToHexStringWithPadding(tempRWSD.waveSection.entries.size(), 2) << ")!\n";
-							}
+							std::cout << "[SUCCESS] Exported modified BRSAR to \"" << exportPath << "\"!\n";
 						}
 						else
 						{
-							std::cerr << "[ERROR] Specified File ID does not belong to a valid RWSD!\n";
+							std::cerr << "[ERROR] Failed to export modified BRSAR to \"" << exportPath << "\"!\n";
 						}
 					}
 					else
 					{
-						std::cerr << "[ERROR] Invalid File ID Specified!\n";
+						std::cerr << "[ERROR] Failed to create WAVEs!\n";
 					}
 				}
 				else
@@ -527,10 +592,12 @@ int main(int argc, char** argv)
 			std::cout << "\tNote: By default, summaries will be placed in the same folder as their source file, wherever they are.\n";
 			std::cout << "\t  Specifying your own output directory will instead force all summaries to be placed in the specified folder.\n";
 		}
-		// CloneWAVEs Info
+		// CreateWAVEs Info
 		{
-			std::cout << "To make copies of a WAVE entry within an RWSD:\n";
-			std::cout << "\tcloneWAVEs {BRSAR_PATH} {FILE_ID} {COPY_COUNT} {SOURCE_WAVE_ID, optional}\n";
+			std::cout << "To add WAVE entries to an RWSD:\n";
+			std::cout << "\tcreateWAVEs {BRSAR_PATH} {FILE_ID} {COPY_COUNT} {SOURCE_WAVE_ID, optional}, OR\n";
+			std::cout << "\tcreateWAVEs {BRSAR_PATH} {FILE_ID_LIST_PATH} {COPY_COUNT} {SOURCE_WAVE_ID, optional}\n";
+			std::cout << "\tNote: FILE_ID_LIST_PATH should point to a file which lists the IDs of RWSDs to add to.\n";
 		}
 		// zeroOutRWSD
 		{
