@@ -10,3 +10,6 @@ This library is based heavily off of the work of other people. Special thanks to
 Additionally, this library directly makes use of the following code written by other people:
 - VGAudioCli by Alex Barney (used for conversions between GC-ADPCM .dsp files and standard .wav files)
 - Portable C++ Hashing Library by Stephan Brumme (used to provide md5 hashes in file export summaries)
+
+# lavaBRSARLibCLI
+A work-in-progress command line interface to provide easy access to certain lavaBRSARLib utilities.
