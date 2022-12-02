@@ -2,14 +2,15 @@
 #include "lavaBRSARLib.h"
 
 const std::string targetBrsarName = "smashbros_sound";
-const std::string tempFileDumpBaseFolder = targetBrsarName + "/";
+const std::string tempFileDumpBaseFolder = "./Junk/" + targetBrsarName + "/";
 const unsigned long fileOverwriteTestTargetFile = 0x50;
-const unsigned long dspTestTargetFileID = 0x32D;
+const unsigned long dspTestTargetFileID = 0x2C0;
 const std::string dspTestFileName = "sawnd000";
 const unsigned long dspTestExportWaveIndex = 0x01;
 const unsigned long dspTestImportWaveIndex = 0x00;
 const unsigned long multiWaveExportTestInitialGroupID = 7;
 const unsigned long multiWaveExportTestGroupsCound = 3;
+const unsigned long multiRWSDPushWAVCount = 0x7F;
 const std::string multiWaveExportOutputDIrectory = "./WAVE_TEST/";
 const std::string testFileName = "testFile";
 const std::string testFileSuffix = ".dat";
@@ -20,6 +21,8 @@ const std::string testFileOutputPath = testFileName + "_edit" + testFileSuffix;
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_1 = false;
 // Test which overwrites File 0x06's header and data with zeroed-out 0x20 byte vectors.
 constexpr bool ENABLE_FILE_OVERWRITE_TEST_2 = false;
+// Test which clones a specified file, handling all necessary INFO and FILE section changes.
+constexpr bool ENABLE_FILE_CLONE_TEST = false;
 // Test which exports the entire .brsar.
 constexpr bool ENABLE_BRSAR_EXPORT_TEST = true;
 // Test which exports the full SYMB section.
@@ -36,6 +39,10 @@ constexpr bool ENABLE_STRING_DUMP_TEST = false;
 constexpr bool ENABLE_FILE_INFO_SUMMARY_TEST = false;
 // Tests the .spt to .dsp header conversion system (see "lavaDSP.h").
 constexpr bool ENABLE_SPT_TO_DSP_HEADER_TEST = false;
+// Tests summarizing and exporting an RWSD's data.
+constexpr bool ENABLE_RWSD_SUMMARIZE_TEST = false;
+// Tests taking apart and reconstructing every RWSD in the BRSAR.
+constexpr bool ENABLE_RWSD_RECONSTRUCTION_TEST = true;
 // Tests exporting an RWSD Wave Info entry into a DSP.
 constexpr bool ENABLE_WAVE_INFO_TO_DSP_TEST = false;
 // Tests importing a DSP into an RWSD Wave Info entry.
@@ -46,10 +53,16 @@ constexpr bool ENABLE_WAVE_INFO_TO_WAV_TEST = false;
 constexpr bool ENABLE_MULTI_WAVE_INFO_TO_WAV_TEST = false;
 // Tests importing a WAV into an RWSD Wave Info entry.
 constexpr bool ENABLE_WAV_TO_WAVE_INFO_TEST = false;
-// Tests addign new WAV entries to an RWSD
-constexpr bool ENABLE_PUSH_RWSD_WAV_ENTRY_TEST = true;
+// Tests adding new WAV entries to an RWSD
+constexpr bool ENABLE_PUSH_RWSD_WAV_ENTRY_TEST = false;
+// Pushes multiple WAVE Entries to the specified RWSD
+constexpr bool ENABLE_MULTI_PUSH_RWSD_WAV_ENTRY_TEST = false;
+// Fills all WAVE entries with a given WAV
+constexpr bool ENABLE_FILL_RWSD_WITH_WAV_TEST = false;
+// Fills all WAVE entries with a given WAV
+constexpr bool ENABLE_CUT_DOWN_RWSD_TEST = true;
 // Tests lossiness of the dsp-to-wav conversion process
-constexpr bool ENABLE_CONV_LOSS_TEST = true;
+constexpr bool ENABLE_CONV_LOSS_TEST = false;
 // Tests lavaByteArray's Operations for errors.
 constexpr bool ENABLE_BYTE_ARRAY_TEST = false;
 
@@ -59,14 +72,27 @@ int main()
 	testBrsar.init(targetBrsarName + ".brsar");
 	if (ENABLE_FILE_OVERWRITE_TEST_1)
 	{
-		lava::brawl::brsarFileFileContents temp = *testBrsar.fileSection.getFileContentsPointer(fileOverwriteTestTargetFile);
-		testBrsar.overwriteFile(temp.header, temp.data, fileOverwriteTestTargetFile);
+		lava::brawl::brsarInfoFileHeader* targetFile = testBrsar.infoSection.getFileHeaderPointer(fileOverwriteTestTargetFile);
+		if (targetFile != nullptr)
+		{
+			testBrsar.overwriteFile(targetFile->fileContents.header, targetFile->fileContents.data, fileOverwriteTestTargetFile);
+		}
+		else
+		{
+			std::cerr << "ENABLE_FILE_OVERWRITE_TEST_1 Test failed! Specified File ID (" 
+				<< fileOverwriteTestTargetFile << " / 0x" << lava::numToHexStringWithPadding(fileOverwriteTestTargetFile, 0x03)
+				<< ") doesn't exist in this BRSAR!\n";
+		}
 	}
 	if (ENABLE_FILE_OVERWRITE_TEST_2)
 	{
 		std::vector<unsigned char> fakeHeader(0x20, 0x00);
 		std::vector<unsigned char> fakeData(0x20, 0x00);
 		testBrsar.overwriteFile(fakeHeader, fakeData, fileOverwriteTestTargetFile);
+	}
+	if (ENABLE_FILE_CLONE_TEST)
+	{
+		testBrsar.cloneFile(0x32D, 0x01);
 	}
 	if (ENABLE_BRSAR_EXPORT_TEST)
 	{
@@ -95,13 +121,13 @@ int main()
 		std::ofstream fileDumpTest(targetBrsarName + "_filedump.dat", std::ios_base::out | std::ios_base::binary);
 		if (fileDumpTest.is_open())
 		{
-			testBrsar.fileSection.exportContents(fileDumpTest);
+			testBrsar.exportVirtualFileSection(fileDumpTest);
 			fileDumpTest.close();
 		}
 	}
 	if (ENABLE_FILE_DUMP_TEST)
 	{
-	testBrsar.doFileDump(tempFileDumpBaseFolder, 0);
+		testBrsar.doFileDump(tempFileDumpBaseFolder, 0);
 	}
 	if (ENABLE_STRING_DUMP_TEST)
 	{
@@ -138,36 +164,94 @@ int main()
 			dspFileOut.close();
 		}
 	}
+	if (ENABLE_RWSD_SUMMARIZE_TEST)
+	{
+		lava::brawl::rwsd testExportRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
+		{
+			if (relevantFileHeader->fileContents.getFileType() == lava::brawl::brsarHexTags::bht_RWSD)
+			{
+				if (testExportRWSD.populate(relevantFileHeader->fileContents))
+				{
+					std::string baseName = targetBrsarName + "_" + lava::numToHexStringWithPadding(dspTestTargetFileID, 0x03) + "_RWSD";
+					std::ofstream fileDumpOut(baseName + ".dat", std::ios_base::out | std::ios_base::binary);
+					std::ofstream summaryOut(baseName + ".txt", std::ios_base::out | std::ios_base::binary);
+					testExportRWSD.exportFileSection(fileDumpOut);
+					testExportRWSD.summarize(summaryOut);
+				}
+			}
+		}
+	}
+	if (ENABLE_RWSD_RECONSTRUCTION_TEST)
+	{
+		MD5 md5Object;
+		for (int i = 0; i < testBrsar.infoSection.fileHeaders.size(); i++)
+		{
+			lava::brawl::brsarInfoFileHeader* currHeader = testBrsar.infoSection.fileHeaders[i].get();
+			if (currHeader != nullptr && currHeader->fileContents.getFileType() == lava::brawl::brsarHexTags::bht_RWSD)
+			{
+				std::string originalHeaderHash = md5Object((char*)currHeader->fileContents.header.data(), currHeader->fileContents.header.size());
+
+				lava::brawl::rwsd testRWSD;
+				if (testRWSD.populate(currHeader->fileContents))
+				{
+					testBrsar.overwriteFile(testRWSD.fileSectionToVec(), testRWSD.rawDataSectionToVec(), i);
+					std::string newHeaderHash = md5Object((char*)currHeader->fileContents.header.data(), currHeader->fileContents.header.size());
+					if (originalHeaderHash != newHeaderHash)
+					{
+						std::cerr << "File ID 0x" << lava::numToHexStringWithPadding(i, 0x03) << ": RWSD parsing error, input and output don't match!\n";
+					}
+				}
+			}
+		}
+		testBrsar.exportContents(targetBrsarName + "_RWSD_rebuild.brsar");
+	}
 	if (ENABLE_WAVE_INFO_TO_DSP_TEST)
 	{
 		lava::brawl::rwsd testExportRWSD;
-		if (testExportRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(dspTestTargetFileID)))
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
 		{
-			lava::brawl::dsp tempDSP = testExportRWSD.exportWaveRawDataToDSP(dspTestExportWaveIndex);
-			std::ofstream dspOut(dspTestFileName + ".dsp", std::ios_base::out | std::ios_base::binary);
-			tempDSP.exportContents(dspOut);
+			if (testExportRWSD.populate(relevantFileHeader->fileContents))
+			{
+				lava::brawl::dsp tempDSP = testExportRWSD.exportWaveRawDataToDSP(dspTestExportWaveIndex);
+				std::ofstream dspOut(dspTestFileName + ".dsp", std::ios_base::out | std::ios_base::binary);
+				tempDSP.exportContents(dspOut);
+			}
 		}
 	}
 	if (ENABLE_DSP_TO_WAVE_INFO_TEST)
 	{
 		lava::brawl::rwsd tempRWSD;
-		if (tempRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(dspTestTargetFileID)))
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
 		{
-			if (tempRWSD.overwriteWaveRawDataWithDSP(dspTestImportWaveIndex, dspTestFileName + ".dsp"))
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
 			{
-				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+				if (tempRWSD.overwriteWaveRawDataWithDSP(dspTestImportWaveIndex, dspTestFileName + ".dsp"))
 				{
-					testBrsar.exportContents(targetBrsarName + "_dsp.brsar");
+					if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+					{
+						testBrsar.exportContents(targetBrsarName + "_dsp.brsar");
+					}
 				}
+				lava::brawl::dsp tempDSP = tempRWSD.exportWaveRawDataToDSP(dspTestExportWaveIndex);
+				std::ofstream dspOut(dspTestFileName + ".dsp", std::ios_base::out | std::ios_base::binary);
+				tempDSP.exportContents(dspOut);
 			}
 		}
 	}
 	if (ENABLE_WAVE_INFO_TO_WAV_TEST)
 	{
 		lava::brawl::rwsd testExportRWSD;
-		if (testExportRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(dspTestTargetFileID)))
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
 		{
-			testExportRWSD.exportWaveRawDataToWAV(dspTestExportWaveIndex, dspTestFileName + ".wav");
+			if (testExportRWSD.populate(relevantFileHeader->fileContents))
+			{
+				testExportRWSD.exportWaveRawDataToWAV(dspTestExportWaveIndex, dspTestFileName + ".wav");
+			}
 		}
 	}
 	if (ENABLE_MULTI_WAVE_INFO_TO_WAV_TEST)
@@ -182,7 +266,8 @@ int main()
 				for (unsigned long y = 0; y < currGroupHead->entries.size(); y++)
 				{
 					lava::brawl::brsarInfoGroupEntry* currFile = &currGroupHead->entries[y];
-					lava::brawl::brsarFileFileContents* currFileContents = testBrsar.fileSection.getFileContentsPointer(currFile->fileID, u);
+					lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(currFile->fileID);
+					lava::brawl::brsarFileFileContents* currFileContents = &relevantFileHeader->fileContents;
 					if (currFileContents->header.size() >= 4)
 					{
 						if (lava::bytesToFundamental<unsigned int>(currFileContents->header.data()) == lava::brawl::brsarHexTags::bht_RWSD)
@@ -219,13 +304,17 @@ int main()
 	if (ENABLE_WAV_TO_WAVE_INFO_TEST)
 	{
 		lava::brawl::rwsd tempRWSD;
-		if (tempRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(dspTestTargetFileID)))
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
 		{
-			if (tempRWSD.overwriteWaveRawDataWithWAV(dspTestImportWaveIndex, dspTestFileName + ".wav"))
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
 			{
-				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+				if (tempRWSD.overwriteWaveRawDataWithWAV(dspTestImportWaveIndex, dspTestFileName + ".wav"))
 				{
-					testBrsar.exportContents(targetBrsarName + "_wav.brsar");
+					if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+					{
+						testBrsar.exportContents(targetBrsarName + "_wav.brsar");
+					}
 				}
 			}
 		}
@@ -233,19 +322,84 @@ int main()
 	if (ENABLE_PUSH_RWSD_WAV_ENTRY_TEST)
 	{
 		lava::brawl::rwsd tempRWSD;
-		lava::brawl::brsarFileFileContents* fileContentsPtr = testBrsar.fileSection.getFileContentsPointer(799);
-		if (fileContentsPtr != nullptr && tempRWSD.populate(*fileContentsPtr))
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
 		{
-			tempRWSD.summarize("tempRWSDSummary.txt");
-			fileContentsPtr->dumpToFile("tempRWSDDump.dat");
-			if (tempRWSD.grantDataEntryUniqueWave(1, tempRWSD.waveSection.entries[1]))
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
 			{
-				//tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
-				tempRWSD.summarize("tempRWSDSummary_edit.txt");
-				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), 799))
+				tempRWSD.summarize("tempRWSDSummary.txt");
+				relevantFileHeader->fileContents.dumpToFile("tempRWSDDump.dat");
+				if (tempRWSD.grantDataEntryUniqueWave(0x25, tempRWSD.waveSection.entries[0x24]))
 				{
-					testBrsar.fileSection.getFileContentsPointer(799)->dumpToFile("tempRWSDDump_edit.dat");
-					testBrsar.exportContents(targetBrsarName + "_newwav.brsar");
+					//tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
+					tempRWSD.summarize("tempRWSDSummary_edit.txt");
+					if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+					{
+						relevantFileHeader->fileContents.dumpToFile("tempRWSDDump_edit.dat");
+						testBrsar.exportContents(targetBrsarName + "_newwav.brsar");
+					}
+				}
+			}
+		}
+	}
+	if (ENABLE_MULTI_PUSH_RWSD_WAV_ENTRY_TEST)
+	{
+		lava::brawl::rwsd tempRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
+		{
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
+			{
+				tempRWSD.summarize("tempMRWSDSummary.txt");
+				relevantFileHeader->fileContents.dumpToFile("tempMRWSDDump.dat");
+				tempRWSD.createNewWaveEntries(tempRWSD.waveSection.entries[0x00], multiRWSDPushWAVCount, 0);
+				//tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
+				tempRWSD.summarize("tempMRWSDSummary_edit.txt");
+				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+				{
+					relevantFileHeader->fileContents.dumpToFile("tempMRWSDDump_edit.dat");
+					testBrsar.exportContents(targetBrsarName + "_mnewwav.brsar");
+				}
+			}
+		}
+	}
+	if (ENABLE_FILL_RWSD_WITH_WAV_TEST)
+	{
+		lava::brawl::rwsd tempRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
+		{
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
+			{
+				tempRWSD.summarize("tempORWSDSummary.txt");
+				relevantFileHeader->fileContents.dumpToFile("tempORWSDDump.dat");
+				tempRWSD.overwriteWaveRawDataWithWAV(0, "sawnd000.wav");
+				tempRWSD.overwriteAllWaves(tempRWSD.waveSection.entries[0]);
+				tempRWSD.summarize("tempORWSDSummary_edit.txt");
+				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+				{
+					relevantFileHeader->fileContents.dumpToFile("tempORWSDDump_edit.dat");
+					testBrsar.exportContents(targetBrsarName + "_overwrite.brsar");
+				}
+			}
+		}
+	}
+	if (ENABLE_CUT_DOWN_RWSD_TEST)
+	{
+		lava::brawl::rwsd tempRWSD;
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
+		{
+			if (tempRWSD.populate(relevantFileHeader->fileContents))
+			{
+				tempRWSD.summarize("tempShrRWSDSummary.txt");
+				relevantFileHeader->fileContents.dumpToFile("tempShrRWSDDump.dat");
+				tempRWSD.cutDownWaveSection();
+				tempRWSD.summarize("tempShrRWSDSummary_edit.txt");
+				if (testBrsar.overwriteFile(tempRWSD.fileSectionToVec(), tempRWSD.rawDataSectionToVec(), dspTestTargetFileID))
+				{
+					relevantFileHeader->fileContents.dumpToFile("tempShrRWSDDump_edit.dat");
+					testBrsar.exportContents(targetBrsarName + "_shr.brsar");
 				}
 			}
 		}
@@ -253,20 +407,24 @@ int main()
 	if (ENABLE_CONV_LOSS_TEST)
 	{
 		lava::brawl::rwsd testExportRWSD;
-		if (testExportRWSD.populate(*testBrsar.fileSection.getFileContentsPointer(dspTestTargetFileID)))
+		lava::brawl::brsarInfoFileHeader* relevantFileHeader = testBrsar.infoSection.getFileHeaderPointer(dspTestTargetFileID);
+		if (relevantFileHeader != nullptr)
 		{
-			lava::brawl::dsp tempDSP = testExportRWSD.exportWaveRawDataToDSP(dspTestExportWaveIndex);
-			std::ofstream dspOut(dspTestFileName + ".dsp", std::ios_base::out | std::ios_base::binary);
-			tempDSP.exportContents(dspOut);
-			dspOut.close();
-			testExportRWSD.overwriteWaveRawDataWithDSP(dspTestExportWaveIndex, dspTestFileName + ".dsp");
-			for (unsigned long i = 0; i < 30; i++)
+			if (testExportRWSD.populate(relevantFileHeader->fileContents))
 			{
-				lava::brawl::dsp testDSP = testExportRWSD.exportWaveRawDataToDSP(dspTestExportWaveIndex);
-				std::ofstream testDSPOut(dspTestFileName + "_edit.dsp", std::ios_base::out | std::ios_base::binary);
-				testDSP.exportContents(testDSPOut);
-				testDSPOut.close();
-				testExportRWSD.overwriteWaveRawDataWithDSP(dspTestExportWaveIndex, dspTestFileName + "_edit.dsp");
+				lava::brawl::dsp tempDSP = testExportRWSD.exportWaveRawDataToDSP(dspTestExportWaveIndex);
+				std::ofstream dspOut(dspTestFileName + ".dsp", std::ios_base::out | std::ios_base::binary);
+				tempDSP.exportContents(dspOut);
+				dspOut.close();
+				testExportRWSD.overwriteWaveRawDataWithDSP(dspTestExportWaveIndex, dspTestFileName + ".dsp");
+				for (unsigned long i = 0; i < 30; i++)
+				{
+					lava::brawl::dsp testDSP = testExportRWSD.exportWaveRawDataToDSP(dspTestExportWaveIndex);
+					std::ofstream testDSPOut(dspTestFileName + "_edit.dsp", std::ios_base::out | std::ios_base::binary);
+					testDSP.exportContents(testDSPOut);
+					testDSPOut.close();
+					testExportRWSD.overwriteWaveRawDataWithDSP(dspTestExportWaveIndex, dspTestFileName + "_edit.dsp");
+				}
 			}
 		}
 	}

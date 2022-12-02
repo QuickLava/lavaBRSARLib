@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include "lavaBytes.h"
 
 namespace lava
@@ -179,16 +180,21 @@ namespace lava
 		byteArray(std::size_t lengthIn = 0x00, char defaultChar = 0x00);
 		byteArray(const char* dataIn, std::size_t lengthIn);
 		byteArray(const unsigned char* dataIn, std::size_t lengthIn);
-		byteArray(std::vector<char>& sourceVec);
-		byteArray(std::vector<unsigned char>& sourceVec);
+		byteArray(const std::vector<char>& sourceVec);
+		byteArray(const std::vector<unsigned char>& sourceVec);
+		byteArray(const byteArray& sourceArray, std::size_t startIndex = 0x00, std::size_t endIndex = SIZE_MAX);
 		byteArray(std::istream& sourceStream);
+		byteArray(std::string sourceFilePath);
 
 		void populate(std::size_t lengthIn, char defaultChar = 0x00);
 		void populate(const char* sourceData, std::size_t lengthIn);
 		void populate(const unsigned char* sourceData, std::size_t lengthIn);
-		void populate(std::vector<char>& sourceVec);
-		void populate(std::vector<unsigned char>& sourceVec);
+		void populate(const std::vector<char>& sourceVec);
+		void populate(const std::vector<unsigned char>& sourceVec);
+		void populate(const byteArray& sourceArray, std::size_t startIndex = 0x00, std::size_t endIndex = SIZE_MAX);
 		void populate(std::istream& sourceStream);
+		void populate(std::string sourceFilePath);
+
 		bool populated() const;
 
 		const char* data() const;
