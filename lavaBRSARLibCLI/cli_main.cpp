@@ -2,30 +2,12 @@
 #include "../lavaBRSARLib/lavaBRSARLib.h"
 
 // CLI Constants
-const std::string cliVersion = "v0.1.0";
+const std::string cliVersion = "v0.2.0";
 
 // Default Argument Constants
 const std::string brsarDumpDefaultPath = "./Dump/";
 const std::string nullArgumentString = "-";
 
-
-int stringToNum(const std::string& stringIn, bool allowNeg, int defaultVal)
-{
-	int result = defaultVal;
-	std::string manipStr = stringIn;
-	int base = (manipStr.find("0x") == 0) ? 16 : 10;
-	char* res = nullptr;
-	result = std::strtoul(manipStr.c_str(), &res, base);
-	if (res != (manipStr.c_str() + manipStr.size()))
-	{
-		result = defaultVal;
-	}
-	if (result < 0 && !allowNeg)
-	{
-		result = defaultVal;
-	}
-	return result;
-}
 
 int _globalArgC = INT_MAX;
 char** _globalArgV = nullptr;
@@ -53,6 +35,35 @@ bool processBoolArgument(const char* argIn)
 		if (argStr == "T" || "TRUE" || argStr == "Y" || argStr == "YES")
 		{
 			result = 1;
+		}
+	}
+
+	return result;
+}
+int stringToNum(const std::string& stringIn, bool allowNeg, int defaultVal)
+{
+	int result = defaultVal;
+
+	std::size_t firstNonWhitespaceCharFound = SIZE_MAX;
+	for (std::size_t i = 0; i < stringIn.size() && firstNonWhitespaceCharFound == SIZE_MAX; i++)
+	{
+		if (!isblank(stringIn[i]))
+		{
+			firstNonWhitespaceCharFound = i;
+		}
+	}
+	if (firstNonWhitespaceCharFound != SIZE_MAX)
+	{
+		int base = (stringIn.find("0x") == firstNonWhitespaceCharFound) ? 16 : 10;
+		char* res = nullptr;
+		result = std::strtoul(stringIn.c_str(), &res, base);
+		if (res != (stringIn.c_str() + stringIn.size()))
+		{
+			result = defaultVal;
+		}
+		if (result < 0 && !allowNeg)
+		{
+			result = defaultVal;
 		}
 	}
 
@@ -95,11 +106,53 @@ std::string scrubPathString(std::string stringIn)
 	}
 	return manipStr;
 }
+std::vector<unsigned long> parseIDListDocument(std::string documentPath)
+{
+	std::vector<unsigned long> result{};
+
+	if (std::filesystem::is_regular_file(documentPath))
+	{
+		std::ifstream fileIn(documentPath);
+		std::string currentLine = "";
+		while (std::getline(fileIn, currentLine))
+		{
+			if (!lineIsCommented(currentLine))
+			{
+				constexpr char delimChar = ',';
+				std::vector<std::string> lineSegments{};
+
+				std::size_t delimLoc = 0;
+				while (delimLoc != std::string::npos)
+				{
+					delimLoc = currentLine.find(delimChar, delimLoc);
+					lineSegments.push_back(currentLine.substr(0, delimLoc));
+					if ((delimLoc + 1) < currentLine.size())
+					{
+						currentLine = currentLine.substr(delimLoc + 1, std::string::npos);
+					}
+				}
+
+				for (std::size_t i = 0; i < lineSegments.size(); i++)
+				{
+					unsigned long retrievedID = stringToNum(lineSegments[i], 0, ULONG_MAX);
+					if (retrievedID != ULONG_MAX)
+					{
+						result.push_back(retrievedID);
+					}
+				}
+			}
+		}
+	}
+
+	return result;
+}
 
 int main(int argc, char** argv)
 {
 	_globalArgC = argc;
 	_globalArgV = argv;
+
+	parseIDListDocument("idtest.txt");
 
 	srand(time(0));
 	std::cout << "lavaBRSARLibCLI (Library " << lava::brawl::version << ", CLI " << cliVersion << ")\n";
