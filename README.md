@@ -12,4 +12,4 @@ Additionally, this library directly makes use of the following code written by o
 - Portable C++ Hashing Library by Stephan Brumme (used to provide md5 hashes in file export summaries)
 
 # lavaBRSARLibCLI
-A work-in-progress command line interface to provide easy access to certain lavaBRSARLib utilities.
+A work-in-progress command line interface to expose certain lavaBRSARLib utilities for easier access.
