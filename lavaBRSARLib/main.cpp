@@ -1,7 +1,7 @@
 #include "lavaByteArray.h"
 #include "lavaBRSARLib.h"
 
-const std::string targetBrsarName = "smashbros_sound";
+const std::string targetBrsarName = "revo_kart";
 const std::string tempFileDumpBaseFolder = "./Junk/" + targetBrsarName + "/";
 const unsigned long fileOverwriteTestTargetFile = 0x50;
 const unsigned long dspTestTargetFileID = 0x2C0;

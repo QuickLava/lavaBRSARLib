@@ -81,7 +81,7 @@ namespace lava
 		int padLengthTo(unsigned long lengthIn, unsigned long padTo, bool allowZeroPaddingLength)
 		{
 			unsigned long padLength = padTo - (lengthIn % padTo);
-			if (!allowZeroPaddingLength && padLength == padTo)
+			if (allowZeroPaddingLength && padLength == padTo)
 			{
 				padLength = 0x00;
 			}
@@ -1619,7 +1619,7 @@ namespace lava
 				{
 					std::string measurementString = bodyIn.data() + (stringOffset.getAddress(parent->getAddress() + 0x08));
 					// Note: the final bool here determines whether allowing 0 padding length is allowed. 9stars allows this, other BRSARs do not?)
-					std::size_t sizePrescription = padLengthTo(measurementString.size(), 0x04, 1);
+					std::size_t sizePrescription = padLengthTo(measurementString.size(), 0x04, 0);
 					// The following code is for logging whether or not we get the prescribed lengths right when reading in a brsar.
 					// Leaving this in cuz I'll need to come back to it later to ensure compatability with different BRSARs.
 					/*std::cout << "\"" << measurementString << "\" @ 0x" << 
