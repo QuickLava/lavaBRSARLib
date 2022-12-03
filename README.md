@@ -13,3 +13,4 @@ Additionally, this library directly makes use of the following code written by o
 
 # lavaBRSARLibCLI
 A work-in-progress command line interface to expose certain lavaBRSARLib utilities for easier access.
+Run the program from the command line for information on available operations.
