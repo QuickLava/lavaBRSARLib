@@ -250,7 +250,7 @@ bool doCreateWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> f
 
 	return result;
 }
-bool doDeleteWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fileIDList, unsigned long remainingWAVEEntries, bool zeroOutRemainingEntries)
+bool doDeleteWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fileIDList, unsigned long remainingWAVEEntriesIn, bool zeroOutRemainingEntries)
 {
 	bool result = 0;
 
@@ -263,6 +263,7 @@ bool doDeleteWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> f
 		{
 			if (tempRWSD.populate(relevantFileHeader->fileContents))
 			{
+				unsigned long remainingWAVEEntries = remainingWAVEEntriesIn;
 				if (remainingWAVEEntries == 0)
 				{
 					remainingWAVEEntries = tempRWSD.waveSection.entries.size();
