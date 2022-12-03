@@ -1,5 +1,6 @@
 #include "../lavaBRSARLib/lavaByteArray.h"
 #include "../lavaBRSARLib/lavaBRSARLib.h"
+#include "../lavaBRSARLib/lavaUtility.h"
 
 // CLI Constants
 const std::string cliVersion = "v0.2.0";
@@ -135,7 +136,7 @@ std::vector<unsigned long> parseIDListDocument(std::string documentPath)
 				{
 					delimLoc = currentLine.find(delimChar, delimLoc);
 					lineSegments.push_back(currentLine.substr(0, delimLoc));
-					if ((delimLoc + 1) < currentLine.size())
+					if (delimLoc != std::string::npos && (delimLoc + 1) < currentLine.size())
 					{
 						currentLine = currentLine.substr(delimLoc + 1, std::string::npos);
 					}
@@ -306,13 +307,93 @@ bool doDeleteWAVEs(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> f
 
 	return result;
 }
+bool exportFiles(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fileIDList, std::string exportDir, bool joinHeaderAndData)
+{
+	bool result = 1;
+
+	if (std::filesystem::is_directory(exportDir))
+	{
+		std::size_t successes = 0;
+		for (std::size_t i = 0; i < fileIDList.size(); i++)
+		{
+			std::cout << "Exporting File 0x" << lava::numToHexStringWithPadding(fileIDList[i], 0x03) << "...\n";
+			lava::brawl::brsarInfoFileHeader* relevantFileHeader = targetBRSAR.infoSection.getFileHeaderPointer(fileIDList[i]);
+			if (relevantFileHeader != nullptr)
+			{
+				std::string baseFilename = lava::numToDecStringWithPadding(fileIDList[i], 3) + "_(0x" +
+					lava::numToHexStringWithPadding(fileIDList[i], 3) + ")";
+				std::string filetypeStr = lava::stringToLower(relevantFileHeader->fileContents.getFileTypeString());
+				if (joinHeaderAndData)
+				{
+					if (relevantFileHeader->fileContents.dumpToFile(exportDir + baseFilename + ".b" + filetypeStr))
+					{
+						successes++;
+						std::cout << "[SUCCESS] Exported " << relevantFileHeader->fileContents.getFileTypeString() << "!\n";
+					}
+					else
+					{
+						std::cerr << "[ERROR] Failed to export file!\n";
+					}
+				}
+				else
+				{
+					baseFilename += "_" + filetypeStr;
+					bool eitherFailed = 0;
+					if (relevantFileHeader->fileContents.dumpHeaderToFile(exportDir + baseFilename + "_header.dat"))
+					{
+						std::cout << "[SUCCESS] Exported " << relevantFileHeader->fileContents.getFileTypeString() << " header!\n";
+					}
+					else
+					{
+						std::cerr << "[ERROR] Failed to export file data!\n";
+						eitherFailed = 1;
+					}
+					if (relevantFileHeader->fileContents.dumpDataToFile(exportDir + baseFilename + "_data.dat"))
+					{
+						std::cout << "[SUCCESS] Exported " << relevantFileHeader->fileContents.getFileTypeString() << " data!\n";
+					}
+					else
+					{
+						std::cerr << "[ERROR] Failed to export file data!\n";
+						eitherFailed = 1;
+					}
+					successes += !eitherFailed;
+				}
+				if (relevantFileHeader->fileContents.getFileType() == lava::brawl::brsarHexTags::bht_RWSD)
+				{
+					lava::brawl::rwsd tempRWSD;
+					if (tempRWSD.populate(relevantFileHeader->fileContents))
+					{
+						if (tempRWSD.summarize(exportDir + baseFilename + "_meta.txt"))
+						{
+							std::cerr << "[SUCCESS] Produced RWSD summary!\n";
+						}
+						else
+						{
+							std::cerr << "[ERROR] Unable to produce RWSD summary!\n";
+						}
+					}
+				}
+			}
+			else
+			{
+				std::cerr << "[ERROR] Invalid File ID Specified!\n";
+			}
+		}
+		result = successes == fileIDList.size();
+	}
+	else
+	{
+		std::cerr << "[ERROR] Specified output directory (\"" + exportDir + "\") does not exist!\n";
+	}
+
+	return result;
+}
 
 int main(int argc, char** argv)
 {
 	_globalArgC = argc;
 	_globalArgV = argv;
-
-	parseIDListDocument("idtest.txt");
 
 	srand(time(0));
 	std::cout << "lavaBRSARLibCLI (Library " << lava::brawl::version << ", CLI " << cliVersion << ")\n";
@@ -592,6 +673,57 @@ int main(int argc, char** argv)
 				}
 				return 0;
 			}
+			else if (strcmp("exportFiles", argv[1]) == 0 && argc >= 4)
+			{
+				std::cout << "Operation: Export BRSAR Subfiles\n";
+				bool result = 1;
+				lava::brawl::brsar sourceBrsar;
+				std::string targetBRSARPath = argv[2];
+
+				std::vector<unsigned long> fileIDList = handleLiteralNumvsNumListPathOverload(argv[3]);
+
+				bool folderArgumentProvided = 0;
+				std::string targetFolder = "./";
+				if (argProvided(4))
+				{
+					targetFolder = argv[4];
+					folderArgumentProvided = 1;
+				}
+				bool splitHeaderAndData = 0;
+				if (argProvided(5))
+				{
+					splitHeaderAndData = processBoolArgument(argv[5]);
+					if (splitHeaderAndData)
+					{
+						std::cout << "[C.Arg] Exported files will be split into header and data \".dat\" files.\n";
+					}
+				}
+
+				if (std::filesystem::exists(targetBRSARPath))
+				{
+					if (sourceBrsar.init(targetBRSARPath))
+					{
+						if (exportFiles(sourceBrsar, fileIDList, targetFolder, !splitHeaderAndData))
+						{
+							std::cout << "[SUCCESS] Exported all files to \"" << targetFolder << "\"!\n";
+						}
+						else
+						{
+							std::cerr << "[ERROR] Failed to export all files to \"" << targetFolder << "\"!\n";
+						}
+					}
+					else
+					{
+						std::cerr << "Failed to initialize BRSAR!\n";
+					}
+				}
+				else
+				{
+					std::cerr << "[ERROR] Specified BRSAR (\"" << targetBRSARPath << "\") does not exist.\n";
+					result = 0;
+				}
+				return 0;
+			}
 		}
 		std::cout << "Invalid operation argument set supplied:\n";
 		for (unsigned long i = 0; i < argc; i++)
@@ -601,14 +733,22 @@ int main(int argc, char** argv)
 		std::cout << "Please provide one of the following sets of arguments!\n";
 		// DumpRSAR Info
 		{
-			std::cout << "To dump and summarize the files contained in a brsar file:\n";
-			std::cout << "\tdumpRSAR {BRSAR_PATH} {OUTPUT_DIR, optional} {DO_FILE_SUMMARY_ONLY, optional} {SPLIT_HEADERS_AND_DATA, opt}\n";
+			std::cout << "To dump and summarize all files contained in a brsar file:\n";
+			std::cout << "\tdumpRSAR {BRSAR_PATH} {OUTPUT_DIR, optional} {DO_FILE_SUMMARY_ONLY, opt} {SPLIT_HEADERS_AND_DATA, opt}\n";
 			std::cout << "\tNote: Default OUTPUT_DIRECTORY is \"" << brsarDumpDefaultPath << "{BRSAR_NAME}/\"\n";
 			std::cout << "\tNote: DO_FILE_SUMMARY_ONLY and SPLIT_HEADERS_AND_DATA are boolean arguments, both are set to false by default.\n";
 		}
+		// ExportFiles Info
+		{
+			std::cout << "To dump and summarize specific files contained in a brsar file:\n";
+			std::cout << "\texportFiles {BRSAR_PATH} {FILE_ID} {OUTPUT_DIR, optional} {SPLIT_HEADERS_AND_DATA, opt}, OR\n";
+			std::cout << "\texportFiles {BRSAR_PATH} {FILE_ID_LIST_PATH} {OUTPUT_DIR, opt} {SPLIT_HEADERS_AND_DATA, opt}\n";
+			std::cout << "\tNote: Default OUTPUT_DIRECTORY is \"./\"\n";
+			std::cout << "\tNote: SPLIT_HEADERS_AND_DATA is a boolean argument, and is set to false by default.\n";
+		}
 		// SummarizeRWSDs Info
 		{
-			std::cout << "To summarize the contents of dumped RWSD files:\n";
+			std::cout << "To summarize the contents of already dumped RWSD files:\n";
 			std::cout << "\tsummarizeRWSDs {RWSD_PATHS_LIST_PATH} {OUTPUT_DIRECTORY, optional}\n";
 			std::cout << "\tNote: RWSD paths list file should contain a list of paths to the RWSDs to summarize.\n";
 			std::cout << "\tNote: By default, summaries will be placed in the same folder as their source file, wherever they are.\n";

@@ -1451,6 +1451,17 @@ namespace lava
 
 			return result;
 		}
+		std::string brsarFileFileContents::getFileTypeString() const
+		{
+			std::string result = "";
+
+			if (header.size() >= 0x04)
+			{
+				result = std::string((const char*)header.data(), 4);
+			}
+
+			return result;
+		}
 		bool brsarFileFileContents::dumpToStream(std::ostream& output)
 		{
 			bool result = 0;
@@ -2999,7 +3010,7 @@ namespace lava
 		{
 			bool result = 0;
 
-			if (bytesToFundamental<unsigned long>(fileContentsIn.header.data()) == brsarHexTags::bht_RWSD)
+			if (fileContentsIn.getFileType() == brsarHexTags::bht_RWSD)
 			{
 				byteArray headerArr(fileContentsIn.header.data(), fileContentsIn.header.size());
 				byteArray dataArr(fileContentsIn.data.data(), fileContentsIn.data.size());

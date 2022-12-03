@@ -466,6 +466,7 @@ namespace lava
 
 			unsigned long size() const;
 			unsigned long getFileType() const;
+			std::string getFileTypeString() const;
 			bool dumpToStream(std::ostream& output);
 			bool dumpHeaderToStream(std::ostream& output);
 			bool dumpDataToStream(std::ostream& output);

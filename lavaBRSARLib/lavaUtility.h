@@ -9,6 +9,7 @@
 namespace lava
 {
 	std::string stringToUpper(const std::string& stringIn);
+	std::string stringToLower(const std::string& stringIn);
 	std::string numToHexStringWithPadding(unsigned long numIn, unsigned long paddingLength);
 	std::string numToDecStringWithPadding(unsigned long numIn, unsigned long paddingLength);
 	std::string doubleToStringWithPadding(double dblIn, unsigned long paddingLength, unsigned long precisionIn = 2);

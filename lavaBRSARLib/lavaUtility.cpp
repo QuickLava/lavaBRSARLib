@@ -11,6 +11,15 @@ namespace lava
 		}
 		return result;
 	}
+	std::string stringToLower(const std::string& stringIn)
+	{
+		std::string result = stringIn;
+		for (std::size_t i = 0; i < result.size(); i++)
+		{
+			result[i] = tolower(result[i]);
+		}
+		return result;
+	}
 	std::string numToHexStringWithPadding(unsigned long numIn, unsigned long paddingLength)
 	{
 		std::stringstream convBuff;
