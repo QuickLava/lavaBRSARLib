@@ -2956,8 +2956,17 @@ namespace lava
 				else
 				{
 					unsigned long overflowAmount = currWaveDataEndpoint - specificDataEndAddressIn;
-					length -= overflowAmount;
-					currWave->nibbles -= overflowAmount * 2;
+					if (overflowAmount > length)
+					{
+						length = 0;
+						currWave->hollowOut();
+						std::cerr << "Invalid overflow detected in RWSD Wave Data!\n";
+					}
+					else
+					{
+						length -= overflowAmount;
+						currWave->nibbles -= overflowAmount * 2;
+					}
 				}
 				result &= currWave->packetContents.populate(bodyIn, rawDataAddressIn + currWave->dataLocation, length, paddingLength);
 			}

@@ -1,10 +1,10 @@
 #include "lavaByteArray.h"
 #include "lavaBRSARLib.h"
 
-const std::string targetBrsarName = "revo_kart";
+const std::string targetBrsarName = "smashbros_sound";
 const std::string tempFileDumpBaseFolder = "./Junk/" + targetBrsarName + "/";
 const unsigned long fileOverwriteTestTargetFile = 0x50;
-const unsigned long dspTestTargetFileID = 0x2C0;
+const unsigned long dspTestTargetFileID = 0x275;
 const std::string dspTestFileName = "sawnd000";
 const unsigned long dspTestExportWaveIndex = 0x01;
 const unsigned long dspTestImportWaveIndex = 0x00;
@@ -42,7 +42,7 @@ constexpr bool ENABLE_SPT_TO_DSP_HEADER_TEST = false;
 // Tests summarizing and exporting an RWSD's data.
 constexpr bool ENABLE_RWSD_SUMMARIZE_TEST = false;
 // Tests taking apart and reconstructing every RWSD in the BRSAR.
-constexpr bool ENABLE_RWSD_RECONSTRUCTION_TEST = true;
+constexpr bool ENABLE_RWSD_RECONSTRUCTION_TEST = false; constexpr bool DUMP_BAD_RECONSTRUCTIONS = false;
 // Tests exporting an RWSD Wave Info entry into a DSP.
 constexpr bool ENABLE_WAVE_INFO_TO_DSP_TEST = false;
 // Tests importing a DSP into an RWSD Wave Info entry.
@@ -60,7 +60,7 @@ constexpr bool ENABLE_MULTI_PUSH_RWSD_WAV_ENTRY_TEST = false;
 // Fills all WAVE entries with a given WAV
 constexpr bool ENABLE_FILL_RWSD_WITH_WAV_TEST = false;
 // Fills all WAVE entries with a given WAV
-constexpr bool ENABLE_CUT_DOWN_RWSD_TEST = true;
+constexpr bool ENABLE_CUT_DOWN_RWSD_TEST = false;
 // Tests lossiness of the dsp-to-wav conversion process
 constexpr bool ENABLE_CONV_LOSS_TEST = false;
 // Tests lavaByteArray's Operations for errors.
@@ -196,11 +196,19 @@ int main()
 				lava::brawl::rwsd testRWSD;
 				if (testRWSD.populate(currHeader->fileContents))
 				{
+					lava::brawl::brsarFileFileContents backupFileContents = currHeader->fileContents;
+
 					testBrsar.overwriteFile(testRWSD.fileSectionToVec(), testRWSD.rawDataSectionToVec(), i);
 					std::string newHeaderHash = md5Object((char*)currHeader->fileContents.header.data(), currHeader->fileContents.header.size());
 					if (originalHeaderHash != newHeaderHash)
 					{
+						std::string baseFilename = "bad_" + lava::numToHexStringWithPadding(i, 3);
 						std::cerr << "File ID 0x" << lava::numToHexStringWithPadding(i, 0x03) << ": RWSD parsing error, input and output don't match!\n";
+						if (DUMP_BAD_RECONSTRUCTIONS)
+						{
+							backupFileContents.dumpToFile(baseFilename + "_bak.brwsd");
+							currHeader->fileContents.dumpToFile(baseFilename + ".brwsd");
+						}
 					}
 				}
 			}

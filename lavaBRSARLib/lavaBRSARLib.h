@@ -45,7 +45,7 @@ namespace lava
 			bht_RWSD = 0x52575344,
 			bht_RBNK = 0x52424E4B,
 			bht_RSEQ = 0x52534551,
-			// RWSD Subsections
+			// Subfile Subsections
 			bht_SUBF_DATA = 0x44415441,
 			bht_SUBF_WAVE = 0x57415645,
 			bht_SUBF_RWAR = 0x52574152,
@@ -81,7 +81,7 @@ namespace lava
 		unsigned long validateHexTag(unsigned long tagIn);
 		bool detectHexTags(const byteArray& bodyIn, unsigned long startingAddress = 0x00);
 		bool adjustOffset(unsigned long relativeBaseOffset, unsigned long& offsetIn, signed long adjustmentAmount, unsigned long startingAddress);
-		int padLengthTo(unsigned long lengthIn, unsigned long padTo, bool allowZeroPaddingLength = 0);
+		int padLengthTo(unsigned long lengthIn, unsigned long padTo, bool allowZeroPaddingLength = 1);
 
 		/* Misc. */
 
@@ -745,7 +745,6 @@ namespace lava
 
 
 			// Edit Funcs
-
 			bool overwriteDataWSDInfo(unsigned long dataSectionIndex, const dataInfo& dataInfoIn);
 			bool overwriteDataTrackInfo(unsigned long dataSectionIndex, const dataInfo& dataInfoIn);
 			bool overwriteDataNoteInfo(unsigned long dataSectionIndex, const dataInfo& dataInfoIn);
