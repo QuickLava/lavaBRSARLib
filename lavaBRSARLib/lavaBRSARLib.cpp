@@ -1462,6 +1462,30 @@ namespace lava
 
 			return result;
 		}
+		bool brsarFileFileContents::populateFromFile(std::string filePathIn)
+		{
+			bool result = 0;
+
+			if (std::filesystem::exists(filePathIn))
+			{
+				lava::byteArray body(filePathIn);
+				if (body.populated() && body.size() > 0x0C)
+				{
+					if (lava::brawl::validateHexTag(body.getLong(0x00)) == lava::brawl::brsarHexTagType::bhtt_FILE_SECTION)
+					{
+						unsigned long lengthIn = body.getLong(0x08);
+						if (lengthIn <= body.size())
+						{
+							header = body.getBytes(lengthIn, 0x00);
+							data = body.getBytes(SIZE_MAX, lengthIn);
+							result = 1;
+						}
+					}
+				}
+			}
+
+			return result;
+		}
 		bool brsarFileFileContents::dumpToStream(std::ostream& output)
 		{
 			bool result = 0;
