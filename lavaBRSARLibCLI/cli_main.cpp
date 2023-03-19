@@ -3,7 +3,7 @@
 #include "../lavaBRSARLib/lavaUtility.h"
 
 // CLI Constants
-const std::string cliVersion = "v0.2.0";
+const std::string cliVersion = "v0.2.2";
 
 // Default Argument Constants
 const std::string brsarDumpDefaultPath = "./Dump/";
@@ -390,6 +390,56 @@ bool exportFiles(lava::brawl::brsar& targetBRSAR, std::vector<unsigned long> fil
 
 	return result;
 }
+bool importFiles(lava::brawl::brsar& targetBRSAR, std::vector<std::pair<unsigned long, std::string>> fileIDsToFilePaths)
+{
+	bool result = 1;
+
+	for (int i = 0; i < fileIDsToFilePaths.size(); i++)
+	{
+		std::pair<unsigned long, std::string>* currPair = &fileIDsToFilePaths[i];
+
+		std::cout << "Importing \"" << currPair->second << "\" over File ID 0x" << lava::numToHexStringWithPadding(currPair->first, 0x03) << "...\n";
+
+		lava::brawl::brsarInfoFileHeader* targetFileHeader = targetBRSAR.infoSection.getFileHeaderPointer(currPair->first);
+		if (targetFileHeader != nullptr)
+		{
+			if (std::filesystem::exists(currPair->second))
+			{
+				lava::brawl::brsarFileFileContents importContents;
+				if (importContents.populateFromFile(currPair->second))
+				{
+					if (targetBRSAR.overwriteFile(importContents.header, importContents.data, currPair->first))
+					{
+						std::cout << "[SUCCESS] Overwrote file in BRSAR!\n";
+						result &= 1;
+					}
+					else
+					{
+						std::cerr << "[ERROR] Failed to overwrite file in BRSAR!\n";
+						result = 0;
+					}
+				}
+				else
+				{
+					std::cerr << "[ERROR] Unable to parse specified file!\n";
+					result = 0;
+				}
+			}
+			else
+			{
+				std::cerr << "[ERROR] Specified file path is invalid!\n";
+				result = 0;
+			}
+		}
+		else
+		{
+			std::cerr << "[ERROR] Invalid File ID Specified!\n";
+			result = 0;
+		}
+	}
+
+	return result;
+}
 
 int main(int argc, char** argv)
 {
@@ -725,6 +775,55 @@ int main(int argc, char** argv)
 				}
 				return 0;
 			}
+			else if (strcmp("importFile", argv[1]) == 0 && argc >= 4)
+			{
+				std::cout << "Operation: Import BRSAR Subfile\n";
+				bool result = 1;
+				lava::brawl::brsar sourceBrsar;
+				std::string targetBRSARPath = argv[2];
+
+				unsigned long fileID = stringToNum(argv[3], 0, ULONG_MAX);
+
+				std::string targetFile = "";
+				if (argProvided(4))
+				{
+					targetFile = argv[4];
+				}
+
+				if (std::filesystem::exists(targetBRSARPath))
+				{
+					if (sourceBrsar.init(targetBRSARPath))
+					{
+						if (importFiles(sourceBrsar, { {fileID, targetFile} }))
+						{
+							std::cout << "[SUCCESS] Imported all files!\n";
+							std::string exportPath = suffixFilename(targetBRSARPath, "_edit");
+							if (sourceBrsar.exportContents(exportPath))
+							{
+								std::cout << "[SUCCESS] Exported modified BRSAR to \"" << exportPath << "\"!\n";
+							}
+							else
+							{
+								std::cerr << "[ERROR] Failed to export modified BRSAR to \"" << exportPath << "\"!\n";
+							}
+						}
+						else
+						{
+							std::cerr << "[ERROR] Failed to import all files!\n";
+						}
+					}
+					else
+					{
+						std::cerr << "Failed to initialize BRSAR!\n";
+					}
+				}
+				else
+				{
+					std::cerr << "[ERROR] Specified BRSAR (\"" << targetBRSARPath << "\") does not exist.\n";
+					result = 0;
+				}
+				return 0;
+			}
 		}
 		std::cout << "Invalid operation argument set supplied:\n";
 		for (unsigned long i = 0; i < argc; i++)
@@ -746,6 +845,11 @@ int main(int argc, char** argv)
 			std::cout << "\texportFiles {BRSAR_PATH} {FILE_ID_LIST_PATH} {OUTPUT_DIR, opt} {SPLIT_HEADERS_AND_DATA, opt}\n";
 			std::cout << "\tNote: Default OUTPUT_DIRECTORY is \"./\"\n";
 			std::cout << "\tNote: SPLIT_HEADERS_AND_DATA is a boolean argument, and is set to false by default.\n";
+		}
+		// ImportFile Info
+		{
+			std::cout << "To import a specific brsar subfile to a brsar file:\n";
+			std::cout << "\timportFile {BRSAR_PATH} {FILE_ID} {FILE_PATH}\n";
 		}
 		// SummarizeRWSDs Info
 		{
@@ -772,8 +876,8 @@ int main(int argc, char** argv)
 			std::cout << "\t  This is a boolean argument, default vaule is true.\n";
 		}
 
-		std::cout << "\tNote: In any command, FILE_ID_LIST_PATH should point to a file which lists the IDs of every file to be affected.\n";
-		std::cout << "Note: To explicitly use one of the above defaults, specify \"" << nullArgumentString << "\" for that argument.\n";
+		std::cout << "Note: In any command, FILE_ID_LIST_PATH should point to a file which lists the IDs of every file to be affected.\n";
+		std::cout << "Note: To explicitly use any of the above defaults, specify \"" << nullArgumentString << "\" for that argument.\n";
 	}
 	catch (std::exception e)
 	{
