@@ -3270,7 +3270,7 @@ namespace lava
 				{
 					dataInfo* currDataEntry = &(*dataVecPtr)[u];
 					output << "\tData Entry 0x" << lava::numToHexStringWithPadding(u, 0x04) << "\n";
-					output << "\t\tOffset / Address:\t0x" << lava::numToHexStringWithPadding(dataRefVecPtr->refs[u].address, 0x08) << " / 0x" << lava::numToHexStringWithPadding(getDATASectionOffset() + dataRefVecPtr->refs[u].address, 0x08) << "\n";
+					output << "\t\tOffset / Address:\t0x" << lava::numToHexStringWithPadding(dataRefVecPtr->refs[u].address, 0x08) << " / 0x" << lava::numToHexStringWithPadding(getDATASectionOffset() + 0x08 + dataRefVecPtr->refs[u].address, 0x08) << "\n";
 					output << "\t\tAssociated Wave ID:\t0x" << lava::numToHexStringWithPadding(currDataEntry->ntWaveIndex, 0x04) << "\n";
 					if (currDataEntry->ntWaveIndex != ULONG_MAX)
 					{
