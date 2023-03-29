@@ -3,7 +3,7 @@
 #include "../lavaBRSARLib/lavaUtility.h"
 
 // CLI Constants
-const std::string cliVersion = "v0.2.2";
+const std::string cliVersion = "v0.2.3";
 
 // Default Argument Constants
 const std::string brsarDumpDefaultPath = "./Dump/";
